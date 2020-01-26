@@ -1,0 +1,613 @@
+#!/usr/bin/python
+
+# Automotive configuration file scripts
+# Copyright (C) 2015-2020  Dr. Lars Voelker
+# Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
+# Copyright (C) 2020-2020  Dr. Lars Voelker, Technica Engineering GmbH
+
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+import sys
+import time
+import os.path
+
+from configuration_base_classes import *  # @UnusedWildImport
+
+from fibex_parser import FibexParser
+
+
+class SimpleConfigurationFactory(BaseConfigurationFactory):
+
+    def __init__(self):
+        self.__services__ = dict()
+        self.__services_long__ = dict()
+        self.__ecus__ = dict()
+
+    def create_ecu(self, name, controllers):
+        ret = ECU(name, controllers)
+        assert (name not in self.__ecus__)
+        self.__ecus__[name] = ret
+        return ret
+
+    def create_controller(self, name, vlans):
+        ret = Controller(name, vlans)
+        return ret
+
+    def create_interface(self, name, vlanid, sockets):
+        ret = Interface(name, vlanid, sockets)
+        return ret
+
+    def create_socket(self, name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
+                      eventgroupreceivers):
+        ret = Socket(name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
+                     eventgroupreceivers)
+        return ret
+
+    def create_someip_service_instance(self, service, instanceid, protover):
+        ret = SOMEIPServiceInstance(service, instanceid, protover)
+        return ret
+
+    def create_someip_service_instance_client(self, service, instanceid, protover, server):
+        ret = SOMEIPServiceInstanceClient(service, instanceid, protover, server)
+        return ret
+
+    def create_someip_service_eventgroup_sender(self, serviceinstance, eventgroupid):
+        ret = SOMEIPServiceEventgroupSender(serviceinstance, eventgroupid)
+        return ret
+
+    def create_someip_service_eventgroup_receiver(self, serviceinstance, eventgroupid, sender):
+        ret = SOMEIPServiceEventgroupReceiver(serviceinstance, eventgroupid, sender)
+        return ret
+
+    def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
+        ret = SOMEIPService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
+        print(f"Adding Service(ID: 0x{serviceid:04x} Ver: {majorver:d}.{minorver:d})")
+        self.add_service(serviceid, majorver, minorver, ret)
+        return ret
+
+    def create_someip_service_method(self, name, methodid, calltype, relia, inparams, outparams,
+                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1):
+        ret = SOMEIPServiceMethod(name, methodid, calltype, relia, inparams, outparams,
+                                  reqdebounce, reqmaxretention, resmaxretention)
+        return ret
+
+    def create_someip_service_event(self, name, methodid, relia, params,
+                                    debounce=-1, maxretention=-1):
+        ret = SOMEIPServiceEvent(name, methodid, relia, params,
+                                 debounce, maxretention)
+        return ret
+
+    def create_someip_service_field(self, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
+                                    params,
+                                    getter_debouncereq, getter_retentionreq, getter_retentionres,
+                                    setter_debouncereq, setter_retentionreq, setter_retentionres,
+                                    notifier_debounce, notifier_retention):
+        ret = SOMEIPServiceField(self, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
+                                 params,
+                                 getter_debouncereq, getter_retentionreq, getter_retentionres,
+                                 setter_debouncereq, setter_retentionreq, setter_retentionres,
+                                 notifier_debounce, notifier_retention)
+        return ret
+
+    def create_someip_service_eventgroup(self, name, eid, eventids, fieldids):
+        ret = SOMEIPServiceEventgroup(name, eid, eventids, fieldids)
+        return ret
+
+    def create_someip_parameter(self, position, name, desc, mandatory, datatype):
+        ret = SOMEIPParameter(position, name, desc, mandatory, datatype)
+        return ret
+
+    def create_someip_parameter_basetype(self, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
+        ret = SOMEIPParameterBasetype(name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type)
+        return ret
+
+    def create_someip_parameter_string(self, name, chartype, bigendian, lowerlimit, upperlimit, termination,
+                                       length_of_length, pad_to):
+        ret = SOMEIPParameterString(name, chartype, bigendian, lowerlimit, upperlimit, termination, length_of_length,
+                                    pad_to)
+        return ret
+
+    def create_someip_parameter_array(self, name, dims, child):
+        ret = SOMEIPParameterArray(name, dims, child)
+        return ret
+
+    def create_someip_parameter_array_dim(self, dim, lowerlimit, upperlimit, length_of_length, pad_to):
+        ret = SOMEIPParameterArrayDim(dim, lowerlimit, upperlimit, length_of_length, pad_to)
+        return ret
+
+    def create_someip_parameter_struct(self, name, length_of_length, pad_to, members):
+        ret = SOMEIPParameterStruct(name, length_of_length, pad_to, members)
+        return ret
+
+    def create_someip_parameter_struct_member(self, position, name, mandatory, child):
+        ret = SOMEIPParameterStructMember(position, name, mandatory, child)
+        return ret
+
+    def create_someip_parameter_typedef(self, name, name2, child):
+        ret = SOMEIPParameterTypedef(name, name2, child)
+        return ret
+
+    def create_someip_parameter_enumeration(self, name, items, child):
+        ret = SOMEIPParameterEnumeration(name, items, child)
+        return ret
+
+    def create_someip_parameter_enumeration_item(self, value, name, desc):
+        ret = SOMEIPParameterEnumerationItem(value, name, desc)
+        return ret
+
+    def create_someip_parameter_union(self, name, length_of_length, length_of_type, pad_to, members):
+        ret = SOMEIPParameterUnion(name, length_of_length, length_of_type, pad_to, members)
+        return ret
+
+    def create_someip_parameter_union_member(self, index, name, mandatory, child):
+        ret = SOMEIPParameterUnionMember(index, name, mandatory, child)
+        return ret
+
+    def add_service(self, serviceid, majorver, minorver, service):
+        sid = f"{serviceid:04x}-{majorver:02x}-{minorver:08x}"
+        if sid in self.__services_long__:
+            print(
+                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, " +
+                f"Minor-Ver: {minorver:d}) already exists! Not overriding it!"
+            )
+            return False
+        self.__services_long__[sid] = service
+
+        sid = f"{serviceid:04x}-{majorver:02x}"
+        if sid in self.__services__:
+            print(
+                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d})" +
+                f"already exists with a different Minor Version (not {minorver:d})! Not overriding it!"
+            )
+            return False
+        self.__services__[sid] = service
+        return True
+
+    def get_service(self, serviceid, majorver, minorver=None):
+        if minorver is None:
+            sid = f"{serviceid:04x}-{majorver:02x}"
+            if sid in self.__services__:
+                return self.__services__[sid]
+            else:
+                return None
+        else:
+            sid = f"{serviceid:04x}-{majorver:02x}-{minorver:08x}"
+            if sid in self.__services_long__:
+                return self.__services_long__[sid]
+            else:
+                return None
+
+    def __str__(self):
+        ret = "Services: \n"
+        for serviceid in sorted(self.__services__):
+            ret += self.__services__[serviceid].str(2)
+
+        ret += "\nECUs: \n"
+        for name in sorted(self.__ecus__):
+            ret += self.__ecus__[name].str(2)
+
+        return ret
+
+
+class ECU(BaseECU):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"ECU {self.__name__}\n"
+
+        for c in self.__controllers__:
+            ret += c.str(indent + 2)
+
+        return ret
+
+
+class Controller(BaseController):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"CTRL {self.__name__}\n"
+        for i in self.__interfaces__:
+            ret += i.str(indent + 2)
+
+        return ret
+
+
+class Interface(BaseInterface):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Interface {self.__vlanname__} (VLAN-ID: 0x{self.__vlanid__:x})\n"
+        for s in self.__sockets__:
+            ret += s.str(indent + 2)
+        return ret
+
+
+class Socket(BaseSocket):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Socket {self.__name__} {self.__ip__}:{self.__portnumber__}/{self.__proto__}\n"
+        for i in self.__instances__:
+            ret += i.str(indent + 2)
+        for i in self.__instanceclients__:
+            ret += i.str(indent + 2)
+        for c in self.__ehs__:
+            ret += c.str(indent + 2)
+        for c in self.__cegs__:
+            ret += c.str(indent + 2)
+        return ret
+
+
+class SOMEIPServiceInstance(SOMEIPBaseServiceInstance):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"ServiceInstance Service-ID: 0x{self.__service__.serviceid():04x} "
+        ret += f"Version: {self.__service__.versionstring()} "
+        ret += f"Instance-ID: 0x{self.__instanceid__:04x} "
+        ret += f"Protover: {self.__protover__:d}\n"
+        return ret
+
+
+class SOMEIPServiceInstanceClient(SOMEIPBaseServiceInstanceClient):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"ServiceInstanceClient Service-ID: 0x{self.__service__.serviceid():04x} "
+        ret += f"Version: {self.__service__.versionstring()} "
+        ret += f"Instance-ID: 0x{self.__instanceid__:04x} "
+        ret += f"Protover: {self.__protover__:d}\n"
+        return ret
+
+
+class SOMEIPServiceEventgroupSender(SOMEIPBaseServiceEventgroupSender):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"EventgroupSender: Service-ID: 0x{self.__si__.service().serviceid():04x} "
+        ret += f"Instance-ID: 0x{self.__si__.instanceid():04x} "
+        ret += f"Eventgroup-ID: 0x{self.__eventgroupid__:04x}\n"
+        return ret
+
+
+class SOMEIPServiceEventgroupReceiver(SOMEIPBaseServiceEventgroupReceiver):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"EventgroupReceiver: Service-ID: 0x{self.__si__.service().serviceid():04x} "
+        ret += f"Instance-ID: 0x{self.__si__.instanceid():04x} "
+        ret += f"Eventgroup-ID: 0x{self.__eventgroupid__:04x}\n"
+        return ret
+
+
+class SOMEIPService(SOMEIPBaseService):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Service {self.__name__} (id: 0x{self.__serviceid__:04x} ver: {self.__major__:d}.{self.__minor__:d})\n"
+
+        for methodid in sorted(self.__methods__):
+            ret += self.__methods__[methodid].str(indent + 2)
+
+        for eventsid in sorted(self.__events__):
+            ret += self.__events__[eventsid].str(indent + 2)
+
+        for fieldid in sorted(self.__fields__, key=lambda x: (x is None, x)):
+            ret += self.__fields__[fieldid].str(indent + 2)
+
+        for egid in sorted(self.__eventgroups__):
+            ret += self.__eventgroups__[egid].str(indent + 2)
+
+        return ret
+
+
+class SOMEIPServiceMethod(SOMEIPBaseServiceMethod):
+    def str(self, indent):
+        extra = ""
+        if self.__reqdebouncetime__ >= 0:
+            extra += f" debounce:{str(self.__reqdebouncetime__)}s"
+        if self.__reqretentiontime___ >= 0:
+            extra += f" max_request_retention:{str(self.__reqretentiontime___)}s"
+        if self.__resretentiontime___ >= 0:
+            extra += f" max_response_retention:{str(self.__resretentiontime___)}s"
+
+        ret = indent * " "
+        ret += f"Method {self.__name__} (id:0x{self.__methodid__:04x} type:{self.__calltype__} " + \
+               f"reli:{self.__reliable__}{extra})\n"
+
+        ret += (indent + 2) * " "
+        ret += "In Parameters: \n"
+        for param in self.__inparams__:
+            ret += param.str(indent + 4)
+
+        ret += (indent + 2) * " "
+        ret += "Out Parameters: \n"
+        for param in self.__outparams__:
+            ret += param.str(indent + 4)
+
+        return ret
+
+
+class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
+    def str(self, indent):
+        extra = ""
+        if self.__debouncetime__ >= 0:
+            extra += f" debounce:{str(self.__debouncetime__)}s"
+        if self.__retentiontime___ >= 0:
+            extra += f" max_retention:{str(self.__retentiontime___)}s"
+
+        ret = indent * " "
+        ret += f"Event {self.__name__} (id:0x{self.__methodid__:04x} reli:{self.__reliable__}{extra})\n"
+
+        for param in self.__params__:
+            ret += param.str(indent + 2)
+
+        return ret
+
+
+class SOMEIPServiceField(SOMEIPBaseServiceField):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Field {self.__name__}\n"
+
+        indent += 2
+        if self.__getter__ is not None:
+            extra = ""
+            if self.__getter__.debounce_time_req() >= 0:
+                extra += f" debounce:{str(self.__getter__.debounce_time_req())}s"
+            if self.__getter__.max_buffer_retention_time_req() >= 0:
+                extra += f" max_request_retention:{str(self.__getter__.max_buffer_retention_time_req())}s"
+            if self.__getter__.max_buffer_retention_time_res() >= 0:
+                extra += f" max_response_retention:{str(self.__getter__.max_buffer_retention_time_res())}s"
+
+            ret += indent * " "
+            ret += f"Getter(id:0x{self.__getter__.methodid():04x} reli:{self.__getter__.reliable()}{extra})\n"
+
+        if self.__setter__ is not None:
+            extra = ""
+            if self.__setter__.debounce_time_req() >= 0:
+                extra += f" debounce:{str(self.__setter__.debounce_time_req())}s"
+            if self.__setter__.max_buffer_retention_time_req() >= 0:
+                extra += f" max_request_retention:{str(self.__setter__.max_buffer_retention_time_req())}s"
+            if self.__setter__.max_buffer_retention_time_res() >= 0:
+                extra += f" max_response_retention:{str(self.__setter__.max_buffer_retention_time_res())}s"
+
+            ret += indent * " "
+            ret += f"Setter(id:0x{self.__setter__.methodid():04x} reli:{self.__setter__.reliable()}{extra})\n"
+
+        if self.__notifier__ is not None:
+            extra = ""
+            if self.__notifier__.__debouncetime__ >= 0:
+                extra += f" debounce:{str(self.__notifier__.debounce_time())}s"
+            if self.__notifier__.__retentiontime___ >= 0:
+                extra += f" max_retention:{str(self.__notifier__.max_buffer_retention_time())}s"
+            ret += indent * " "
+            ret += f"Notifier(id:0x{self.__notifier__.methodid():04x} reli:{self.__notifier__.reliable()}{extra})\n"
+
+        ret += indent * " "
+        ret += "Parameters:\n"
+        for param in self.__params__:
+            ret += param.str(indent + 2)
+
+        return ret
+
+
+class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Eventgroup {self.__name__} (id: 0x{self.__id__:04x})\n"
+
+        if len(self.__eventids__) > 0:
+            ret += (2 + indent) * " "
+            ret += "Events: "
+            first = True
+            for eid in self.__eventids__:
+                if not first:
+                    ret += ", "
+                else:
+                    first = False
+                ret += f"0x{eid:04x}"
+            ret += "\n"
+
+        if len(self.__fieldids__) > 0:
+            ret += (2 + indent) * " "
+            ret += "Notifiers: "
+            first = True
+            for fid in self.__fieldids__:
+                if not first:
+                    ret += ", "
+                else:
+                    first = False
+                ret += f"0x{fid:04x}"
+            ret += "\n"
+
+        return ret
+
+
+class SOMEIPParameter(SOMEIPBaseParameter):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Parameter {self.__position__:d} {self.__name__} (mandatory: {self.__mandatory__})\n"
+        if self.__datatype__ is None:
+            ret += f"{(indent + 2) * ' '}None\n"
+        else:
+            ret += self.__datatype__.str(indent + 2)
+
+        return ret
+
+
+class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
+    def str(self, indent):
+        endian = "BE"
+        if not self.__bigendian__:
+            endian = "LE"
+
+        ret = indent * " "
+        ret += f"{self.__name__} {self.__datatype__} {endian} ({self.__bitlength_basetype__:d};" + \
+               f"{self.__bitlength_encoded_type__:d})\n"
+        return ret
+
+
+class SOMEIPParameterString(SOMEIPBaseParameterString):
+    def str(self, indent):
+        endian = "BE"
+        if not self.__bigendian__:
+            endian = "LE"
+
+        ret = indent * " "
+        ret += f"String {self.__name__} {self.__chartype__} {endian} ({self.__lowerlimit__:d};" + \
+               f"{self.__upperlimit__:d}) term: {self.__termination__} " + \
+               f"len: {self.__lengthOfLength__:d} pad: {self.__padTo__:d}\n"
+        return ret
+
+
+class SOMEIPParameterArray(SOMEIPBaseParameterArray):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Array {self.__name__}:\n"
+        for dim in self.__dims__:
+            ret += self.__dims__[dim].str(indent + 2)
+        if self.__child__ is None:
+            ret += f"{(indent + 2) * ' '}None\n"
+        else:
+            ret += self.__child__.str(indent + 2)
+
+        return ret
+
+
+class SOMEIPParameterArrayDim(SOMEIPBaseParameterArrayDim):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Dimension {self.__dim__:d} [{self.__lowerlimit__:d}-{self.__upperlimit__:d}] " + \
+               f"lengthOfLength: {self.__lengthOfLength__:d} padding: {self.__padTo__:d}\n"
+        return ret
+
+
+class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Struct {self.__name__}:\n"
+        if self.__members__ is not None:
+            for m in sorted(self.__members__.keys()):
+                member = self.__members__[m]
+                if member is not None:
+                    ret += member.str(indent + 2)
+                else:
+                    print("ERROR: struct member == None!")
+
+        return ret
+
+
+class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"{self.__position__:d} {self.__name__} (mandatory: {self.__mandatory__})\n"
+
+        if self.__child__ is not None:
+            ret += self.__child__.str(indent + 2)
+
+        return ret
+
+
+class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Typedef: {self.__name__} {self.__name2__}\n"
+        if self.__child__ is not None:
+            ret += self.__child__.str(indent + 2)
+        return ret
+
+
+class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Enumeration {self.__name__}\n"
+        ret += self.__child__.str(indent + 2)
+        for i in self.__items__:
+            i.str(indent + 2)
+        return ret
+
+
+class SOMEIPParameterEnumerationItem(SOMEIPBaseParameterEnumerationItem):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"{self.__value__}: {self.__name__}"
+        return ret
+
+
+class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Union {self.__name__}:\n"
+        if self.__members__ is not None:
+            for m in sorted(self.__members__.keys()):
+                member = self.__members__[m]
+                if member is not None:
+                    ret += member.str(indent + 2)
+                else:
+                    print("ERROR: union member == None!")
+
+        return ret
+
+
+class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
+    def str(self, indent):
+        ret = indent * " "
+
+        ret += f"{self.__index__:d} {self.__name__} (mandatory: {self.__mandatory__})\n"
+
+        if self.__child__ is not None:
+            ret += self.__child__.str(indent + 2)
+
+        return ret
+
+
+################################################################################
+# just a simple main for testing the code of this file ...
+#
+
+def help_and_exit():
+    print("illegal arguments!")
+    print(f"  {sys.argv[0]} type filename")
+    print(f"  example: {sys.argv[0]} FIBEX test.xml")
+    sys.exit(-1)
+
+
+def main():
+    print("Converting configuration to text")
+
+    if len(sys.argv) != 3:
+        help_and_exit()
+
+    (t, filename) = sys.argv[1:]
+
+    (path, f) = os.path.split(filename)
+    filenoext = '.'.join(f.split('.')[:-1])
+    target_dir = os.path.join(path, filenoext, "text")
+
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+        time.sleep(0.5)
+
+    conf_factory = SimpleConfigurationFactory()
+
+    if t.upper() == "FIBEX":
+        fb = FibexParser()
+        fb.parse_file(conf_factory, filename)
+    else:
+        help_and_exit()
+
+    textfile = os.path.join(target_dir, filenoext + ".txt")
+
+    f = open(textfile, "w")
+    f.write("%s" % conf_factory)
+    f.close()
+    print("Done.")
+
+
+# only call main, if we are started directly
+if __name__ == "__main__":
+    main()
