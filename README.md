@@ -28,7 +28,7 @@ Important:
 ## Convert a FIBEX4 file to CSV reports:
 Just call it like this:
 
-    python3 configuration_to_repots.py FIBEX example-file.xml
+    python3 configuration_to_reports.py FIBEX example-file.xml
 
 The result will be:
 
