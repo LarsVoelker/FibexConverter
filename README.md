@@ -15,7 +15,7 @@ Just call it like this:
     
     python3 configuration_to_wireshark.py FIBEX example-file.xml
 
-The result (hosts, vlanids, SOMEIP_*) will be in:
+The results (hosts, vlanids, SOMEIP...) will be in:
     
     example-file/wireshark/
 
@@ -24,3 +24,12 @@ Copy the result files to your wireshark configuration directory (e.g. ~/.config/
 Important:
 * SOME/IP support was added to Wireshark 3.2, you need a custom plugin before.
 * Wireshark loads the config on start. So you better stop Wireshark while copying the configs in.
+
+## Convert a FIBEX4 file to CSV reports:
+Just call it like this:
+
+    python3 configuration_to_repots.py FIBEX example-file.xml
+
+The result will be:
+
+    example-file/reports/
