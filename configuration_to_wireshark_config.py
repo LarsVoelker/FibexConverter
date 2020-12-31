@@ -596,8 +596,8 @@ class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
         for i in self.items():
             ret += "\"%08x\",\"%s\",\"%d\",\"%08x\",\"%d\",\"%x\",\"%s\"\n" % (self.globalid(),
                                                                                self.name(),
-                                                                               self.paramtype(),
-                                                                               self.globalid(),
+                                                                               self.child().paramtype(),
+                                                                               self.child().globalid(),
                                                                                len(self.items()),
                                                                                i.value(),
                                                                                i.name())
