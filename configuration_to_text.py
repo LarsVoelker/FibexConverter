@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2020  Dr. Lars Voelker
+# Copyright (C) 2015-2021  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
-# Copyright (C) 2020-2020  Dr. Lars Voelker, Technica Engineering GmbH
+# Copyright (C) 2020-2021  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -105,8 +105,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPServiceEventgroup(name, eid, eventids, fieldids)
         return ret
 
-    def create_someip_parameter(self, position, name, desc, mandatory, datatype):
-        ret = SOMEIPParameter(position, name, desc, mandatory, datatype)
+    def create_someip_parameter(self, position, name, desc, mandatory, datatype, signal):
+        ret = SOMEIPParameter(position, name, desc, mandatory, datatype, signal)
         return ret
 
     def create_someip_parameter_basetype(self, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
@@ -131,8 +131,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterStruct(name, length_of_length, pad_to, members)
         return ret
 
-    def create_someip_parameter_struct_member(self, position, name, mandatory, child):
-        ret = SOMEIPParameterStructMember(position, name, mandatory, child)
+    def create_someip_parameter_struct_member(self, position, name, mandatory, child, signal):
+        ret = SOMEIPParameterStructMember(position, name, mandatory, child, signal)
         return ret
 
     def create_someip_parameter_typedef(self, name, name2, child):
@@ -153,6 +153,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def create_someip_parameter_union_member(self, index, name, mandatory, child):
         ret = SOMEIPParameterUnionMember(index, name, mandatory, child)
+        return ret
+
+    def create_legacy_signal(self, id, name, compu_scale, compu_consts):
+        ret = SOMEIPLegacySignal(id, name, compu_scale, compu_consts)
         return ret
 
     def add_service(self, serviceid, majorver, minorver, service):
@@ -340,7 +344,10 @@ class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
             extra += f" max_retention:{str(self.__retentiontime___)}s"
 
         ret = indent * " "
-        ret += f"Event {self.__name__} (id:0x{self.__methodid__:04x} reli:{self.__reliable__}{extra})\n"
+        if self.legacy():
+            ret += f"Event {self.__name__} (id:0x{self.__methodid__:04x} reli:{self.__reliable__}{extra}, Legacy PDU)\n"
+        else:
+            ret += f"Event {self.__name__} (id:0x{self.__methodid__:04x} reli:{self.__reliable__}{extra})\n"
 
         for param in self.__params__:
             ret += param.str(indent + 2)
@@ -350,6 +357,10 @@ class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
 
 class SOMEIPServiceField(SOMEIPBaseServiceField):
     def str(self, indent):
+        legacy = ""
+        if self.legacy():
+            legacy = ", Legacy PDU"
+
         ret = indent * " "
         ret += f"Field {self.__name__}\n"
 
@@ -364,7 +375,7 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
                 extra += f" max_response_retention:{str(self.__getter__.max_buffer_retention_time_res())}s"
 
             ret += indent * " "
-            ret += f"Getter(id:0x{self.__getter__.methodid():04x} reli:{self.__getter__.reliable()}{extra})\n"
+            ret += f"Getter(id:0x{self.__getter__.methodid():04x} reli:{self.__getter__.reliable()}{extra}{legacy})\n"
 
         if self.__setter__ is not None:
             extra = ""
@@ -376,7 +387,7 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
                 extra += f" max_response_retention:{str(self.__setter__.max_buffer_retention_time_res())}s"
 
             ret += indent * " "
-            ret += f"Setter(id:0x{self.__setter__.methodid():04x} reli:{self.__setter__.reliable()}{extra})\n"
+            ret += f"Setter(id:0x{self.__setter__.methodid():04x} reli:{self.__setter__.reliable()}{extra}{legacy})\n"
 
         if self.__notifier__ is not None:
             extra = ""
@@ -385,7 +396,8 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
             if self.__notifier__.__retentiontime___ >= 0:
                 extra += f" max_retention:{str(self.__notifier__.max_buffer_retention_time())}s"
             ret += indent * " "
-            ret += f"Notifier(id:0x{self.__notifier__.methodid():04x} reli:{self.__notifier__.reliable()}{extra})\n"
+            ret += f"Notifier(id:0x{self.__notifier__.methodid():04x} reli:{self.__notifier__.reliable()}{extra}" \
+                   f"{legacy})\n"
 
         ret += indent * " "
         ret += "Parameters:\n"
@@ -435,7 +447,8 @@ class SOMEIPParameter(SOMEIPBaseParameter):
             ret += f"{(indent + 2) * ' '}None\n"
         else:
             ret += self.__datatype__.str(indent + 2)
-
+        if self.__signal__ is not None:
+            ret += self.__signal__.str(indent + 2)
         return ret
 
 
@@ -508,6 +521,8 @@ class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
 
         if self.__child__ is not None:
             ret += self.__child__.str(indent + 2)
+        if self.__signal__ is not None:
+            ret += self.__signal__.str(indent + 2)
 
         return ret
 
@@ -563,6 +578,25 @@ class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
             ret += self.__child__.str(indent + 2)
 
         return ret
+
+
+class SOMEIPLegacySignal(SOMEIPBaseLegacySignal):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Signal {self.__name__}"
+        if self.__compu_scale__ is not None and len(self.__compu_scale__) == 3:
+            ret += f", f(x) = {self.__compu_scale__[0]} + {self.__compu_scale__[1]}/{self.__compu_scale__[2]} * x"
+        if self.__compu_consts__ is not None and len(self.__compu_consts__) > 0:
+            ret += f", Consts: "
+            first = True
+            for name, start, end in self.__compu_consts__:
+                if not first:
+                    first = True
+                else:
+                    ret += ", "
+                ret += f"{name} ({start}-{end})"
+            ret += f" "
+        return ret + "\n"
 
 
 ################################################################################

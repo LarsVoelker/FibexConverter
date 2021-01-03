@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2020  Dr. Lars Voelker
+# Copyright (C) 2015-2021  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
-# Copyright (C) 2020-2020  Dr. Lars Voelker, Technica Engineering GmbH
+# Copyright (C) 2020-2021  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -107,8 +107,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPServiceEventgroup(name, eid, eventids, fieldids)
         return ret
 
-    def create_someip_parameter(self, position, name, desc, mandatory, datatype):
-        ret = SOMEIPParameter(position, name, desc, mandatory, datatype)
+    def create_someip_parameter(self, position, name, desc, mandatory, datatype, signal):
+        ret = SOMEIPParameter(position, name, desc, mandatory, datatype, signal)
         return ret
 
     def create_someip_parameter_basetype(self, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
@@ -133,8 +133,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterStruct(name, length_of_length, pad_to, members)
         return ret
 
-    def create_someip_parameter_struct_member(self, position, name, mandatory, child):
-        ret = SOMEIPParameterStructMember(position, name, mandatory, child)
+    def create_someip_parameter_struct_member(self, position, name, mandatory, child, signal):
+        ret = SOMEIPParameterStructMember(position, name, mandatory, child, signal)
         return ret
 
     def create_someip_parameter_typedef(self, name, name2, child):

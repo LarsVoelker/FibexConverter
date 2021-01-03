@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2020  Dr. Lars Voelker
+# Copyright (C) 2015-2021  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
-# Copyright (C) 2020-2020  Dr. Lars Voelker, Technica Engineering GmbH
+# Copyright (C) 2020-2021  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -37,6 +37,7 @@ class FibexParser:
 
         self.__services__ = dict()
         self.__codings__ = dict()
+        self.__signals__ = dict()
         self.__datatypes__ = dict()
         self.__channels__ = dict()
         # self.__ecus__ = dict()
@@ -113,6 +114,8 @@ class FibexParser:
         return d[key]
 
     def get_from_dict_or_none(self, d, key):
+        if d is None:
+            return None
         return self.get_from_dict(d, key, None)
 
     @staticmethod
@@ -200,6 +203,8 @@ class FibexParser:
         coded_min_length = -1
         coded_max_length = -1
 
+        compu_scale = None
+
         ct = element.find('./ho:CODED-TYPE', self.__ns__)
         if ct is not None:
             coded_basetype = self.get_attribute(ct, 'ho:BASE-DATA-TYPE')
@@ -216,6 +221,32 @@ class FibexParser:
             if bl is not None and bl.text is not None:
                 coded_max_length = int(bl.text)
 
+        cs = element.find('./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:COMPU-INTERNAL-TO-PHYS/ho:COMPU-SCALES/ho:COMPU-SCALE/'
+                          'ho:COMPU-RATIONAL-COEFFS', self.__ns__)
+        if cs is not None:
+            compu_scale = []
+            for num in cs.findall('./ho:COMPU-NUMERATOR/ho:V', self.__ns__):
+                compu_scale.append(float(num.text))
+            if len(compu_scale) != 2:
+                print(f"WARNING: We did not find to nums in the compu-numerator but {len(compu_scale)}!")
+            num = cs.find('./ho:COMPU-DENOMINATOR/ho:V', self.__ns__)
+            if num is not None:
+                compu_scale.append(float(num.text))
+            else:
+                compu_scale.append(None)
+
+        compu_consts = []
+        for cs in element.findall('./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:COMPU-INTERNAL-TO-PHYS/ho:COMPU-SCALES/',
+                                  self.__ns__):
+
+            cc = cs.find('./ho:COMPU-CONST/ho:VT', self.__ns__)
+
+            if cc is not None:
+                compu_const = (cc.text,
+                               self.get_child_text(cs, "ho:LOWER-LIMIT"),
+                               self.get_child_text(cs, "ho:UPPER-LIMIT"))
+                compu_consts.append(compu_const)
+
         if id is None:
             print(f"ERROR: Coding does not have ID!\n{element.text}")
 
@@ -228,7 +259,9 @@ class FibexParser:
              'Termination': coded_termination,
              'BitLength': coded_bit_length,
              'MinLength': coded_min_length,
-             'MaxLength': coded_max_length}
+             'MaxLength': coded_max_length,
+             'CompuScale': compu_scale,
+             'CompuConsts': compu_consts}
         return d
 
     def parse_codings(self, root):
@@ -236,6 +269,26 @@ class FibexParser:
             d = self.parse_coding(coding)
             if d is not None and 'ID' in d:
                 self.__codings__[d['ID']] = d
+
+    def parse_signal(self, element):
+        id = self.get_id(element)
+        oid = self.get_oid(element)
+        name = self.get_child_text(element, './ho:SHORT-NAME')
+        code_id = self.get_child_attribute(element, './fx:CODING-REF', 'ID-REF')
+        coding = self.get_from_dict_or_none(self.__codings__, code_id)
+        if coding is None:
+            print(f"Warning: Signal Coding == None!")
+        compu_scale = self.get_from_dict_or_none(coding, 'CompuScale')
+        compu_consts = self.get_from_dict_or_none(coding, 'CompuConsts')
+        ret = self.__conf_factory__.create_legacy_signal(id, name, compu_scale, compu_consts)
+
+        return ret
+
+    def parse_signals(self, root):
+        for signal in root.findall('.//fx:SIGNALS/fx:SIGNAL', self.__ns__):
+            s = self.parse_signal(signal)
+            if s is not None:
+                self.__signals__[s.id()] = s
 
     def interpret_datatype(self, element, utils, serialization_attributes):
         ret = None
@@ -389,11 +442,15 @@ class FibexParser:
                                 child
                             )
 
+                        signal = self.get_from_dict_or_none(self.__signals__,
+                                                            self.get_from_dict_or_none(m, "SignalRef"))
+
                         member = self.__conf_factory__.create_someip_parameter_struct_member(
                             m["Position"],
                             m["Name"],
                             m["Mandatory"],
-                            child
+                            child,
+                            signal
                         )
                         members[m["Position"]] = member
                     len_of_len = self.get_from_dict(serialization_attributes, "LengthFieldSize", 0)
@@ -536,6 +593,11 @@ class FibexParser:
         if p["Datatype"] is None:
             print("ERROR: Parameter without datatype is kind of strange!!!")
 
+        s = self.get_child_attribute(param, './fx:SIGNAL-REF', 'ID-REF')
+        signal = None
+        if s is not None:
+            signal = self.get_from_dict_or_none(self.__signals__, s)
+
         p["Array"] = self.parse_array(param)
         utils = self.parse_utilization(param)
         serialization_attributes = self.parse_serialization_attributes(param)
@@ -548,7 +610,7 @@ class FibexParser:
             ret = self.build_array(p["Name"], serialization_attributes["ArrayLengthSize"], p["Array"], ret)
 
         return p["Position"], self.__conf_factory__.create_someip_parameter(p["Position"], p["Name"], p["Desc"],
-                                                                            p["Mandatory"], ret), p
+                                                                            p["Mandatory"], ret, signal), p
 
     def parse_method(self, element):
         id = self.get_id(element)
@@ -641,12 +703,20 @@ class FibexParser:
             print(f"ERROR: Unknown Datatype: {dt}")
             return None
 
+        signal = None
+        s = self.get_child_attribute(element, './fx:SIGNAL-REF', 'ID-REF')
+        if s is not None:
+            signal = self.get_from_dict_or_none(self.__signals__, s)
+            if signal is None:
+                print(f"ERROR: Unknown Signal: {s}")
+                return None
+
         utils = self.parse_utilization(element)
         serialization_attributes = self.parse_serialization_attributes(element)
 
         params = []
         child = self.interpret_datatype(datatype, utils, serialization_attributes)
-        params += [self.__conf_factory__.create_someip_parameter(0, 'fieldparam', '', True, child)]
+        params += [self.__conf_factory__.create_someip_parameter(0, 'fieldparam', '', True, child, signal)]
 
         getter_debouncereq = -1
         getter_retentionreq = -1
@@ -734,6 +804,7 @@ class FibexParser:
         p["Name"] = self.get_child_text(element, './ho:SHORT-NAME')
 
         p["DatatypeRef"] = self.get_child_attribute(element, 'fx:DATATYPE-REF', 'ID-REF')
+        p["SignalRef"] = self.get_child_attribute(element, 'fx:SIGNAL-REF', 'ID-REF')
 
         p["Index"] = self.element_text_to_int(element.find('fx:INDEX', self.__ns__), -1)
 
@@ -1047,6 +1118,12 @@ class FibexParser:
         self.parse_codings(root)
         if verbose:
             print(self.__codings__)
+            print("")
+
+        if verbose:
+            print("*** Parsing Signals ***")
+        self.parse_signals(root)
+        if verbose:
             print("")
 
         if verbose:
