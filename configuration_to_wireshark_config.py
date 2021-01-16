@@ -43,6 +43,17 @@ def cleanup_string(tmp):
     return ret
 
 
+def cleanup_datatype_string(tmp):
+    ret = tmp[2:].lower()
+    if ret.startswith("uint"):
+        ret = "uint"
+    if ret.startswith("int"):
+        ret = "int"
+    if ret.startswith("float"):
+        ret = "float"
+    return ret
+
+
 class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
     def __init__(self):
@@ -283,13 +294,13 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
             tmp = s.fields()
             for fid in tmp:
                 if tmp[fid].getter() is not None:
-                    dm[tmp[fid].getter().methodid()] = tmp[fid].name() + " (Getter)"
+                    dm[tmp[fid].getter().methodid()] = tmp[fid].name() + "_Getter"
 
                 if tmp[fid].setter() is not None:
-                    dm[tmp[fid].setter().methodid()] = tmp[fid].name() + " (Setter)"
+                    dm[tmp[fid].setter().methodid()] = tmp[fid].name() + "_Setter"
 
                 if tmp[fid].notifier() is not None:
-                    dm[tmp[fid].notifier().methodid()] = tmp[fid].name() + " (Notifier)"
+                    dm[tmp[fid].notifier().methodid()] = tmp[fid].name() + "_Notifier"
 
             for mkey in sorted(dm.keys()):
                 fm.write(f"\"{key:04x}\",\"{mkey:04x}\",\"{dm[mkey]}\"\n")
@@ -561,12 +572,14 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                                          f"\"{cleanup_string(value)}\""
                                          "\n"
                                          )
+                        else:
+                            print(f"Warning: CompuConst<0 not supported! {pdu_id}:{m.position()} {start}-{end} {value}")
 
                 f.write(f"\"{pdu_id}\","
                         f"\"{len(tmp)}\","
                         f"\"{m.position()}\","
                         f"\"{m.name()}\","
-                        f"\"{m.child().datatype()[2:].lower()}\","
+                        f"\"{cleanup_datatype_string(m.child().datatype())}\","
                         f"\"{endian}\","
                         f"\"{m.child().bitlength_basetype()}\","
                         f"\"{m.child(). bitlength_encoded_type()}\","
@@ -603,12 +616,14 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                                          f"\"{cleanup_string(value)}\""
                                          "\n"
                                          )
+                        else:
+                            print(f"Warning: CompuConst<0 not supported! {pdu_id}:{p.position()} {start}-{end} {value}")
 
             f.write(f"\"{pdu_id}\","
                     f"\"{len(params)}\","
                     f"\"{p.position()}\","
                     f"\"{p.name()}\","
-                    f"\"{p.datatype().datatype()[2:].lower()}\","
+                    f"\"{cleanup_datatype_string(p.datatype().datatype())}\","
                     f"\"{endian}\","
                     f"\"{p.datatype().bitlength_basetype()}\","
                     f"\"{p.datatype().bitlength_encoded_type()}\","
@@ -933,6 +948,10 @@ def main():
         fb.parse_file(conf_factory, filename)
     else:
         help_and_exit()
+
+    print("")
+
+    print("Generating configs:")
 
     print("  SOMEIP_service_identifiers / SOMEIP_method_event_identifiers / SOMEIP_eventgroup_identifiers")
     conf_services = os.path.join(target_dir, "SOMEIP_service_identifiers")
