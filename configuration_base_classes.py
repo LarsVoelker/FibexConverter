@@ -130,7 +130,6 @@ class BaseConfigurationFactory(object):
 
 
 class BaseItem(object):
-
     def legacy(self):
         return False
 

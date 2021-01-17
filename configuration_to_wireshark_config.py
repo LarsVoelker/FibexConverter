@@ -80,6 +80,10 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         self.__ecus__ = dict()
 
+    def create_backlinks(self):
+        for s in self.__services__.values():
+            s.create_backlinks(self)
+
     def create_ecu(self, name, controllers):
         tmp = BaseECU(name, controllers)
         print(f"Adding ECU {name}")
@@ -89,13 +93,35 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         return tmp
 
     def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
-        ret = SOMEIPBaseService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
+        ret = SOMEIPService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
         print(f"Adding Service(ID: 0x{serviceid:04x} Ver: {majorver:d}.{minorver:d})")
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 
+    def create_someip_service_method(self, name, methodid, calltype, relia, inparams, outparams,
+                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1):
+        return SOMEIPServiceMethod(name, methodid, calltype, relia, inparams, outparams,
+                                   reqdebounce, reqmaxretention, resmaxretention)
+
+    def create_someip_service_event(self, name, methodid, relia, params,
+                                    debounce=-1, maxretention=-1):
+        return SOMEIPServiceEvent(name, methodid, relia, params,
+                                  debounce, maxretention)
+
+    def create_someip_service_field(self, name, getterid, setterid, notifierid,
+                                    getterreli, setterreli, notifierreli, params,
+                                    getter_debouncereq, getter_retentionreq, getter_retentionres,
+                                    setter_debouncereq, setter_retentionreq, setter_retentionres,
+                                    notifier_debounce, notifier_retention):
+        ret = SOMEIPServiceField(self, name, getterid, setterid, notifierid,
+                                 getterreli, setterreli, notifierreli, params,
+                                 getter_debouncereq, getter_retentionreq, getter_retentionres,
+                                 setter_debouncereq, setter_retentionreq, setter_retentionres,
+                                 notifier_debounce, notifier_retention)
+        return ret
+
     def create_someip_parameter(self, position, name, desc, mandatory, datatype, signal):
-        return SOMEIPBaseParameter(position, name, desc, mandatory, datatype, signal)
+        return SOMEIPParameter(position, name, desc, mandatory, datatype, signal)
 
     def create_someip_parameter_basetype(self, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
         if bitlength_basetype != bitlength_encoded_type:
@@ -133,11 +159,10 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
     def create_someip_parameter_array(self, name, dims, child):
         ret = SOMEIPParameterArray(self.__globalid_arrays__, name, dims, child)
 
-        if self.__space_optimized__:
-            for key in self.__param_arrays__:
-                tmp = self.__param_arrays__[key]
-                if tmp == ret:
-                    return tmp
+#        if self.__space_optimized__:
+#            for key in self.__param_arrays__:
+#                tmp = self.__param_arrays__[key]
+#                if tmp == ret:
 
         self.__param_arrays__[self.__globalid_arrays__] = ret
         self.__globalid_arrays__ += 1
@@ -149,27 +174,27 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
     def create_someip_parameter_struct(self, name, length_of_length, pad_to, members):
         ret = SOMEIPParameterStruct(self.__globalid_structs__, name, length_of_length, pad_to, members)
 
-        if self.__space_optimized__:
-            for key in self.__param_structs__:
-                tmp = self.__param_structs__[key]
-                if tmp == ret:
-                    return tmp
+#        if self.__space_optimized__:
+#            for key in self.__param_structs__:
+#                tmp = self.__param_structs__[key]
+#                if tmp == ret:
+#                    return tmp
 
         self.__param_structs__[self.__globalid_structs__] = ret
         self.__globalid_structs__ += 1
         return ret
 
     def create_someip_parameter_struct_member(self, position, name, mandatory, child, signal):
-        return SOMEIPBaseParameterStructMember(position, name, mandatory, child, signal)
+        return SOMEIPParameterStructMember(position, name, mandatory, child, signal)
 
     def create_someip_parameter_typedef(self, name, name2, child):
         ret = SOMEIPParameterTypedef(self.__globalid_typedefs__, name, name2, child)
 
-        if self.__space_optimized__:
-            for key in self.__param_typedefs__:
-                tmp = self.__param_typedefs__[key]
-                if tmp == ret:
-                    return tmp
+#        if self.__space_optimized__:
+#            for key in self.__param_typedefs__:
+#                tmp = self.__param_typedefs__[key]
+#                if tmp == ret:
+#                    return tmp
 
         self.__param_typedefs__[self.__globalid_typedefs__] = ret
         self.__globalid_typedefs__ += 1
@@ -194,18 +219,18 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
     def create_someip_parameter_union(self, name, length_of_length, length_of_type, pad_to, members):
         ret = SOMEIPParameterUnion(self.__globalid_unions__, name, length_of_length, length_of_type, pad_to, members)
 
-        if self.__space_optimized__:
-            for key in self.__param_unions__:
-                tmp = self.__param_unions__[key]
-                if tmp == ret:
-                    return tmp
+#        if self.__space_optimized__:
+#            for key in self.__param_unions__:
+#                tmp = self.__param_unions__[key]
+#                if tmp == ret:
+#                    return tmp
 
         self.__param_unions__[self.__globalid_unions__] = ret
         self.__globalid_unions__ += 1
         return ret
 
     def create_someip_parameter_union_member(self, index, name, mandatory, child):
-        return SOMEIPBaseParameterUnionMember(index, name, mandatory, child)
+        return SOMEIPParameterUnionMember(index, name, mandatory, child)
 
     def add_service(self, serviceid, majorver, minorver, service):
         sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
@@ -330,7 +355,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         f.close()
 
     @staticmethod
-    def write_parameter_configlines(f, service, method, msgtype, params):
+    def write_parameter_configlines(f, service, method, msgtype, params, version):
         for p in params:
             tmp = "\"%04x\",\"%04x\",\"%d\",\"%x\",\"%d\"" % (service.serviceid(),
                                                               method.methodid(),
@@ -338,10 +363,15 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                                                               msgtype,
                                                               len(params))
 
-            tmp += ",\"%d\",\"%s\",\"%d\",\"%08x\"\n" % (p.position(),
-                                                         p.name(),
-                                                         p.datatype().paramtype(),
-                                                         p.datatype().globalid())
+            tmp += ",\"%d\",\"%s\",\"%d\",\"%08x\"" % (p.position(),
+                                                       p.name(),
+                                                       p.datatype().paramtype(),
+                                                       p.datatype().globalid())
+
+            if version > 1:
+                tmp += f",\"{service.name()}.{method.name()}.{p.name()}\""
+
+            tmp += "\n"
             f.write(tmp)
 
     def write_parameter_config(self, filename, version=1):
@@ -356,24 +386,24 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
             for key in sorted(serv.methods()):
                 method = serv.methods()[key]
                 if method.calltype() == "REQUEST_RESPONSE":
-                    self.write_parameter_configlines(f, serv, method, 0x00, method.inparams())
-                    self.write_parameter_configlines(f, serv, method, 0x80, method.outparams())
+                    self.write_parameter_configlines(f, serv, method, 0x00, method.inparams(), version)
+                    self.write_parameter_configlines(f, serv, method, 0x80, method.outparams(), version)
                 else:
-                    self.write_parameter_configlines(f, serv, method, 0x01, method.inparams())
+                    self.write_parameter_configlines(f, serv, method, 0x01, method.inparams(), version)
 
             for key in sorted(serv.events()):
-                self.write_parameter_configlines(f, serv, serv.events()[key], 0x02, serv.events()[key].params())
+                self.write_parameter_configlines(f, serv, serv.events()[key], 0x02, serv.events()[key].params(), version)
 
             for key in sorted(serv.fields(), key=lambda x: (x is None, x)):
                 field = serv.fields()[key]
                 if field.getter() is not None:
-                    self.write_parameter_configlines(f, serv, field.getter(), 0x00, field.getter().inparams())
-                    self.write_parameter_configlines(f, serv, field.getter(), 0x80, field.getter().outparams())
+                    self.write_parameter_configlines(f, serv, field.getter(), 0x00, field.getter().inparams(), version)
+                    self.write_parameter_configlines(f, serv, field.getter(), 0x80, field.getter().outparams(), version)
                 if field.setter() is not None:
-                    self.write_parameter_configlines(f, serv, field.setter(), 0x00, field.setter().inparams())
-                    self.write_parameter_configlines(f, serv, field.setter(), 0x80, field.setter().outparams())
+                    self.write_parameter_configlines(f, serv, field.setter(), 0x00, field.setter().inparams(), version)
+                    self.write_parameter_configlines(f, serv, field.setter(), 0x80, field.setter().outparams(), version)
                 if field.notifier() is not None:
-                    self.write_parameter_configlines(f, serv, field.notifier(), 0x02, field.notifier().params())
+                    self.write_parameter_configlines(f, serv, field.notifier(), 0x02, field.notifier().params(), version)
 
         f.close()
 
@@ -530,8 +560,8 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         f.close()
 
-    def write_legacy_pdu_signal_configlines(self, f, f_enum, pdu_id, service, method, params):
-        if method.legacy() is False:
+    def write_legacy_pdu_signal_configlines(self, f, f_enum, pdu_id, pdu_name, service, method, params):
+        if not method.legacy():
             return
 
         if params is None or len(params) == 0:
@@ -579,6 +609,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                         f"\"{len(tmp)}\","
                         f"\"{m.position()}\","
                         f"\"{m.name()}\","
+                        f"\"{pdu_name}.{m.name()}\","
                         f"\"{cleanup_datatype_string(m.child().datatype())}\","
                         f"\"{endian}\","
                         f"\"{m.child().bitlength_basetype()}\","
@@ -623,6 +654,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                     f"\"{len(params)}\","
                     f"\"{p.position()}\","
                     f"\"{p.name()}\","
+                    f"\"{pdu_name}.{p.name()}\","
                     f"\"{cleanup_datatype_string(p.datatype().datatype())}\","
                     f"\"{endian}\","
                     f"\"{p.datatype().bitlength_basetype()}\","
@@ -655,37 +687,111 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 method = serv.methods()[key]
                 pid = f"{serv.serviceid():04x}{method.methodid():04x}"
                 if method.calltype() == "REQUEST_RESPONSE":
-                    self.write_legacy_pdu_signal_configlines(f, f2, pid, serv, method, method.inparams())
-                    self.write_legacy_pdu_signal_configlines(f, f2, pid, serv, method, method.outparams())
+                    self.write_legacy_pdu_signal_configlines(f, f2, pid, method.name(), serv, method,
+                                                             method.inparams())
+                    self.write_legacy_pdu_signal_configlines(f, f2, pid, method.name(), serv, method,
+                                                             method.outparams())
                 else:
-                    self.write_legacy_pdu_signal_configlines(f, f2, pid, serv, method, method.inparams())
+                    self.write_legacy_pdu_signal_configlines(f, f2, pid, method.name(), serv, method,
+                                                             method.inparams())
 
             for key in sorted(serv.events()):
                 pid = f"{serv.serviceid():04x}{serv.events()[key].methodid():04x}"
-                self.write_legacy_pdu_signal_configlines(f, f2, pid, serv, serv.events()[key],
+                self.write_legacy_pdu_signal_configlines(f, f2, pid, method.name(), serv, serv.events()[key],
                                                          serv.events()[key].params())
 
             for key in sorted(serv.fields(), key=lambda x: (x is None, x)):
                 field = serv.fields()[key]
                 if field.getter() is not None:
                     pid = f"{serv.serviceid():04x}{field.getter().methodid():04x}"
-                    self.write_legacy_pdu_signal_configlines(f, f2, pid, serv, field.getter(),
+                    self.write_legacy_pdu_signal_configlines(f, f2, pid, field.name(), serv, field.getter(),
                                                              field.getter().inparams())
-                    self.write_legacy_pdu_signal_configlines(f, f2, pid, serv, field.getter(),
+                    self.write_legacy_pdu_signal_configlines(f, f2, pid, field.name(), serv, field.getter(),
                                                              field.getter().outparams())
                 if field.setter() is not None:
                     pid = f"{serv.serviceid():04x}{field.setter().methodid():04x}"
-                    self.write_legacy_pdu_signal_configlines(f, f2, pid, serv, field.setter(),
+                    self.write_legacy_pdu_signal_configlines(f, f2, pid, field.name(), serv, field.setter(),
                                                              field.setter().inparams())
-                    self.write_legacy_pdu_signal_configlines(f, f2, pid, serv, field.setter(),
+                    self.write_legacy_pdu_signal_configlines(f, f2, pid, field.name(), serv, field.setter(),
                                                              field.setter().outparams())
                 if field.notifier() is not None:
                     pid = f"{serv.serviceid():04x}{field.notifier().methodid():04x}"
-                    self.write_legacy_pdu_signal_configlines(f, f2, pid, serv, field.notifier(),
+                    self.write_legacy_pdu_signal_configlines(f, f2, pid, field.name(), serv, field.notifier(),
                                                              field.notifier().params())
 
         f.close()
         f2.close()
+
+
+class SOMEIPService(SOMEIPBaseService):
+    def create_backlinks(self, factory):
+        for i in self.__methods__.values():
+            i.create_backlinks(factory, self)
+        for i in self.__events__.values():
+            i.create_backlinks(factory, self)
+        for i in self.__fields__.values():
+            i.create_backlinks(factory, self)
+
+
+class SOMEIPServiceMethod(SOMEIPBaseServiceMethod):
+    def create_backlinks(self, factory, service):
+        tmp = []
+        for p in self.__inparams__:
+            tmp.append(p.create_backlinks(factory, service, self))
+        self.__inparams__ = tmp
+
+        tmp = []
+        for p in self.__outparams__:
+            tmp.append(p.create_backlinks(factory, service, self))
+        self.__outparams__ = tmp
+
+
+class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
+    def create_backlinks(self, factory, service):
+        tmp = []
+        for p in self.__params__:
+            tmp.append(p.create_backlinks(factory, service, self))
+        self.__params__ = tmp
+
+
+class SOMEIPServiceField(SOMEIPBaseServiceField):
+    def create_backlinks(self, factory, service):
+        if self.__getter__ is not None:
+            self.__getter__.create_backlinks(factory, service)
+        if self.__setter__ is not None:
+            self.__setter__.create_backlinks(factory, service)
+        if self.__notifier__ is not None:
+            self.__notifier__.create_backlinks(factory, service)
+
+
+class SOMEIPParameter(SOMEIPBaseParameter):
+    def __init__(self, position, name, desc, mandatory, datatype, signal):
+        super(SOMEIPParameter, self).__init__(position, name, desc, mandatory, datatype, signal)
+
+        self.__parent_service__ = None
+        self.__parent_method__ = None
+
+    def create_backlinks(self, factory, service, method):
+        if factory is None or (self.__parent_service__ is None and self.__parent_method__ is None):
+            self.__parent_service__ = service
+            self.__parent_method__ = method
+
+            self.__datatype__ = self.__datatype__.create_backlinks(factory, service, method)
+            return self
+        else:
+            ret = factory.create_someip_parameter(self.__position__,
+                                                  self.__name__,
+                                                  self.__desc__,
+                                                  self.__mandatory__,
+                                                  self.__datatype__,
+                                                  self.__signal__)
+            return ret.create_backlinks(factory, service, method)
+
+    def parent_service(self):
+        return self.__parent_service__
+
+    def parent_method(self):
+        return self.__parent_method__
 
 
 class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
@@ -693,6 +799,9 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
         super(SOMEIPParameterBasetype, self).__init__(name, datatype, bigendian, bitlength_basetype,
                                                       bitlength_encoded_type)
         self.__globalid__ = int(globalid)
+
+    def create_backlinks(self, factory, service, method):
+        return self
 
     def globalid(self):
         return self.__globalid__
@@ -733,6 +842,9 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
                                                     length_of_length, pad_to)
         self.__globalid__ = int(globalid)
 
+    def create_backlinks(self, factory, service, method):
+        return self
+
     def globalid(self):
         return self.__globalid__
 
@@ -772,6 +884,22 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
         super(SOMEIPParameterArray, self).__init__(name, dims, child)
         self.__globalid__ = int(globalid)
 
+        self.__parent_service__ = None
+        self.__parent_method__ = None
+
+    def create_backlinks(self, factory, service, method):
+        if factory is None or (self.__parent_service__ is None and self.__parent_method__ is None):
+            self.__parent_service__ = service
+            self.__parent_method__ = method
+
+            self.__child__ = self.__child__.create_backlinks(factory, service, method)
+
+            return self
+        else:
+            ret = factory.create_someip_parameter_array(self.__name__, self.__dims__, self.__child__)
+
+            return ret.create_backlinks(factory, service, method)
+
     def globalid(self):
         return self.__globalid__
 
@@ -782,19 +910,28 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
     def ws_config_line(self, version=1):
         # Array-ID,Name,DT-Type,DT-ID,MaxDim,Dim,Min,Max,LenOfLen,PadTo
 
+        if self.__parent_service__ is None or self.__parent_method__ is None:
+            print(f"    Warning: array ({self.name()}) is not attached to service!")
+
         ret = ""
         for key in self.dims():
             d = self.dims()[key]
-            ret += "\"%08x\",\"%s\",\"%d\",\"%08x\",\"%d\"," % (self.globalid(),
-                                                                self.name(),
-                                                                self.child().paramtype(),
-                                                                self.child().globalid(),
-                                                                len(self.dims()))
-            ret += "\"%d\",\"%d\",\"%d\",\"%d\",\"%d\"\n" % (d.dim() - 1,
-                                                             d.lowerlimit(),
-                                                             d.upperlimit(),
-                                                             d.length_of_length(),
-                                                             d.pad_to())
+            ret += "\"%08x\",\"%s\",\"%d\",\"%08x\",\"%d\"" % (self.globalid(),
+                                                               self.name(),
+                                                               self.child().paramtype(),
+                                                               self.child().globalid(),
+                                                               len(self.dims()))
+            if version > 1:
+                if self.__parent_service__ is None or self.__parent_method__ is None:
+                    ret += f",\"invalid.invalid.{self.name()}\""
+                else:
+                    ret += f",\"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{self.name()}\""
+
+            ret += ",\"%d\",\"%d\",\"%d\",\"%d\",\"%d\"\n" % (d.dim() - 1,
+                                                              d.lowerlimit(),
+                                                              d.upperlimit(),
+                                                              d.length_of_length(),
+                                                              d.pad_to())
         return ret
 
 
@@ -802,6 +939,26 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
     def __init__(self, globalid, name, length_of_length, pad_to, members):
         super(SOMEIPParameterStruct, self).__init__(name, length_of_length, pad_to, members)
         self.__globalid__ = int(globalid)
+
+        self.__parent_service__ = None
+        self.__parent_method__ = None
+
+    def create_backlinks(self, factory, service, method):
+        if factory is None or (self.__parent_service__ is None and self.__parent_method__ is None):
+            self.__parent_service__ = service
+            self.__parent_method__ = method
+
+            tmp = {}
+            for k in self.__members__.keys():
+                tmp[k] = self.__members__[k].create_backlinks(factory, service, method)
+            self.__members__ = tmp
+
+            return self
+        else:
+            ret = factory.create_someip_parameter_struct(self.__name__, self.__lengthOfLength__, self.__padTo__,
+                                                         self.__members__)
+
+            return ret.create_backlinks(factory, service, method)
 
     def globalid(self):
         return self.__globalid__
@@ -813,6 +970,9 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
     def ws_config_line(self, version=1):
         # Struct-ID,Struct Name,Length of length field,Align to,Number of items,Position,Name,Data Type,Datatype ID
 
+        if self.__parent_service__ is None or self.__parent_method__ is None:
+            print(f"    Warning: struct ({self.name()}) is not attached to service!")
+
         ret = ""
         for key in self.members():
             m = self.members()[key]
@@ -821,17 +981,62 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
                                                              self.length_of_length(),
                                                              self.pad_to(),
                                                              len(self.members()))
-            ret += ",\"%d\",\"%s\",\"%d\",\"%08x\"\n" % (m.position(),
-                                                         m.name(),
-                                                         m.child().paramtype(),
-                                                         m.child().globalid())
+            ret += ",\"%d\",\"%s\",\"%d\",\"%08x\"" % (m.position(),
+                                                       m.name(),
+                                                       m.child().paramtype(),
+                                                       m.child().globalid())
+            if version > 1:
+                if self.__parent_service__ is None or self.__parent_method__ is None:
+                    ret += f",\"invalid.invalid.{m.name()}\""
+                else:
+                    ret += f",\"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{m.name()}\""
+
+            ret += "\n"
         return ret
+
+
+class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
+    def __init__(self, position, name, mandatory, child, signal):
+        super(SOMEIPParameterStructMember, self).__init__(position, name, mandatory, child, signal)
+
+        self.__parent_service__ = None
+        self.__parent_method__ = None
+
+    def create_backlinks(self, factory, service, method):
+        if factory is None or (self.__parent_service__ is None and self.__parent_method__ is None):
+            self.__parent_service__ = service
+            self.__parent_method__ = method
+
+            self.__child__ = self.__child__.create_backlinks(factory, service, method)
+
+            return self
+        else:
+            ret = factory.create_someip_parameter_struct_member(self.__position__, self.__name__, self.__mandatory__,
+                                                                self.__child__, self.__signal__)
+
+            return ret.create_backlinks(factory, service, method)
 
 
 class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
     def __init__(self, globalid, name, name2, child):
         super(SOMEIPParameterTypedef, self).__init__(name, name2, child)
         self.__globalid__ = int(globalid)
+
+        self.__parent_service__ = None
+        self.__parent_method__ = None
+
+    def create_backlinks(self, factory, service, method):
+        if factory is None or (self.__parent_service__ is None and self.__parent_method__ is None):
+            self.__parent_service__ = service
+            self.__parent_method__ = method
+
+            self.__child__ = self.__child__.create_backlinks(factory, service, method)
+
+            return self
+        else:
+            ret = factory.create_someip_parameter_typedef(self.__name__, self.__name2__, self.__child__)
+
+            return ret.create_backlinks(factory, service, method)
 
     def globalid(self):
         return self.__globalid__
@@ -854,6 +1059,11 @@ class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
     def __init__(self, globalid, name, items, child):
         super(SOMEIPParameterEnumeration, self).__init__(name, items, child)
         self.__globalid__ = int(globalid)
+
+        assert(isinstance(child, SOMEIPParameterBasetype))
+
+    def create_backlinks(self, factory, service, method):
+        return self
 
     def globalid(self):
         return self.__globalid__
@@ -883,6 +1093,26 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
         super(SOMEIPParameterUnion, self).__init__(name, length_of_length, length_of_type, pad_to, members)
         self.__globalid__ = int(globalid)
 
+        self.__parent_service__ = None
+        self.__parent_method__ = None
+
+    def create_backlinks(self, factory, service, method):
+        if factory is None or (self.__parent_service__ is None and self.__parent_method__ is None):
+            self.__parent_service__ = service
+            self.__parent_method__ = method
+
+            tmp = {}
+            for k in self.__members__.keys():
+                tmp[k] = self.__members__[k].create_backlinks(factory, service, method)
+            self.__members__ = tmp
+
+            return self
+        else:
+            ret = factory.create_someip_parameter_union(self.__name__, self.__lengthOfLength__, self.__lengthOfType__,
+                                                        self.__padTo__, self.__members__)
+
+            return ret.create_backlinks(factory, service, method)
+
     def globalid(self):
         return self.__globalid__
 
@@ -893,6 +1123,9 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
     def ws_config_line(self, version=1):
         # Union-ID,Name,Length of length,Length of Type,Align to,Number of items,Index,Name,Data Type,Datatype ID
 
+        if self.__parent_service__ is None or self.__parent_method__ is None:
+            print(f"    Warning: union ({self.name()}) is not attached to service!")
+
         ret = ""
         for key in self.members():
             m = self.members()[key]
@@ -902,11 +1135,39 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
                                                                     self.length_of_type(),
                                                                     self.pad_to(),
                                                                     len(self.members()))
-            ret += ",\"%d\",\"%s\",\"%d\",\"%08x\"\n" % (m.index(),
+            ret += ",\"%d\",\"%s\",\"%d\",\"%08x\"" % (m.index(),
                                                          m.name(),
                                                          m.child().paramtype(),
                                                          m.child().globalid())
+            if version > 1:
+                if self.__parent_service__ is None or self.__parent_method__ is None:
+                    ret += f",\"invalid.invalid.{m.name()}\""
+                else:
+                    ret += f",\"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{m.name()}\""
+            ret += "\n"
         return ret
+
+
+class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
+    def __init__(self, index, name, mandatory, child):
+        super(SOMEIPParameterUnionMember, self).__init__(index, name, mandatory, child)
+
+        self.__parent_service__ = None
+        self.__parent_method__ = None
+
+    def create_backlinks(self, factory, service, method):
+        if factory is None or (self.__parent_service__ is None and self.__parent_method__ is None):
+            self.__parent_service__ = service
+            self.__parent_method__ = method
+
+            self.__child__ = self.__child__.create_backlinks(factory, service, method)
+
+            return self
+        else:
+            ret = factory.create_someip_parameter_union_member(self.__index__, self.__name__, self.__mandatory__,
+                                                               self.__child__)
+
+            return ret.create_backlinks(factory, service, method)
 
 
 def help_and_exit():
@@ -950,6 +1211,8 @@ def main():
         help_and_exit()
 
     print("")
+    print("Generating back links...")
+    conf_factory.create_backlinks()
 
     print("Generating configs:")
 
