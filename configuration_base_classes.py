@@ -61,25 +61,25 @@ class BaseConfigurationFactory(object):
         return SOMEIPBaseService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
 
     def create_someip_service_method(self, name, methodid, calltype, relia, inparams, outparams,
-                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1):
+                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1, tlv=False):
         return SOMEIPBaseServiceMethod(name, methodid, calltype, relia, inparams, outparams,
-                                       reqdebounce, reqmaxretention, resmaxretention)
+                                       reqdebounce, reqmaxretention, resmaxretention, tlv)
 
     def create_someip_service_event(self, name, methodid, relia, params,
-                                    debounce=-1, maxretention=-1):
+                                    debounce=-1, maxretention=-1, tlv=False):
         return SOMEIPBaseServiceEvent(name, methodid, relia, params,
-                                      debounce, maxretention)
+                                      debounce, maxretention, tlv)
 
     def create_someip_service_field(self, name, getterid, setterid, notifierid,
                                     getterreli, setterreli, notifierreli, params,
                                     getter_debouncereq, getter_retentionreq, getter_retentionres,
                                     setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                    notifier_debounce, notifier_retention):
+                                    notifier_debounce, notifier_retention, tlv=False):
         ret = SOMEIPBaseServiceField(self, name, getterid, setterid, notifierid,
                                      getterreli, setterreli, notifierreli, params,
                                      getter_debouncereq, getter_retentionreq, getter_retentionres,
                                      setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                     notifier_debounce, notifier_retention)
+                                     notifier_debounce, notifier_retention, tlv)
         return ret
 
     def create_someip_service_eventgroup(self, name, eid, eventids, fieldids):
@@ -92,11 +92,9 @@ class BaseConfigurationFactory(object):
         return SOMEIPBaseParameterBasetype(name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type)
 
     def create_someip_parameter_string(self, name, chartype, bigendian, lowerlimit, upperlimit, termination,
-                                       length_of_length, pad_to
-                                       ):
+                                       length_of_length, pad_to):
         return SOMEIPBaseParameterString(name, chartype, bigendian, lowerlimit, upperlimit, termination,
-                                         length_of_length, pad_to
-                                         )
+                                         length_of_length, pad_to)
 
     def create_someip_parameter_array(self, name, dims, child):
         return SOMEIPBaseParameterArray(name, dims, child)
@@ -104,8 +102,8 @@ class BaseConfigurationFactory(object):
     def create_someip_parameter_array_dim(self, dim, lowerlimit, upperlimit, length_of_length, pad_to):
         return SOMEIPBaseParameterArrayDim(dim, lowerlimit, upperlimit, length_of_length, pad_to)
 
-    def create_someip_parameter_struct(self, name, length_of_length, pad_to, members):
-        return SOMEIPBaseParameterStruct(name, length_of_length, pad_to, members)
+    def create_someip_parameter_struct(self, name, length_of_length, pad_to, members, tlv=False):
+        return SOMEIPBaseParameterStruct(name, length_of_length, pad_to, members, tlv)
 
     def create_someip_parameter_struct_member(self, position, name, mandatory, child, signal):
         return SOMEIPBaseParameterStructMember(position, name, mandatory, child, signal)
@@ -468,7 +466,7 @@ class SOMEIPBaseService(BaseItem):
 
 class SOMEIPBaseServiceMethod(BaseItem):
     def __init__(self, name, methodid, calltype, relia, inparams, outparams, reqdebounce=-1, reqmaxretention=-1,
-                 resmaxretention=-1):
+                 resmaxretention=-1, tlv=False):
         self.__name__ = name
         self.__methodid__ = methodid
         self.__calltype__ = calltype
@@ -480,6 +478,7 @@ class SOMEIPBaseServiceMethod(BaseItem):
         self.__reqdebouncetime__ = reqdebounce
         self.__reqretentiontime___ = reqmaxretention
         self.__resretentiontime___ = resmaxretention
+        self.__tlv__ = tlv
 
     def methodid(self):
         return self.__methodid__
@@ -541,15 +540,19 @@ class SOMEIPBaseServiceMethod(BaseItem):
                 return True
         return False
 
+    def tlv(self):
+        return self.__tlv__
+
 
 class SOMEIPBaseServiceEvent(BaseItem):
-    def __init__(self, name, methodid, relia, params, debouncetimerange=-1, maxbufferretentiontime=-1):
+    def __init__(self, name, methodid, relia, params, debouncetimerange=-1, maxbufferretentiontime=-1, tlv=False):
         self.__name__ = name
         self.__methodid__ = methodid
         self.__reliable__ = relia
         self.__params__ = params
         self.__debouncetime__ = debouncetimerange
         self.__retentiontime___ = maxbufferretentiontime
+        self.__tlv__ = tlv
 
     def methodid(self):
         return self.__methodid__
@@ -595,13 +598,17 @@ class SOMEIPBaseServiceEvent(BaseItem):
                 return True
         return False
 
+    def tlv(self):
+        return self.__tlv__
+
 
 class SOMEIPBaseServiceField(BaseItem):
     def __init__(self, config_factory, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
                  params,
                  getter_reqdebounce=-1, getter_reqmaxretention=-1, getter_resmaxretention=-1,
                  setter_reqdebounce=-1, setter_reqmaxretention=-1, setter_resmaxretention=-1,
-                 notifier_debounce=-1, notifier_maxretention=-1):
+                 notifier_debounce=-1, notifier_maxretention=-1,
+                 tlv=False):
         self.__name__ = name
 
         self.__getter__ = None
@@ -610,6 +617,8 @@ class SOMEIPBaseServiceField(BaseItem):
         self.__params__ = params
 
         self.__minimum_id__ = None
+
+        self.__tlv__ = tlv
 
         if getterid is not None:
             self.__getter__ = config_factory.create_someip_service_method(
@@ -698,6 +707,9 @@ class SOMEIPBaseServiceField(BaseItem):
                 return True
 
         return False
+
+    def tlv(self):
+        return self.__tlv__
 
 
 class SOMEIPBaseServiceEventgroup(BaseItem):
@@ -968,9 +980,10 @@ class SOMEIPBaseParameterArrayDim(BaseItem):
 
 
 class SOMEIPBaseParameterStruct(BaseItem):
-    def __init__(self, name, length_of_length, pad_to, members):
+    def __init__(self, name, length_of_length, pad_to, members, tlv=False):
         self.__name__ = name
         self.__members__ = members
+        self.__tlv__ = tlv
 
         if length_of_length is None or length_of_length == -1:
             self.__lengthOfLength__ = 0
@@ -999,7 +1012,8 @@ class SOMEIPBaseParameterStruct(BaseItem):
                 self.name() == other.name() and
                 self.members() == other.members() and
                 self.length_of_length() == other.length_of_length() and
-                self.pad_to() == other.pad_to()
+                self.pad_to() == other.pad_to() and
+                self.tlv() == other.tlv()
         )
 
     def size_min_bits(self):
@@ -1019,6 +1033,9 @@ class SOMEIPBaseParameterStruct(BaseItem):
             if m.legacy():
                 return True
         return False
+
+    def tlv(self):
+        return self.__tlv__
 
 
 class SOMEIPBaseParameterStructMember(BaseItem):
