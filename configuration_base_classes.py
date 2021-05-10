@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2020  Dr. Lars Voelker
+# Copyright (C) 2015-2021  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
-# Copyright (C) 2020-2020  Dr. Lars Voelker, Technica Engineering GmbH
+# Copyright (C) 2020-2021  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -85,8 +85,8 @@ class BaseConfigurationFactory(object):
     def create_someip_service_eventgroup(self, name, eid, eventids, fieldids):
         return SOMEIPBaseServiceEventgroup(name, eid, eventids, fieldids)
 
-    def create_someip_parameter(self, position, name, desc, mandatory, datatype):
-        return SOMEIPBaseParameter(position, name, desc, mandatory, datatype)
+    def create_someip_parameter(self, position, name, desc, mandatory, datatype, signal):
+        return SOMEIPBaseParameter(position, name, desc, mandatory, datatype, signal)
 
     def create_someip_parameter_basetype(self, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
         return SOMEIPBaseParameterBasetype(name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type)
@@ -107,8 +107,8 @@ class BaseConfigurationFactory(object):
     def create_someip_parameter_struct(self, name, length_of_length, pad_to, members):
         return SOMEIPBaseParameterStruct(name, length_of_length, pad_to, members)
 
-    def create_someip_parameter_struct_member(self, position, name, mandatory, child):
-        return SOMEIPBaseParameterStructMember(position, name, mandatory, child)
+    def create_someip_parameter_struct_member(self, position, name, mandatory, child, signal):
+        return SOMEIPBaseParameterStructMember(position, name, mandatory, child, signal)
 
     def create_someip_parameter_typedef(self, name, name2, child):
         return SOMEIPBaseParameterTypedef(name, name2, child)
@@ -125,9 +125,13 @@ class BaseConfigurationFactory(object):
     def create_someip_parameter_union_member(self, index, name, mandatory, child):
         return SOMEIPBaseParameterUnionMember(index, name, mandatory, child)
 
+    def create_legacy_signal(self, id, name, compu_scale, compu_consts):
+        return SOMEIPBaseLegacySignal(id, name, compu_scale, compu_consts)
+
 
 class BaseItem(object):
-    pass
+    def legacy(self):
+        return False
 
 
 class BaseECU(BaseItem):
@@ -528,6 +532,15 @@ class SOMEIPBaseServiceMethod(BaseItem):
     def max_buffer_retention_time_res(self):
         return self.__resretentiontime___
 
+    def legacy(self):
+        for p in self.__inparams__:
+            if p.legacy():
+                return True
+        for p in self.__outparams__:
+            if p.legacy():
+                return True
+        return False
+
 
 class SOMEIPBaseServiceEvent(BaseItem):
     def __init__(self, name, methodid, relia, params, debouncetimerange=-1, maxbufferretentiontime=-1):
@@ -575,6 +588,12 @@ class SOMEIPBaseServiceEvent(BaseItem):
 
     def max_buffer_retention_time(self):
         return self.__retentiontime___
+
+    def legacy(self):
+        for p in self.__params__:
+            if p.legacy():
+                return True
+        return False
 
 
 class SOMEIPBaseServiceField(BaseItem):
@@ -670,6 +689,16 @@ class SOMEIPBaseServiceField(BaseItem):
             ret += p.size_max_bits()
         return bits_to_bytes(ret)
 
+    def legacy(self):
+        if self.__params__ is None:
+            return False
+
+        for p in self.__params__:
+            if p.legacy():
+                return True
+
+        return False
+
 
 class SOMEIPBaseServiceEventgroup(BaseItem):
     def __init__(self, name, egid, eventids, fieldids):
@@ -692,12 +721,13 @@ class SOMEIPBaseServiceEventgroup(BaseItem):
 
 
 class SOMEIPBaseParameter(BaseItem):
-    def __init__(self, position, name, desc, mandatory, datatype):
+    def __init__(self, position, name, desc, mandatory, datatype, signal):
         self.__position__ = int(position)
         self.__name__ = name
         self.__desc__ = desc
         self.__mandatory__ = mandatory
         self.__datatype__ = datatype
+        self.__signal__ = signal
 
     def position(self):
         return self.__position__
@@ -714,11 +744,19 @@ class SOMEIPBaseParameter(BaseItem):
     def datatype(self):
         return self.__datatype__
 
+    def signal(self):
+        return self.__signal__
+
     def size_min_bits(self):
         return self.__datatype__.size_min_bits()
 
     def size_max_bits(self):
         return self.__datatype__.size_max_bits()
+
+    def legacy(self):
+        if self.__signal__ is not None:
+            return True
+        return self.__datatype__.legacy()
 
 
 class SOMEIPBaseParameterBasetype(BaseItem):
@@ -976,13 +1014,20 @@ class SOMEIPBaseParameterStruct(BaseItem):
             ret += m.child().size_max_bits()
         return ret
 
+    def legacy(self):
+        for m in self.__members__.values():
+            if m.legacy():
+                return True
+        return False
+
 
 class SOMEIPBaseParameterStructMember(BaseItem):
-    def __init__(self, position, name, mandatory, child):
+    def __init__(self, position, name, mandatory, child, signal):
         self.__name__ = name
         self.__position__ = int(position)
         self.__mandatory__ = mandatory
         self.__child__ = child
+        self.__signal__ = signal
 
     def name(self):
         return self.__name__
@@ -996,6 +1041,9 @@ class SOMEIPBaseParameterStructMember(BaseItem):
     def child(self):
         return self.__child__
 
+    def signal(self):
+        return self.__signal__
+
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
             return False
@@ -1004,8 +1052,14 @@ class SOMEIPBaseParameterStructMember(BaseItem):
                 self.name() == other.name() and
                 self.position() == other.position() and
                 self.mandatory() == other.mandatory() and
-                self.child() == other.child()
+                self.child() == other.child() and
+                self.signal() == self.signal()
         )
+
+    def legacy(self):
+        if self.__signal__ is not None:
+            return True
+        return False
 
 
 class SOMEIPBaseParameterTypedef(BaseItem):
@@ -1197,4 +1251,35 @@ class SOMEIPBaseParameterUnionMember(BaseItem):
                 self.index() == other.index() and
                 self.mandatory() == other.mandatory() and
                 self.child() == other.child()
+        )
+
+
+class SOMEIPBaseLegacySignal(BaseItem):
+    def __init__(self, id, name, compu_scale, compu_const):
+        self.__id__ = id
+        self.__name__ = name
+        self.__compu_scale__ = compu_scale
+        self.__compu_consts__ = compu_const
+
+    def id(self):
+        return self.__id__
+
+    def name(self):
+        return self.__name__
+
+    def compu_scale(self):
+        return self.__compu_scale__
+
+    def compu_consts(self):
+        return self.__compu_consts__
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        return (
+                self.id() == self.id() and
+                self.name() == other.name() and
+                self.compu_scale() == other.compu_scale() and
+                self.compu_consts() == other.compu_consts()
         )
