@@ -22,6 +22,7 @@
 import sys
 import time
 import os.path
+import glob
 
 from configuration_base_classes import *  # @UnusedWildImport
 
@@ -73,32 +74,32 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
         ret = SOMEIPService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
-        print(f"Adding Service(ID: 0x{serviceid:04x} Ver: {majorver:d}.{minorver:d})")
+        print(f"Adding Service(Name: {name} ID: 0x{serviceid:04x} Ver: {majorver:d}.{minorver:d})")
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 
     def create_someip_service_method(self, name, methodid, calltype, relia, inparams, outparams,
-                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1):
+                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1, tlv=False):
         ret = SOMEIPServiceMethod(name, methodid, calltype, relia, inparams, outparams,
-                                  reqdebounce, reqmaxretention, resmaxretention)
+                                  reqdebounce, reqmaxretention, resmaxretention, tlv)
         return ret
 
     def create_someip_service_event(self, name, methodid, relia, params,
-                                    debounce=-1, maxretention=-1):
+                                    debounce=-1, maxretention=-1, tlv=False):
         ret = SOMEIPServiceEvent(name, methodid, relia, params,
-                                 debounce, maxretention)
+                                 debounce, maxretention, tlv)
         return ret
 
     def create_someip_service_field(self, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
                                     params,
                                     getter_debouncereq, getter_retentionreq, getter_retentionres,
                                     setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                    notifier_debounce, notifier_retention):
+                                    notifier_debounce, notifier_retention, tlv=False):
         ret = SOMEIPServiceField(self, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
                                  params,
                                  getter_debouncereq, getter_retentionreq, getter_retentionres,
                                  setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                 notifier_debounce, notifier_retention)
+                                 notifier_debounce, notifier_retention, tlv)
         return ret
 
     def create_someip_service_eventgroup(self, name, eid, eventids, fieldids):
@@ -127,8 +128,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterArrayDim(dim, lowerlimit, upperlimit, length_of_length, pad_to)
         return ret
 
-    def create_someip_parameter_struct(self, name, length_of_length, pad_to, members):
-        ret = SOMEIPParameterStruct(name, length_of_length, pad_to, members)
+    def create_someip_parameter_struct(self, name, length_of_length, pad_to, members, tlv=False):
+        ret = SOMEIPParameterStruct(name, length_of_length, pad_to, members, tlv)
         return ret
 
     def create_someip_parameter_struct_member(self, position, name, mandatory, child, signal):
@@ -318,6 +319,7 @@ class SOMEIPServiceMethod(SOMEIPBaseServiceMethod):
         if self.__resretentiontime___ >= 0:
             extra += f" max_response_retention:{str(self.__resretentiontime___)}s"
 
+        extra += ' TLV' if self.__tlv__ else ''
         ret = indent * " "
         ret += f"Method {self.__name__} (id:0x{self.__methodid__:04x} type:{self.__calltype__} " + \
                f"reli:{self.__reliable__}{extra})\n"
@@ -344,6 +346,7 @@ class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
             extra += f" max_retention:{str(self.__retentiontime___)}s"
 
         ret = indent * " "
+        extra += ', TLV:True' if self.__tlv__ else ''
         if self.legacy():
             ret += f"Event {self.__name__} (id:0x{self.__methodid__:04x} reli:{self.__reliable__}{extra}, Legacy PDU)\n"
         else:
@@ -362,7 +365,7 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
             legacy = ", Legacy PDU"
 
         ret = indent * " "
-        ret += f"Field {self.__name__}\n"
+        ret += f"Field {self.__name__}{' TLV' if self.__tlv__ else ''}\n"
 
         indent += 2
         if self.__getter__ is not None:
@@ -402,7 +405,8 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
         ret += indent * " "
         ret += "Parameters:\n"
         for param in self.__params__:
-            ret += param.str(indent + 2)
+            if param is not None:
+                ret += param.str(indent + 2)
 
         return ret
 
@@ -502,7 +506,9 @@ class SOMEIPParameterArrayDim(SOMEIPBaseParameterArrayDim):
 class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Struct {self.__name__}:\n"
+        tlv = ' (TLV: True)' if self.__tlv__ else ''
+
+        ret += f"Struct {self.__name__}{tlv}:\n"
         if self.__members__ is not None:
             for m in sorted(self.__members__.keys()):
                 member = self.__members__[m]
@@ -618,9 +624,18 @@ def main():
 
     (t, filename) = sys.argv[1:]
 
-    (path, f) = os.path.split(filename)
-    filenoext = '.'.join(f.split('.')[:-1])
-    target_dir = os.path.join(path, filenoext, "text")
+    if os.path.isdir(filename):
+        fibex_files = glob.glob(filename + "/**/FBX*.xml", recursive=True)
+        target_dir = os.path.join(filename, "text")
+        textfile = os.path.join(target_dir, "all_files" + ".txt")
+    elif os.path.isfile(filename):
+        fibex_files = [filename]
+        (path, f) = os.path.split(filename)
+        filenoext = '.'.join(f.split('.')[:-1])
+        target_dir = os.path.join(path, filenoext, "text")
+        textfile = os.path.join(target_dir, filenoext + ".txt")
+    else:
+        help_and_exit()
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
@@ -630,11 +645,10 @@ def main():
 
     if t.upper() == "FIBEX":
         fb = FibexParser()
-        fb.parse_file(conf_factory, filename)
+        for f in fibex_files:
+            fb.parse_file(conf_factory, f)
     else:
         help_and_exit()
-
-    textfile = os.path.join(target_dir, filenoext + ".txt")
 
     f = open(textfile, "w")
     f.write("%s" % conf_factory)
