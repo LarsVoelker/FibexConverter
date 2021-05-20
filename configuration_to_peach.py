@@ -143,9 +143,9 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
                                     self.write_configfile_event(target_dir, ecu, vlanid, socket, si,
                                                                 field.notifier(), "")
                                 # getter has empty request anyhow
-                                # if field.getter()!=None:
-                                #    self.write_configfile_method_request(target_dir, ecu, vlanid, socket, si,
-                                #                                         field.getter(), "GetterRequest")
+                                if field.getter() is not None:
+                                    self.write_configfile_method_request(target_dir, ecu, vlanid, socket, si,
+                                                                         field.getter(), "-Request")
                                 if field.setter() is not None:
                                     self.write_configfile_method_request(target_dir, ecu, vlanid, socket, si,
                                                                          field.setter(), "-Request")
