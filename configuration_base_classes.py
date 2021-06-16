@@ -768,6 +768,8 @@ class SOMEIPBaseParameter(BaseItem):
     def legacy(self):
         if self.__signal__ is not None:
             return True
+        if self.__datatype__ is None:
+            return False
         return self.__datatype__.legacy()
 
 
