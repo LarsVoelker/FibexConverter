@@ -358,28 +358,32 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
     @staticmethod
     def write_parameter_configlines(f, service, method, msgtype, params, version):
         for p in params:
-            tmp = "\"%04x\",\"%04x\",\"%d\",\"%x\"" % (service.serviceid(),
-                                                       method.methodid(),
-                                                       service.majorversion(),
-                                                       msgtype)
-            if version > 1:
-                if method.tlv():
-                    tmp += f",\"TRUE\""
-                else:
-                    tmp += f",\"FALSE\""
+            if p.datatype() is not None:
+                tmp = "\"%04x\",\"%04x\",\"%d\",\"%x\"" % (service.serviceid(),
+                                                           method.methodid(),
+                                                           service.majorversion(),
+                                                           msgtype)
+                if version > 1:
+                    if method.tlv():
+                        tmp += f",\"TRUE\""
+                    else:
+                        tmp += f",\"FALSE\""
 
-            tmp += ",\"%d\"" % (len(params))
+                tmp += ",\"%d\"" % (len(params))
 
-            tmp += ",\"%d\",\"%s\",\"%d\",\"%08x\"" % (p.position(),
-                                                       p.name(),
-                                                       p.datatype().paramtype(),
-                                                       p.datatype().globalid())
+                tmp += ",\"%d\",\"%s\",\"%d\",\"%08x\"" % (p.position(),
+                                                           p.name(),
+                                                           p.datatype().paramtype(),
+                                                           p.datatype().globalid())
 
-            if version > 1:
-                tmp += f",\"{service.name()}.{method.name()}.{p.name()}\""
+                if version > 1:
+                    tmp += f",\"{service.name()}.{method.name()}.{p.name()}\""
 
-            tmp += "\n"
-            f.write(tmp)
+                tmp += "\n"
+                f.write(tmp)
+            else:
+                print(f"ERROR: Cannot write config, if p.datatype() = None! "
+                      f"Service: {service.name()} Method: {method.name()} Param: {p.name()} Pos: {p.position()}")
 
     def write_parameter_config(self, filename, version=1):
         # Service-ID,Method-ID,Version,MessageType,Num-Of-Params,Position,Name,Datatype,Datatype-ID
@@ -790,7 +794,7 @@ class SOMEIPParameter(SOMEIPBaseParameter):
             self.__parent_method__ = method
 
             if self.__datatype__ is None:
-                print(f"ERROR: create_backlinks __datatype__ is None {service} {method}")
+                print(f"ERROR: create_backlinks __datatype__ is None {service.name()} {method.name()}")
                 return self
 
             self.__datatype__ = self.__datatype__.create_backlinks(factory, service, method)
@@ -1225,6 +1229,7 @@ def main():
         target_dir = os.path.join(path, filenoext, "wireshark_3.4_and_earlier")
         target_dir2 = os.path.join(path, filenoext, "wireshark_later")
     else:
+        print("Error: File not found!")
         help_and_exit()
 
     if not os.path.exists(target_dir):
@@ -1241,6 +1246,7 @@ def main():
     if t.upper() == "FIBEX":
         fb = FibexParser()
         for f in fibex_files:
+            print(f"\nFile: {f}")
             fb.parse_file(conf_factory, f)
     else:
         help_and_exit()
