@@ -945,6 +945,17 @@ class FibexParser(AbstractParser):
                 ctrl = None
                 if ctrlref in ctrls:
                     ctrl = ctrls[ctrlref]
+                else:
+                    print(f"FIBEX WARNING: I cannot find controller with ref {ctrlref} "
+                          f"for connector {self.get_id(c)}! Creating dummy myself!")
+
+                    # creating dummy controller since we need to link ECU and Interface
+                    ctrl = dict()
+                    ctrl["id"] = self.get_id(c)
+                    ctrl["name"] = self.get_id(c)
+                    ctrl["conns"] = []
+                    ctrl["ifaces"] = []
+                    ctrls[ctrl["id"]] = ctrl
 
                 if channelref in self.__channels__:
                     channel = self.__channels__[channelref]
@@ -1019,7 +1030,8 @@ class FibexParser(AbstractParser):
                 # build interfaces
                 if channel is not None:
                     iface = self.__conf_factory__.create_interface(channel["name"], channel["vlanid"], sockets)
-                    ctrl["ifaces"] += [iface]
+                    if ctrl is not None:
+                        ctrl["ifaces"] += [iface]
 
             # build Controllers
             ctrllist = []
