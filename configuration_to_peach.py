@@ -450,7 +450,7 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
             if lower < 1:
                 print("ERROR: String %s does not have valid length." % (self.name()))
 
-            f.write("%s	<String name=\"%s_string\" type=\"%s\" length=\"%d\" %s minOccurs=\"1\" maxOccurs=\"1\" >\n" %
+            f.write("%s	<String name=\"%s_string\" type=\"%s\" length=\"%d\" %s minOccurs=\"1\" maxOccurs=\"1\" />\n" %
                     (identtabs, blockid, t, lower, term))
         f.write("%s</Block>\n" % identtabs)
 
