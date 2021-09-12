@@ -279,9 +279,15 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         return ret
 
     def write_name_configs(self, conf_services, conf_methods, conf_eventgroups, version=1):
+        count_services = 0
+        count_events = 0
+        count_methods = 0
+        count_fields = 0
+
         d = dict()
 
         for sid in self.__services__.keys():
+            count_services += 1
             s = self.__services__[sid]
 
             if s.serviceid() in d.keys():
@@ -311,21 +317,28 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
             tmp = s.methods()
             for mid in tmp:
+                count_methods += 1
                 dm[tmp[mid].methodid()] = tmp[mid].name()
 
             tmp = s.events()
             for eid in tmp:
+                count_events += 1
                 dm[tmp[eid].methodid()] = tmp[eid].name()
 
             tmp = s.fields()
             for fid in tmp:
+                count_fields += 1
+
                 if tmp[fid].getter() is not None:
+                    count_methods += 1
                     dm[tmp[fid].getter().methodid()] = tmp[fid].name() + "_Getter"
 
                 if tmp[fid].setter() is not None:
+                    count_methods += 1
                     dm[tmp[fid].setter().methodid()] = tmp[fid].name() + "_Setter"
 
                 if tmp[fid].notifier() is not None:
+                    count_events += 1
                     dm[tmp[fid].notifier().methodid()] = tmp[fid].name() + "_Notifier"
 
             for mkey in sorted(dm.keys()):
@@ -343,6 +356,10 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         fs.close()
         fm.close()
         fe.close()
+
+        if version==1:
+            print(f"  Found {count_services} services, {count_methods} methods, and {count_events} events. "
+                  f"This includes the methods and events of {count_fields} fields.")
 
     @staticmethod
     def write_ws_config(filename, arr, version=1):
@@ -1249,6 +1266,7 @@ def main():
             print(f"\nFile: {f}")
             fb.parse_file(conf_factory, f)
     else:
+        print("Error: File not found!")
         help_and_exit()
 
     print("")
