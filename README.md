@@ -13,7 +13,7 @@ The result will be:
 ## Convert a FIBEX4 file to wireshark configs:
 Just call it like this:
     
-    python3 configuration_to_wireshark.py FIBEX example-file.xml
+    python3 configuration_to_wireshark_config.py FIBEX example-file.xml
 
 The results (hosts, vlanids, SOMEIP...) will be in:
     
