@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2021  Dr. Lars Voelker
+# Copyright (C) 2015-2022  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
-# Copyright (C) 2020-2021  Dr. Lars Voelker, Technica Engineering GmbH
+# Copyright (C) 2020-2022  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -24,9 +24,8 @@ import time
 import os.path
 import argparse
 
+from parser import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
-
-from fibex_parser import FibexParser
 
 
 class SimpleConfigurationFactory(BaseConfigurationFactory):
@@ -957,24 +956,17 @@ def main():
     ignore_services = read_hex_integer_file(args.ignore_services)
     ecu_order = read_string_file(args.ecu_order)
 
+    conf_factory = SimpleConfigurationFactory()
+    output_dir = parse_input_files(args.filename, args.type, conf_factory)
+
     # setup output path
     (path, f) = os.path.split(args.filename)
     filenoext = ".".join(f.split('.')[:-1])
-    target_dir = os.path.join(path, filenoext, "reports")
+    target_dir = os.path.join(output_dir, "reports")
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
         time.sleep(0.5)
-
-    # load FIBEX
-    conf_factory = SimpleConfigurationFactory()
-
-    if args.type.upper() == "FIBEX":
-        fb = FibexParser()
-        fb.parse_file(conf_factory, args.filename)
-    else:
-        print("Unknown Filetype")
-        sys.exit(-1)
 
     # get the names of all ECUs not on the ignored_ecus list
     ecunamesall = sorted(conf_factory.get_ecu_names())

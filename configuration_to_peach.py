@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2021  Dr. Lars Voelker
+# Copyright (C) 2015-2022  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
-# Copyright (C) 2020-2021  Dr. Lars Voelker, Technica Engineering GmbH
+# Copyright (C) 2020-2022  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -23,9 +23,8 @@ import sys
 import time
 import os.path
 
+from parser import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
-
-from fibex_parser import FibexParser
 
 
 class PeachConfigurationFactory(BaseConfigurationFactory):
@@ -576,24 +575,18 @@ def main():
 
     (t, filename) = sys.argv[1:]
 
+    # we only support single files
     if not os.path.isfile(filename):
         help_and_exit()
 
-    (path, f) = os.path.split(filename)
-    filenoext = ".".join(f.split('.')[:-1])
-    target_dir = os.path.join(path, filenoext, "peach")
+    confFactory = PeachConfigurationFactory()
+    output_dir = parse_input_files(filename, t, confFactory)
+
+    target_dir = os.path.join(output_dir, "peach")
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
         time.sleep(0.5)
-
-    confFactory = PeachConfigurationFactory()
-
-    if t.upper() == "FIBEX":
-        fb = FibexParser()
-        fb.parse_file(confFactory, filename)
-    else:
-        help_and_exit()
 
     confFactory.generate_configs(target_dir)
 

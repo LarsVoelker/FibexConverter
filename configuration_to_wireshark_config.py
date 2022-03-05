@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2021  Dr. Lars Voelker
+# Copyright (C) 2015-2022  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
-# Copyright (C) 2020-2021  Dr. Lars Voelker, Technica Engineering GmbH
+# Copyright (C) 2020-2022  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -22,11 +22,9 @@
 import sys
 import time
 import os.path
-import glob
 
+from parser import * # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
-
-from fibex_parser import FibexParser
 
 
 class WiresharkParameterTypes:
@@ -1235,19 +1233,16 @@ def main():
 
     (t, filename) = sys.argv[1:]
 
-    if os.path.isdir(filename):
-        fibex_files = glob.glob(filename + "/**/FBX*.xml", recursive=True)
-        target_dir = os.path.join(filename, "wireshark_3.4_and_earlier")
-        target_dir2 = os.path.join(filename, "wireshark_later")
-    elif os.path.isfile(filename):
-        fibex_files = [filename]
-        (path, f) = os.path.split(filename)
-        filenoext = '.'.join(f.split('.')[:-1])
-        target_dir = os.path.join(path, filenoext, "wireshark_3.4_and_earlier")
-        target_dir2 = os.path.join(path, filenoext, "wireshark_later")
-    else:
-        print("Error: File not found!")
+    conf_factory = WiresharkConfigurationFactory()
+    output_dir = parse_input_files(filename, t, conf_factory)
+
+    if output_dir is None:
         help_and_exit()
+
+    print("Generating output directories:")
+
+    target_dir = os.path.join(output_dir, "wireshark_3.4_and_earlier")
+    target_dir2 = os.path.join(output_dir, "wireshark_later")
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
@@ -1257,17 +1252,6 @@ def main():
 
     # we had race conditions in the past
     time.sleep(0.5)
-
-    conf_factory = WiresharkConfigurationFactory()
-
-    if t.upper() == "FIBEX":
-        fb = FibexParser()
-        for f in fibex_files:
-            print(f"\nFile: {f}")
-            fb.parse_file(conf_factory, f)
-    else:
-        print("Error: File not found!")
-        help_and_exit()
 
     print("")
     print("Generating back links...")
