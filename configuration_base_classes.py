@@ -29,6 +29,12 @@ def bits_to_bytes(bits):
 
 class BaseConfigurationFactory(object):
 
+    def create_switch(self, name, ecu, ports):
+        return BaseSwitch(name, ecu, ports)
+
+    def create_switch_port(self, portid, ctrl, port, default_vlan, vlans):
+        return BaseSwitchPort(portid, ctrl, port, default_vlan, vlans)
+
     def create_ecu(self, name, controllers):
         return BaseECU(name, controllers)
 
@@ -132,10 +138,62 @@ class BaseItem(object):
         return False
 
 
+class BaseSwitchPort(BaseItem):
+    def __init__(self, portid, ctrl, port, default_vlan, vlans):
+        self.__portid__ = portid
+        self.__ctrl__ = ctrl
+        self.__port__ = port
+        self.__default_vlan__ = default_vlan
+        self.__vlans__ = vlans
+        self.__switch__ = None
+
+    def portid(self):
+        return self.__portid__
+
+    def set_parent_switch(self, switch):
+        self.__switch__ = switch
+
+    def switch(self):
+        return self.__switch__
+
+    def set_connected_port(self, peer_port):
+        assert (self.__port__ is None)
+        self.__port__ = peer_port
+
+    def connected_to_port(self):
+        return self.__port__
+
+    def connected_to_ecu_ctrl(self):
+        return self.__ctrl__
+
+
+class BaseSwitch(BaseItem):
+    def __init__(self, name, ecu, ports):
+        self.__name__ = name
+        self.__ports__ = ports
+        self.__ecu__ = ecu
+
+        if ecu is not None:
+            ecu.add_switch(self)
+
+        for port in ports:
+            port.set_parent_switch(self)
+
+    def name(self):
+        return self.__name__
+
+    def ecu(self):
+        return self.__ecu__
+
+    def ports(self):
+        return self.__ports__
+
+
 class BaseECU(BaseItem):
     def __init__(self, name, controllers):
         self.__name__ = name
         self.__controllers__ = controllers
+        self.__switches__ = []
 
         for c in controllers:
             c.set_ecu(self)
@@ -145,6 +203,12 @@ class BaseECU(BaseItem):
 
     def controllers(self):
         return self.__controllers__
+
+    def add_switch(self, switch):
+        self.__switches__.append(switch)
+
+    def switches(self):
+        return self.__switches__
 
 
 class BaseController(BaseItem):
