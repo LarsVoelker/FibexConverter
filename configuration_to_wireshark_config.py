@@ -21,6 +21,7 @@
 
 import sys
 import time
+import math
 import os.path
 
 from parser import * # @UnusedWildImport
@@ -621,17 +622,18 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 if m.signal() is not None and m.signal().compu_consts() is not None:
                     cc = m.signal().compu_consts()
                     for value, start, end in m.signal().compu_consts():
-                        if int(start) >= 0:
+                        if 0 <= int(start) <= pow(2, 64) and 0 <= int(end) <= pow(2, 64):
                             f_enum.write(f"\"{pdu_id}\","
                                          f"\"{m.position()}\","
                                          f"\"{len(cc)}\","
-                                         f"\"{start}\","
-                                         f"\"{end}\","
+                                         f"\"{int(start):x}\","
+                                         f"\"{int(end):x}\","
                                          f"\"{cleanup_string(value)}\""
                                          "\n"
                                          )
                         else:
-                            print(f"Warning: CompuConst<0 not supported! {pdu_id}:{m.position()} {start}-{end} {value}")
+                            print(f"Warning: CompuConst<0 or >2^64 not supported! "
+                                  f"{pdu_id}:{m.position()} {start}-{end} {value}")
 
                 f.write(f"\"{pdu_id}\","
                         f"\"{len(tmp)}\","
