@@ -1015,6 +1015,16 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
             print(f"    Warning: struct ({self.name()}) is not attached to service!")
 
         ret = ""
+        number_of_entries = len(self.members())
+
+        # first pass: check that all positions are below numbers_of_entries
+        for key in self.members():
+            m = self.members()[key]
+            m_pos = m.position()
+            if m_pos >= number_of_entries:
+                print(f"Position of SOME/IP Struct Member > len(members)! Adjusting ({m_pos+1})")
+                number_of_entries = m_pos + 1
+
         for key in self.members():
             m = self.members()[key]
             ret += "\"%08x\",\"%s\",\"%d\",\"%d\"" % (self.globalid(),
@@ -1028,7 +1038,7 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
                 else:
                     ret += f",\"FALSE\""
 
-            ret += ",\"%d\"" % (len(self.members()))
+            ret += ",\"%d\"" % number_of_entries
 
             ret += ",\"%d\",\"%s\",\"%d\",\"%08x\"" % (m.position(),
                                                        m.name(),
