@@ -25,13 +25,13 @@ import glob
 from fibex_parser import FibexParser
 
 
-def parse_input_files(filename, t, conf_factory, print_filename=True, fibex_filter="/**/FBX*.xml"):
+def parse_input_files(filename, t, conf_factory, print_filename=True, file_filter="/**/FBX*.xml"):
     if os.path.isdir(filename):
-        fibex_files = glob.glob(filename + fibex_filter, recursive=True)
+        files = glob.glob(filename + file_filter, recursive=True)
         output_dir = filename
 
     elif os.path.isfile(filename):
-        fibex_files = [filename]
+        files = [filename]
         (path, f) = os.path.split(filename)
         filenoext = '.'.join(f.split('.')[:-1])
         output_dir = os.path.join(path, filenoext)
@@ -40,11 +40,11 @@ def parse_input_files(filename, t, conf_factory, print_filename=True, fibex_filt
         return None
 
     if t.upper() == "FIBEX":
-        fb = FibexParser()
-        for f in fibex_files:
+        parser = FibexParser()
+        for f in files:
             if print_filename:
                 print(f"\nFile: {f}")
-            fb.parse_file(conf_factory, f)
+            parser.parse_file(conf_factory, f)
     else:
         print("Error: type {t} not known/supported!")
         return None
