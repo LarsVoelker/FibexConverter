@@ -21,11 +21,12 @@
 
 import sys
 import time
-import math
 import os.path
 
 from parser import * # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
+
+DEBUG_LEGACY_STRIPPING = False
 
 
 class WiresharkParameterTypes:
@@ -412,27 +413,36 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
             for key in sorted(serv.methods()):
                 method = serv.methods()[key]
-                if method.calltype() == "REQUEST_RESPONSE":
-                    self.write_parameter_configlines(f, serv, method, 0x00, method.inparams(), version)
-                    self.write_parameter_configlines(f, serv, method, 0x80, method.outparams(), version)
-                else:
-                    self.write_parameter_configlines(f, serv, method, 0x01, method.inparams(), version)
+                if version == 1 or not method.legacy():
+                    if method.calltype() == "REQUEST_RESPONSE":
+                        self.write_parameter_configlines(f, serv, method, 0x00, method.inparams(), version)
+                        self.write_parameter_configlines(f, serv, method, 0x80, method.outparams(), version)
+                    else:
+                        self.write_parameter_configlines(f, serv, method, 0x01, method.inparams(), version)
+                elif DEBUG_LEGACY_STRIPPING:
+                    print(f"--> skipping legacy method: {serv.name()} (0x{serv.serviceid():x}) {method.name()} (0x{method.methodid():x})")
 
             for key in sorted(serv.events()):
-                self.write_parameter_configlines(f, serv, serv.events()[key], 0x02, serv.events()[key].params(),
-                                                 version)
+                if version == 1 or not serv.events()[key].legacy():
+                    self.write_parameter_configlines(f, serv, serv.events()[key], 0x02, serv.events()[key].params(),
+                                                     version)
+                elif DEBUG_LEGACY_STRIPPING:
+                    print(f"--> skipping legacy event: {serv.name()} (0x{serv.serviceid():x}) {method.name()} (0x{method.methodid():x})")
 
             for key in sorted(serv.fields(), key=lambda x: (x is None, x)):
                 field = serv.fields()[key]
-                if field.getter() is not None:
-                    self.write_parameter_configlines(f, serv, field.getter(), 0x00, field.getter().inparams(), version)
-                    self.write_parameter_configlines(f, serv, field.getter(), 0x80, field.getter().outparams(), version)
-                if field.setter() is not None:
-                    self.write_parameter_configlines(f, serv, field.setter(), 0x00, field.setter().inparams(), version)
-                    self.write_parameter_configlines(f, serv, field.setter(), 0x80, field.setter().outparams(), version)
-                if field.notifier() is not None:
-                    self.write_parameter_configlines(f, serv, field.notifier(), 0x02, field.notifier().params(),
-                                                     version)
+                if version == 1 or not field.legacy():
+                    if field.getter() is not None:
+                        self.write_parameter_configlines(f, serv, field.getter(), 0x00, field.getter().inparams(), version)
+                        self.write_parameter_configlines(f, serv, field.getter(), 0x80, field.getter().outparams(), version)
+                    if field.setter() is not None:
+                        self.write_parameter_configlines(f, serv, field.setter(), 0x00, field.setter().inparams(), version)
+                        self.write_parameter_configlines(f, serv, field.setter(), 0x80, field.setter().outparams(), version)
+                    if field.notifier() is not None:
+                        self.write_parameter_configlines(f, serv, field.notifier(), 0x02, field.notifier().params(),
+                                                         version)
+                elif DEBUG_LEGACY_STRIPPING:
+                    print(f"--> skipping legacy field: {serv.name()} (0x{serv.serviceid():x}) {field.name()}")
 
         f.close()
 
@@ -867,6 +877,12 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
                                                                       self.bitlength_basetype(),
                                                                       self.bitlength_encoded_type())
         else:
+            # remove non SOME/IP datatypes since they are configured as Signal-PDU configs
+            if self.bitlength_basetype() not in (8, 16, 32, 64):
+                return ""
+            if self.bitlength_basetype() != self.bitlength_encoded_type():
+                return ""
+
             endianess = "TRUE" if self.bigendian() else "FALSE"
             return "\"%08x\",\"%s\",\"%s\",\"%s\",\"%d\",\"%d\"\n" % (self.globalid(),
                                                                       self.name(),
@@ -1010,11 +1026,16 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
 
     def ws_config_line(self, version=1):
         # Struct-ID,Struct Name,Length of length field,Align to,Number of items,Position,Name,Data Type,Datatype ID
+        ret = ""
 
         if self.__parent_service__ is None or self.__parent_method__ is None:
             print(f"    Warning: struct ({self.name()}) is not attached to service!")
+        else:
+            if version == 2 and self.__parent_method__.legacy():
+                if DEBUG_LEGACY_STRIPPING:
+                    print(f"--> Skipping struct {self.name()} of Service {self.__parent_service__.name()} and Method {self.__parent_method__.name()}")
+                return ret
 
-        ret = ""
         number_of_entries = len(self.members())
 
         # first pass: check that all positions are below numbers_of_entries
