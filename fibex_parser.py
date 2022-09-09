@@ -245,16 +245,27 @@ class FibexParser(AbstractParser):
 
             basetype = self.get_from_dict(coding2, "Basetype", "--INVALID--")
             if basetype in (t_ints + t_floats):
+
+                # Translate ASAM Basetypes to general Basetypes
+                basetype = basetype.lower()
+                if basetype.startswith("a_"):
+                    basetype = basetype[2:]
+
                 bitlenbase = self.get_from_dict(coding2, "BitLength", -1)
                 bitlenenct = self.get_from_dict(utils, "BitLength", -1)
                 if bitlenenct == -1:
                     bitlenenct = bitlenbase
 
+                big_endian = self.get_from_dict_or_none(utils, "HighLowByteOrder")
+                if bitlenbase == 8 and not big_endian:
+                    # uint8 is only need in one endianess
+                    big_endian = True
+
                 if p["Type"] == "fx:COMMON-DATATYPE-TYPE":
                     ret = self.__conf_factory__.create_someip_parameter_basetype(
                         self.get_from_dict_or_none(p, "Name"),
-                        self.get_from_dict_or_none(coding2, "Basetype"),
-                        self.get_from_dict_or_none(utils, "HighLowByteOrder"),
+                        basetype,
+                        big_endian,
                         bitlenbase,
                         bitlenenct
                     )
@@ -262,8 +273,8 @@ class FibexParser(AbstractParser):
                 elif p["Type"] == "fx:ENUM-DATATYPE-TYPE":
                     ret = self.__conf_factory__.create_someip_parameter_basetype(
                         self.get_from_dict_or_none(coding2, "Name"),
-                        self.get_from_dict_or_none(coding2, "Basetype"),
-                        self.get_from_dict_or_none(utils, "HighLowByteOrder"),
+                        basetype,
+                        big_endian,
                         bitlenbase,
                         bitlenenct
                     )
@@ -273,7 +284,7 @@ class FibexParser(AbstractParser):
                 minlen = self.get_from_dict(utils, "MinBitLength", -1)
                 maxlen = self.get_from_dict(utils, "MaxBitLength", -1)
 
-                # this basically gives us smallest char
+                # this basically gives us the smallest char
                 if minlen == -1:
                     minlen = self.get_from_dict(coding2, "MinLength", -1)
 

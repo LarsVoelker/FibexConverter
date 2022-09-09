@@ -357,7 +357,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         fm.close()
         fe.close()
 
-        if version==1:
+        if version == 1:
             print(f"  Found {count_services} services, {count_methods} methods, and {count_events} events. "
                   f"This includes the methods and events of {count_fields} fields.")
 
@@ -1267,6 +1267,20 @@ def main():
     (t, filename) = sys.argv[1:]
 
     conf_factory = WiresharkConfigurationFactory()
+
+    # add common basetypes already here, so they have fixed IDs
+    conf_factory.create_someip_parameter_basetype("BOOL", "uint8", True, 8, 8)
+    conf_factory.create_someip_parameter_basetype("UINT8", "uint8", True, 8, 8)
+    conf_factory.create_someip_parameter_basetype("UINT16", "uint16", True, 16, 16)
+    conf_factory.create_someip_parameter_basetype("UINT32", "uint32", True, 32, 32)
+    conf_factory.create_someip_parameter_basetype("UINT64", "uint64", True, 64, 64)
+    conf_factory.create_someip_parameter_basetype("INT8", "int8", True, 8, 8)
+    conf_factory.create_someip_parameter_basetype("INT16", "int16", True, 16, 16)
+    conf_factory.create_someip_parameter_basetype("INT32", "int32", True, 32, 32)
+    conf_factory.create_someip_parameter_basetype("INT64", "int64", True, 64, 64)
+    conf_factory.create_someip_parameter_basetype("FLOAT32", "float32", True, 32, 32)
+    conf_factory.create_someip_parameter_basetype("FLOAT64", "float64", True, 64, 64)
+
     output_dir = parse_input_files(filename, t, conf_factory)
 
     if output_dir is None:
