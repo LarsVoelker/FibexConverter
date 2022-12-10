@@ -45,8 +45,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = Controller(name, vlans)
         return ret
 
-    def create_interface(self, name, vlanid, sockets):
-        ret = Interface(name, vlanid, sockets)
+    def create_interface(self, name, vlanid, ips, sockets):
+        ret = Interface(name, vlanid, ips, sockets)
         return ret
 
     def create_socket(self, name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,

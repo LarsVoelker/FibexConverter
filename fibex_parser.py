@@ -18,14 +18,13 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
-
 import xml.etree.ElementTree
 from abstract_parser import AbstractParser
 
 
 class FibexParser(AbstractParser):
-
     def __init__(self):
+        super().__init__()
         self.__conf_factory__ = None
 
         self.__ns__ = {'fx': 'http://www.asam.net/xml/fbx',
@@ -40,7 +39,9 @@ class FibexParser(AbstractParser):
         self.__signals__ = dict()
         self.__datatypes__ = dict()
         self.__channels__ = dict()
-        # self.__ecus__ = dict()
+        self.__controllers__ = dict()
+        self.__ecus__ = dict()
+        self.__coupling_ports__ = dict()
 
         # FIBEX-ID -> (FIBEX-ID of Service, Eventgroup-ID)
         self.__eventgrouprefs__ = dict()
@@ -245,27 +246,16 @@ class FibexParser(AbstractParser):
 
             basetype = self.get_from_dict(coding2, "Basetype", "--INVALID--")
             if basetype in (t_ints + t_floats):
-
-                # Translate ASAM Basetypes to general Basetypes
-                basetype = basetype.lower()
-                if basetype.startswith("a_"):
-                    basetype = basetype[2:]
-
                 bitlenbase = self.get_from_dict(coding2, "BitLength", -1)
                 bitlenenct = self.get_from_dict(utils, "BitLength", -1)
                 if bitlenenct == -1:
                     bitlenenct = bitlenbase
 
-                big_endian = self.get_from_dict_or_none(utils, "HighLowByteOrder")
-                if bitlenbase == 8 and not big_endian:
-                    # uint8 is only need in one endianess
-                    big_endian = True
-
                 if p["Type"] == "fx:COMMON-DATATYPE-TYPE":
                     ret = self.__conf_factory__.create_someip_parameter_basetype(
                         self.get_from_dict_or_none(p, "Name"),
-                        basetype,
-                        big_endian,
+                        self.get_from_dict_or_none(coding2, "Basetype"),
+                        self.get_from_dict_or_none(utils, "HighLowByteOrder"),
                         bitlenbase,
                         bitlenenct
                     )
@@ -273,8 +263,8 @@ class FibexParser(AbstractParser):
                 elif p["Type"] == "fx:ENUM-DATATYPE-TYPE":
                     ret = self.__conf_factory__.create_someip_parameter_basetype(
                         self.get_from_dict_or_none(coding2, "Name"),
-                        basetype,
-                        big_endian,
+                        self.get_from_dict_or_none(coding2, "Basetype"),
+                        self.get_from_dict_or_none(utils, "HighLowByteOrder"),
                         bitlenbase,
                         bitlenenct
                     )
@@ -939,6 +929,7 @@ class FibexParser(AbstractParser):
 
         for e in root.findall('.//fx:ECUS/fx:ECU', self.__ns__):
             ecu_name = self.get_child_text(e, "ho:SHORT-NAME")
+            ecu_id = self.get_attribute(e, "ID")
 
             ctrls = dict()
             for c in e.findall('fx:CONTROLLERS/fx:CONTROLLER', self.__ns__):
@@ -974,8 +965,22 @@ class FibexParser(AbstractParser):
                     channel = None
                     print(f"ERROR in FIBEX: I cannot find channel {channelref}")
 
+                interface_ips = []
                 sockets = []
                 neps = self.parse_neps(c)
+
+                for nepref, nep in neps.items():
+                    ips = []
+                    if "ipsv4" in nep:
+                        for ip in nep["ipsv4"]:
+                            ips += [ip["addr"]]
+                    if "ipsv6" in nep:
+                        for ip in nep["ipsv6"]:
+                            ips += [ip["addr"]]
+
+                    for ip in ips:
+                        if ip not in interface_ips:
+                            interface_ips.append(ip)
 
                 for aep in c.findall('it:APPLICATION-ENDPOINTS/it:APPLICATION-ENDPOINT', self.__ns__):
                     aep_id = self.get_id(aep)
@@ -1040,7 +1045,8 @@ class FibexParser(AbstractParser):
 
                 # build interfaces
                 if channel is not None:
-                    iface = self.__conf_factory__.create_interface(channel["name"], channel["vlanid"], sockets)
+                    iface = self.__conf_factory__.create_interface(channel["name"], channel["vlanid"], interface_ips,
+                                                                   sockets)
                     if ctrl is not None:
                         ctrl["ifaces"] += [iface]
 
@@ -1048,8 +1054,75 @@ class FibexParser(AbstractParser):
             ctrllist = []
             for key in sorted(ctrls.keys()):
                 ctrl = ctrls[key]
-                ctrllist += [self.__conf_factory__.create_controller(ctrl["name"], ctrl["ifaces"])]
-            self.__conf_factory__.create_ecu(ecu_name, ctrllist)
+                tmp = self.__conf_factory__.create_controller(ctrl["name"], ctrl["ifaces"])
+                ctrllist += [tmp]
+
+                assert (tmp not in self.__controllers__)
+                self.__controllers__[key] = tmp
+
+            self.__ecus__[ecu_id] = self.__conf_factory__.create_ecu(ecu_name, ctrllist)
+
+    def parse_topology(self, root, verbose=False):
+        for e in root.findall('.//fx:COUPLING-ELEMENTS/fx:COUPLING-ELEMENT', self.__ns__):
+            switch_name = self.get_child_text(e, "ho:SHORT-NAME")
+            cluster_ref = self.get_child_attribute(e, "fx:CLUSTER-REF", "ID-REF")
+            ecu_ref = self.get_child_attribute(e, "fx:ECU-REF", "ID-REF")
+            coupling_element_type = self.get_child_text(e, "ethernet:COUPLING-ELEMENT-TYPE")
+
+            ecu = self.__ecus__.get(ecu_ref, None)
+
+            if verbose:
+                print(f"{switch_name} cluster_ref:{cluster_ref} ecu_ref:{ecu_ref} "
+                      f"coupling_element_type: {coupling_element_type}")
+
+            if coupling_element_type != "SWITCH":
+                print(f"Found unsupported Coupling Element with coupling_element_type={coupling_element_type}!")
+                continue
+
+            coupling_ports = []
+            for c in e.findall('fx:COUPLING-PORTS/fx:COUPLING-PORT', self.__ns__):
+                coupling_port_id = self.get_attribute(c, "ID")
+                controller_ref = self.get_child_attribute(c, "fx:CONTROLLER-REF", "ID-REF")
+                controller = self.__controllers__.get(controller_ref, None)
+
+                if controller is None:
+                    controller_ref_name = ""
+                else:
+                    controller_ref_name = controller.name()
+
+                coupling_port_ref = self.get_child_attribute(c, "fx:COUPLING-PORT-REF", "ID-REF")
+                coupling_port = self.__coupling_ports__.get(coupling_port_ref, None)
+
+                default_vlan_ref = self.get_child_attribute(c, "ethernet:DEFAULT-VLAN/fx:CHANNEL-REF", "ID-REF")
+
+                if verbose:
+                    default_vlan_name = (self.__channels__.get(default_vlan_ref, {})).get("name", "")
+                    print(f"  Port ID:{coupling_port_id} CTRL-REF:{controller_ref} ({controller_ref_name}) "
+                          f"PORT-REF:{coupling_port_ref} DEFAULT-VLAN:{default_vlan_ref} ({default_vlan_name})")
+
+                # a port can only be connected to an ecu port or a switch port
+                assert (controller is None or coupling_port is None)
+
+                vlans = []
+                for v in c.findall('ethernet:VLAN-MEMBERSHIPS/ethernet:VLAN-MEMBERSHIP', self.__ns__):
+                    channel_ref = self.get_child_attribute(v, "fx:CHANNEL-REF", "ID-REF")
+                    channel_ref_name = (self.__channels__.get(channel_ref, {})).get("name", "")
+                    default_prio = self.get_child_text(v, "ethernet:DEFAULT-PRIORITY/fx:PRIORITY")
+                    if verbose:
+                        print(f"    VLAN Channel:{channel_ref} ({channel_ref_name}) Default-Prio:{default_prio}")
+
+                    channel = self.__channels__.get(channel_ref, {})
+                    vlans.append(self.__conf_factory__.create_vlan(channel["name"], channel["vlanid"], default_prio))
+
+                tmp = self.__conf_factory__.create_switch_port(coupling_port_id, controller, coupling_port,
+                                                               default_vlan_ref, vlans)
+                if coupling_port is not None:
+                    coupling_port.set_connected_port(tmp)
+
+                coupling_ports.append(tmp)
+                self.__coupling_ports__[coupling_port_id] = tmp
+
+            self.__conf_factory__.create_switch(switch_name, ecu, coupling_ports)
 
     def parse_file(self, conf_factory, filename, verbose=False):
         self.__conf_factory__ = conf_factory
@@ -1061,6 +1134,8 @@ class FibexParser(AbstractParser):
             print("*** Parsing Channels ***")
         self.parse_channels(root)
         if verbose:
+            for k, v in self.__channels__.items():
+                print(f"{k}: {v}")
             print("")
 
         if verbose:
@@ -1091,6 +1166,12 @@ class FibexParser(AbstractParser):
         if verbose:
             print("*** Parsing ECUs ***")
         self.parse_ecus(root)
+        if verbose:
+            print("")
+
+        if verbose:
+            print("*** Parsing Topology ***")
+        self.parse_topology(root, verbose)
         if verbose:
             print("")
 

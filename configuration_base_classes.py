@@ -19,6 +19,8 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import ipaddress
+
 
 def bits_to_bytes(bits):
     if bits % 8 == 0:
@@ -28,15 +30,26 @@ def bits_to_bytes(bits):
 
 
 class BaseConfigurationFactory(object):
+    def create_vlan(self, name, vlanid, prio):
+        return BaseVLAN(name, vlanid, prio)
+
+    def create_multicast_path(self, switchport_tx, vlan_tx, source_ip, switchport_rx, vlan_rx, multicast_ip, comment):
+        return BaseMulticastPath(switchport_tx, vlan_tx, source_ip, switchport_rx, vlan_rx, multicast_ip, comment)
+
+    def create_switch(self, name, ecu, ports):
+        return BaseSwitch(name, ecu, ports)
+
+    def create_switch_port(self, portid, ctrl, port, default_vlan, vlans):
+        return BaseSwitchPort(portid, ctrl, port, default_vlan, vlans)
 
     def create_ecu(self, name, controllers):
         return BaseECU(name, controllers)
 
-    def create_controller(self, name, vlans):
-        return BaseController(name, vlans)
+    def create_controller(self, name, interfaces):
+        return BaseController(name, interfaces)
 
-    def create_interface(self, name, vlanid, sockets):
-        return BaseInterface(name, vlanid, sockets)
+    def create_interface(self, name, vlanid, ips, sockets):
+        return BaseInterface(name, vlanid, ips, sockets)
 
     def create_socket(self, name, ip, proto, portnumber,
                       serviceinstances, serviceinstanceclients, eventhandlers, evengroupreceivers
@@ -132,10 +145,143 @@ class BaseItem(object):
         return False
 
 
+class BaseVLAN(BaseItem):
+    def __init__(self, vlan_name, vlan_id, priority):
+        self.__vlan_name__ = vlan_name
+        self.__vlan_id__ = vlan_id
+        self.__priority__ = priority
+
+    def name(self):
+        return self.__vlan_name__
+
+    def vlanid(self):
+        return self.__vlan_id__
+
+    def priority(self):
+        return self.__priority__
+
+
+class BaseMulticastPath(BaseItem):
+    def __init__(self, switchport_tx, vlanid_tx, source_ip, switchport_rx, vlanid_rx, multicast_ip, comment):
+        if vlanid_tx != vlanid_rx:
+            print(f"Currently only Multicast Path with same vlan supported IP:{multicast_ip} vlan_tx:{vlanid_tx} "
+                  f"vlan_rx:{vlanid_rx}!")
+            return None
+
+        self.__vlanid__ = vlanid_tx
+        self.__tx_ip__ = source_ip
+        self.__mc_ip__ = multicast_ip
+        self.__swport_tx__ = switchport_tx
+        self.__swport_rx__ = switchport_rx
+        self.__comment__ = comment
+
+    def vlanid(self):
+        return self.__vlanid__
+
+    def source_ip(self):
+        return self.__tx_ip__
+
+    def mc_ip(self):
+        return self.__mc_ip__
+
+    def switchport_tx(self):
+        if self.__swport_tx__ is None:
+            return None
+        else:
+            return self.__swport_tx__.portid()
+
+    def switchport_rx(self):
+        if self.__swport_rx__ is None:
+            return None
+        else:
+            return self.__swport_rx__.portid()
+
+    def comment(self):
+        return self.__comment__
+
+
+class BaseSwitchPort(BaseItem):
+    def __init__(self, portid, ctrl, port, default_vlan, vlans):
+        self.__portid__ = portid
+        self.__ctrl__ = ctrl
+        self.__port__ = port
+        self.__default_vlan__ = default_vlan
+        self.__vlans__ = vlans
+        self.__switch__ = None
+
+    def portid(self):
+        return self.__portid__
+
+    def set_parent_switch(self, switch):
+        self.__switch__ = switch
+
+    def switch(self):
+        return self.__switch__
+
+    def set_connected_port(self, peer_port):
+        assert (self.__port__ is None)
+        self.__port__ = peer_port
+
+    def connected_to_port(self):
+        return self.__port__
+
+    def set_connected_ctrl(self, peer_ctrl):
+        assert (self.__ctrl__ is None)
+        self.__ctrl__ = peer_ctrl
+
+    def connected_to_ecu_ctrl(self):
+        return self.__ctrl__
+
+    def vlans(self):
+        vlans = []
+
+        for vlan in self.__vlans__:
+            if vlan.vlanid() is None:
+                vlans += [0]
+            else:
+                vlans += [int(vlan.vlanid())]
+
+        return sorted(vlans)
+
+    def vlans_as_strings(self):
+        ret = []
+
+        for vlan in self.vlans():
+            if vlan == 0:
+                ret += ["untagged"]
+            else:
+                ret += [f"0x{vlan:x}"]
+
+        return ret
+
+
+class BaseSwitch(BaseItem):
+    def __init__(self, name, ecu, ports):
+        self.__name__ = name
+        self.__ports__ = ports
+        self.__ecu__ = ecu
+
+        if ecu is not None:
+            ecu.add_switch(self)
+
+        for port in ports:
+            port.set_parent_switch(self)
+
+    def name(self):
+        return self.__name__
+
+    def ecu(self):
+        return self.__ecu__
+
+    def ports(self):
+        return self.__ports__
+
+
 class BaseECU(BaseItem):
     def __init__(self, name, controllers):
         self.__name__ = name
         self.__controllers__ = controllers
+        self.__switches__ = []
 
         for c in controllers:
             c.set_ecu(self)
@@ -145,6 +291,12 @@ class BaseECU(BaseItem):
 
     def controllers(self):
         return self.__controllers__
+
+    def add_switch(self, switch):
+        self.__switches__.append(switch)
+
+    def switches(self):
+        return self.__switches__
 
 
 class BaseController(BaseItem):
@@ -170,9 +322,10 @@ class BaseController(BaseItem):
 
 
 class BaseInterface(BaseItem):
-    def __init__(self, vlanname, vlanid, sockets):
+    def __init__(self, vlanname, vlanid, ips, sockets):
         self.__vlanname__ = vlanname
         self.__sockets__ = sockets
+        self.__ips__ = ips
 
         self.__controller__ = None
 
@@ -190,6 +343,9 @@ class BaseInterface(BaseItem):
     def vlanid(self):
         return self.__vlanid__
 
+    def ips(self):
+        return self.__ips__
+
     def sockets(self):
         return self.__sockets__
 
@@ -205,6 +361,12 @@ class BaseSocket(BaseItem):
                  eventgroupreceivers):
         self.__name__ = name
         self.__ip__ = ip
+
+        try:
+            self.__ipaddress__ = ipaddress.ip_address(ip)
+        except ValueError:
+            self.__ipaddress__ = None
+
         self.__proto__ = proto
         self.__portnumber__ = int(portnumber)
         self.__instances__ = serviceinstances
@@ -229,11 +391,21 @@ class BaseSocket(BaseItem):
             for i in eventgroupreceivers:
                 i.setsocket(self)
 
+
     def name(self):
         return self.__name__
 
     def ip(self):
         return self.__ip__
+
+    def is_ipv4(self):
+        return type(self.__ipaddress__) == ipaddress.IPv4Address
+
+    def is_ipv6(self):
+        return type(self.__ipaddress__) == ipaddress.IPv6Address
+
+    def is_multicast(self):
+        return self.__ipaddress__ is not None and self.__ipaddress__.is_multicast
 
     def proto(self):
         return self.__proto__

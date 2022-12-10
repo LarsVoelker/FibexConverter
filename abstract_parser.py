@@ -23,7 +23,6 @@ import isodate
 
 
 class AbstractParser(object):
-
     def __init__(self):
         self.__conf_factory__ = None
         self.__ns__ = {}

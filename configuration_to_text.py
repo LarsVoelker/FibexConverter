@@ -32,7 +32,17 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def __init__(self):
         self.__services__ = dict()
         self.__services_long__ = dict()
+        self.__switches__ = dict()
         self.__ecus__ = dict()
+
+    def create_switch(self, name, ecu, ports):
+        ret = Switch(name, ecu, ports)
+        assert (name not in self.__switches__)
+        self.__switches__[name] = ret
+        return ret
+
+    def create_switch_port(self, portid, ctrl, port, default_vlan, vlans):
+        return SwitchPort(portid, ctrl, port, default_vlan, vlans)
 
     def create_ecu(self, name, controllers):
         ret = ECU(name, controllers)
@@ -40,12 +50,12 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__ecus__[name] = ret
         return ret
 
-    def create_controller(self, name, vlans):
-        ret = Controller(name, vlans)
+    def create_controller(self, name, interfaces):
+        ret = Controller(name, interfaces)
         return ret
 
-    def create_interface(self, name, vlanid, sockets):
-        ret = Interface(name, vlanid, sockets)
+    def create_interface(self, name, vlanid, ips, sockets):
+        ret = Interface(name, vlanid, ips, sockets)
         return ret
 
     def create_socket(self, name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
@@ -201,6 +211,37 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         for name in sorted(self.__ecus__):
             ret += self.__ecus__[name].str(2)
 
+        ret += "\nSwitches: \n"
+        for name in sorted(self.__switches__):
+            ret += self.__switches__[name].str(2, print_ecu_name=True)
+
+        return ret
+
+
+class Switch(BaseSwitch):
+    def str(self, indent, print_ecu_name=False):
+        ret = indent * " "
+        tmp = f" of ECU {self.__ecu__.name()}" if print_ecu_name else ""
+        ret += f"Switch {self.__name__}{tmp}\n"
+        for port in self.__ports__:
+            ret += port.str(indent + 2)
+        return ret
+
+
+class SwitchPort(BaseSwitchPort):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"SwitchPort {self.__portid__} <-> "
+        if self.__port__ is not None:
+            tmp = f"of {self.__port__.switch().name()}" if self.__port__.switch() is not None else ""
+            ret += f"SwitchPort {self.__port__.portid()} {tmp}\n"
+        elif self.__ctrl__ is not None:
+            ret += f"Controller {self.__ctrl__.name()} of {self.__ctrl__.ecu().name()}\n"
+        else:
+            ret += "\n"
+
+        ret += (indent + 2) * " "
+        ret += f"VLANs ({','.join(self.vlans_as_strings())})\n"
         return ret
 
 
@@ -211,6 +252,9 @@ class ECU(BaseECU):
 
         for c in self.__controllers__:
             ret += c.str(indent + 2)
+
+        for s in self.__switches__:
+            ret += s.str(indent + 2)
 
         return ret
 
@@ -643,9 +687,9 @@ def main():
         os.makedirs(target_dir)
         time.sleep(0.5)
 
-    f = open(textfile, "w")
-    f.write("%s" % conf_factory)
-    f.close()
+    with open(textfile, "w") as f:
+        f.write("%s" % conf_factory)
+
     print("Done.")
 
 
