@@ -487,16 +487,21 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                             if len(tmp) == 4:
                                 start = int(tmp[0])
                                 if start < 224:
-                                    ips[ip] = ecuname
+                                    if ip not in ips.keys():
+                                        ips[ip] = dict()
+                                    ips[ip][ecuname] = ecuname
                             else:
                                 # assume IPv6
-                                if not ip.startswith("ff00"):
-                                    ips[ip] = ecuname
+                                if not ip.startswith("ff"):
+                                    if ip not in ips.keys():
+                                        ips[ip] = dict()
+                                    ips[ip][ecuname] = ecuname
                         except ValueError:
                             pass
 
         for ip in sorted(ips):
-            f.write(f"{ip}\t{ips[ip]}\n")
+            ecu_names = "__".join(ips[ip])
+            f.write(f"{ip}\t{ecu_names}\n")
 
         f.close()
 
