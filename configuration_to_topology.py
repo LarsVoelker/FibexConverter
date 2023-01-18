@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2022  Dr. Lars Voelker
+# Copyright (C) 2015-2023  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
-# Copyright (C) 2020-2022  Dr. Lars Voelker, Technica Engineering GmbH
+# Copyright (C) 2020-2023  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
@@ -26,6 +26,8 @@ from graphviz import Graph
 
 from parser import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
+
+DUMMY_SWITCH_NAME = ""
 
 
 class TopologyTableEntry:
@@ -155,6 +157,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__service_instance_provider_sockets__ = dict()
         self.__service_instance_consumer_sockets__ = dict()
 
+        # create dummy ECU for unconnected switches
+        self.__dummy_ecu__ = self.create_ecu(DUMMY_SWITCH_NAME, ())
+
     def __add_service_instance_provider_socket__(self, serviceid, instanceid, swport, socket):
         key = (serviceid << 16) + instanceid
         if key not in self.__service_instance_provider_sockets__.keys():
@@ -192,6 +197,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         return tmp
 
     def create_switch(self, name, ecu, ports):
+        if ecu is None:
+            ecu = self.__dummy_ecu__
+
         ret = Switch(name, ecu, ports)
         assert (name not in self.__switches__)
         self.__switches__[name] = ret
@@ -466,22 +474,27 @@ class ECU(BaseECU):
                     ret.append(';'.join(tmp.to_output_set(vlan_cols)))
                 elif peerport is not None:
                     peerswitch = peerport.switch()
-                    tmp = TopologyTableEntry(self.name(), None, switch.name(), swport.portid(),
-                                             peerswitch.ecu().name(), None, peerswitch.name(), peerport.portid(),
-                                             swport.vlans())
-                    ret.append(';'.join(tmp.to_output_set(vlan_cols)))
-
-                    # checking for asymmetry
-                    if len(swport.vlans()) != len(peerport.vlans()):
-                        print(f"Warning: Different number of vlans for "
-                              f"{self.name()} {switch.name()} {swport.portid()} -> "
-                              f"{peerswitch.ecu().name()} {peerswitch.name()} {peerport.portid()}")
+                    if peerswitch is None:
+                        print(f"ERROR: topology_table: peerswitch is None for peerport {peerport.portid()}")
+                    elif peerswitch.ecu() is None:
+                        print(f"ERROR: topology_table: peerswitch.ecu() is None for peerport {peerport.portid()}")
                     else:
-                        for v in swport.vlans():
-                            if v not in peerport.vlans():
-                                print(f"Warning: VLAN {v} not found in peer port "
-                                      f"{self.name()} {switch.name()} {swport.portid()} -> "
-                                      f"{peerswitch.ecu().name()} {peerswitch.name()} {peerport.portid()}")
+                        tmp = TopologyTableEntry(self.name(), None, switch.name(), swport.portid(),
+                                                 peerswitch.ecu().name(), None, peerswitch.name(), peerport.portid(),
+                                                 swport.vlans())
+                        ret.append(';'.join(tmp.to_output_set(vlan_cols)))
+
+                        # checking for asymmetry
+                        if len(swport.vlans()) != len(peerport.vlans()):
+                            print(f"Warning: Different number of vlans for "
+                                  f"{self.name()} {switch.name()} {swport.portid()} -> "
+                                  f"{peerswitch.ecu().name()} {peerswitch.name()} {peerport.portid()}")
+                        else:
+                            for v in swport.vlans():
+                                if v not in peerport.vlans():
+                                    print(f"Warning: VLAN {v} not found in peer port "
+                                          f"{self.name()} {switch.name()} {swport.portid()} -> "
+                                          f"{peerswitch.ecu().name()} {peerswitch.name()} {peerport.portid()}")
 
         return ret
 
