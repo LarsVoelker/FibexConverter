@@ -35,6 +35,12 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__switches__ = dict()
         self.__ecus__ = dict()
 
+        self.__codings__ = dict()
+        self.__signals__ = dict()
+        self.__pdus__ = dict()
+        self.__frame_triggerings__ = dict()
+        self.__frames__ = dict()
+
     def create_switch(self, name, ecu, ports):
         ret = Switch(name, ecu, ports)
         assert (name not in self.__switches__)
@@ -62,6 +68,37 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                       eventgroupreceivers):
         ret = Socket(name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
                      eventgroupreceivers)
+        return ret
+
+    def create_signal_instance(self, id, signal_ref, bit_position, is_high_low_byte_order):
+        ret = Signal_Instance(id, signal_ref, bit_position,
+                              is_high_low_byte_order)
+        return ret
+
+    def create_pdu(self, id, short_name, byte_length, pdu_type, mux_pdu, signal_instances):
+        ret = PDU(id, short_name, byte_length,
+                  pdu_type, mux_pdu, signal_instances)
+        assert (short_name not in self.__frames__)
+        self.__pdus__[short_name] = ret
+        return ret
+
+    def create_pdu_instance(self, id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position):
+        ret = PDU_Instance(id, pdu_ref, bit_position,
+                           is_high_low_byte_order, pdu_update_bit_position)
+        return ret
+
+    def create_frame(self, id, short_name, byte_length, frame_type, pdu_instances, slot_id, base_cycle, cycle_repitition):
+        ret = Frame(id, short_name, byte_length, frame_type,
+                    pdu_instances, slot_id, base_cycle, cycle_repitition)
+        assert (short_name not in self.__frames__)
+        self.__frames__[short_name] = ret
+        return ret
+
+    def create_frame_triggering(self, id, slot_id, base_cycle, cycle_repitition, frame_ref):
+        ret = Frame_Triggering(id, slot_id, base_cycle,
+                               cycle_repitition, frame_ref)
+        assert (frame_ref not in self.__frame_triggerings__)
+        self.__frame_triggerings__[frame_ref] = ret
         return ret
 
     def create_someip_service_instance(self, service, instanceid, protover):
@@ -166,6 +203,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def create_legacy_signal(self, id, name, compu_scale, compu_consts):
         ret = SOMEIPLegacySignal(id, name, compu_scale, compu_consts)
+        self.__signals__[name] = ret
         return ret
 
     def add_service(self, serviceid, majorver, minorver, service):
@@ -202,6 +240,20 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             else:
                 return None
 
+    def get_signal(self, signal_ref):
+        for _, value in self.__signals__.items():
+            if value.__id__ == signal_ref:
+                return value
+
+        return None
+    
+    def get_pdu(self, pdu_ref):
+        for _, value in self.__pdus__.items():
+            if value.__id__ == pdu_ref:
+                return value
+
+        return None
+
     def __str__(self):
         ret = "Services: \n"
         for serviceid in sorted(self.__services__):
@@ -214,6 +266,18 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret += "\nSwitches: \n"
         for name in sorted(self.__switches__):
             ret += self.__switches__[name].str(2, print_ecu_name=True)
+
+        ret += "\nFrames: \n"
+        for name in sorted(self.__frames__):
+            ret += self.__frames__[name].str(2)
+
+        ret += "\nPDUs: \n"
+        for name in sorted(self.__pdus__):
+            ret += self.__pdus__[name].str(2)
+
+        ret += "\nSignals: \n"
+        for name in sorted(self.__signals__):
+            ret += self.__signals__[name].str(2)
 
         return ret
 
@@ -258,6 +322,50 @@ class ECU(BaseECU):
 
         return ret
 
+class Frame(BaseFrame):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Frame {self.__short_name__}\n"
+
+        for p in self.__pdu_instances__.keys():
+            ret += self.__pdu_instances__[p].str(indent + 2)
+
+        # for s in self.__switches__:
+        #    ret += s.str(indent + 2)
+
+        return ret
+
+
+class PDU(BasePDU):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"PDU {self.__short_name__}\n"
+
+        return ret
+
+
+class PDU_Instance(BasePDUInstance):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"PDU {self.__pdu__.__short_name__}\n"
+
+        return ret
+
+
+class Signal_Instance(BaseSignalInstance):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Signal {self.__signal__.__name__}\n"
+
+        return ret
+
+
+class Frame_Triggering(BaseFrameTriggering):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"FrameTriggering {self.__frame_ref__}\n"
+
+        return ret
 
 class Controller(BaseController):
     def str(self, indent):
