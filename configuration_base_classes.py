@@ -144,6 +144,21 @@ class BaseItem(object):
     def legacy(self):
         return False
 
+class BaseCoding(BaseItem):
+    def __init__(self, id, name, coded_basetype, coded_category, coded_termination, coded_bit_length, coded_max_length, compu_scale, compu_consts):
+        self.__id__ = id
+        self.__name__ = name
+        self.__coded_basetype__ = coded_basetype
+        self.__coded_category__ = coded_category
+        self.__coded_termination__ = coded_termination
+        self.__coded_bit_length__ = coded_bit_length
+        self.__coded_max_length__ = coded_max_length
+        self.__compu_scale__ = compu_scale
+        self.__compu_consts__ = compu_consts
+    
+    def name(self):
+        return self.__name__
+
 
 class BaseVLAN(BaseItem):
     def __init__(self, vlan_name, vlan_id, priority):
@@ -1474,3 +1489,97 @@ class SOMEIPBaseLegacySignal(BaseItem):
                 self.compu_scale() == other.compu_scale() and
                 self.compu_consts() == other.compu_consts()
         )
+
+class BaseSignal(BaseItem):
+    def __init__(self, id, name, coding_ref, compu_scale, compu_const):
+        self.__id__ = id
+        self.__name__ = name
+        self.__coding_ref__ = coding_ref
+        self.__compu_scale__ = compu_scale
+        self.__compu_consts__ = compu_const
+
+    def id(self):
+        return self.__id__
+
+    def name(self):
+        return self.__name__
+
+    def compu_scale(self):
+        return self.__compu_scale__
+
+    def compu_consts(self):
+        return self.__compu_consts__
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        return (
+                self.id() == self.id() and
+                self.name() == other.name() and
+                self.compu_scale() == other.compu_scale() and
+                self.compu_consts() == other.compu_consts()
+        )
+class BaseSignalInstance(BaseItem):   
+    def __init__(self, id, signal_ref, bit_position, is_high_low_byte_order):    
+        self.__id__ = id
+        self.__signal_ref__ = signal_ref
+        self.__bit_position__ = bit_position
+        self.__is_high_low_byte_order__ = is_high_low_byte_order
+        self.__signal__ = None
+    
+    def add_signal(self, signal):
+        self.__signal__ = signal
+
+class BasePDU(BaseItem):
+    def __init__(self, id, short_name, byte_length, pdu_type, mux_pdu, signal_instances):    
+        self.__id__ = id
+        self.__short_name__ = short_name
+        self.__byte_length__ = byte_length
+        self.__pdu_type__ = pdu_type
+        self.__mux_pdu__ = mux_pdu
+        self.__signal_instances__ = signal_instances
+
+
+class BasePDUInstance(BaseItem):
+    def __init__(self, id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position):    
+        self.__id__ = id
+        self.__pdu_ref__ = pdu_ref
+        self.__bit_position__ = bit_position
+        self.__is_high_low_byte_order__ = is_high_low_byte_order
+        self.__pdu_update_bit_position__ = pdu_update_bit_position
+        self.__pdu__ = None
+
+    def add_pdu(self, pdu):
+        self.__pdu__ = pdu
+        
+class BaseFrame(BaseItem):
+    def __init__(self, id, short_name, frame_type, byte_length, pdu_instances, slot_id, base_cycle, cycle_repitition):
+        self.__id__ = id
+        self.__short_name__ = short_name
+        self.__byte_length__ = byte_length
+        self.__frame_type__ = frame_type
+        self.__pdu_instances__ = pdu_instances
+        self.__slot_id__ = slot_id
+        self.__base_cycle__ = base_cycle
+        self.__cycle_repitition__ = cycle_repitition
+    
+    def add_pdu_instance(self, pdu_instance):
+        self.__pdu_instances__[pdu_instance.__pdu_ref__] = pdu_instance
+
+    def short_name(self):
+        return self.__short_name__
+
+class BaseFrameTriggering(BaseItem):
+    def __init__(self, id, slot_id, base_cycle, cycle_repitition, frame_ref):
+        self.__id__ = id
+        self.__slot_id__ = slot_id
+        self.__base_cycle__ = base_cycle
+        self.__cycle_repitition__ = cycle_repitition
+        self.__frame_ref__ = frame_ref
+    
+    def frame_ref(self):
+        return self.__frame_ref__
+    
+    def return_scheduling(self):
+        return self.__slot_id__, self.__base_cycle__, self.__cycle_repitition__
