@@ -43,6 +43,10 @@ class FibexParser(AbstractParser):
         self.__ecus__ = dict()
         self.__coupling_ports__ = dict()
 
+        self.__frames__ = dict()
+        self.__frame_triggerings__ = dict()
+        self.__pdus__ = dict()
+
         # FIBEX-ID -> (FIBEX-ID of Service, Eventgroup-ID)
         self.__eventgrouprefs__ = dict()
 
@@ -217,6 +221,85 @@ class FibexParser(AbstractParser):
             s = self.parse_signal(signal)
             if s is not None:
                 self.__signals__[s.id()] = s
+
+    def parse_signal_instance(self, element):
+        id = self.get_id(element)
+        bit_position = self.get_child_text(element, './/fx:BIT-POSITION')
+        is_high_low_byte_order = self.get_child_text(element, './/fx:IS-HIGH-LOW-BYTE-ORDER')
+        signal_ref = self.get_child_attribute(element, './/fx:SIGNAL-REF', 'ID-REF')
+
+        ret = self.__conf_factory__.create_signal_instance(id, signal_ref, bit_position, is_high_low_byte_order)
+        return ret
+
+    def parse_pdu(self, element):
+        id = self.get_id(element)
+        short_name = self.get_child_text(element, './ho:SHORT-NAME')   
+        byte_length = self.get_child_text(element, './fx:BYTE-LENGTH')
+        pdu_type = self.get_child_text(element, './fx:PDU-TYPE')
+        
+        if element.find('.//fx:MULTIPLEXER', self.__ns__) or 'mux' in id: #Multiplexer PDU, like e.g. FZP_01
+            mux_pdu = True
+        else:
+            mux_pdu = False
+        signal_instances = dict()
+        for signal_instance in element.findall('.//fx:SIGNAL-INSTANCE', self.__ns__):
+            si = self.parse_signal_instance(signal_instance)
+            si.add_signal(self.__conf_factory__.get_signal(si.__signal_ref__))
+            if si is not None:
+                signal_instances[si.__id__] = si
+
+        self.__pdus__[short_name] = self.__conf_factory__.create_pdu(id, short_name, byte_length, pdu_type, mux_pdu, signal_instances)
+
+    def parse_pdus(self, root):
+        for pdu in root.findall('.//fx:PDUS/fx:PDU', self.__ns__):
+            p = self.parse_pdu(pdu)
+            if p is not None:
+                self.__pdus__[p.id()] = p
+
+    def parse_pdu_instance(self, element):
+        id = self.get_id(element)
+        pdu_ref = self.get_child_attribute(element, './/fx:PDU-REF', 'ID-REF')   
+        bit_position = self.get_child_text(element, './/fx:BIT-POSITION')
+        is_high_low_byte_order = self.get_child_text(element, './/fx:IS-HIGH-LOW-BYTE-ORDER')       
+        pdu_update_bit_position = self.get_child_text(element, './/fx:PDU-UPDATE-BIT-POSITION')
+        ret = self.__conf_factory__.create_pdu_instance(id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position)
+        return ret
+
+    def parse_frames(self, root):
+        for frame in root.findall('.//fx:FRAMES/fx:FRAME', self.__ns__):
+            f = self.parse_frame(frame)
+            if f is not None:
+                self.__frames__[f.short_name()] = f
+
+    def parse_frame(self, element):
+        id = self.get_id(element)
+        short_name = self.get_child_text(element, './ho:SHORT-NAME')
+        byte_length = self.get_child_text(element, './fx:BYTE-LENGTH')
+        frame_type = self.get_child_text(element, './fx:FRAME-TYPE')
+        pdu_instances = dict()
+        for pdu_instance in element.findall('.//fx:PDU-INSTANCE', self.__ns__):
+            pi = self.parse_pdu_instance(pdu_instance)
+            pi.add_pdu(self.__conf_factory__.get_pdu(pi.__pdu_ref__))
+            if pi is not None:
+                pdu_instances[pi.__id__] = pi
+        
+        slot_id, base_cycle, cycle_repitition = self.__frame_triggerings__[short_name].return_scheduling()
+        ret = self.__conf_factory__.create_frame(id, short_name, byte_length, frame_type, pdu_instances, slot_id, base_cycle, cycle_repitition)
+
+    def parse_frame_triggerings(self, root):
+        for frame_triggering in root.findall('.//fx:FRAME-TRIGGERING', self.__ns__):
+            f = self.parse_frame_triggering(frame_triggering)
+            if f is not None:
+                self.__frame_triggerings__[f.frame_ref()] = f
+
+    def parse_frame_triggering(self, element):
+        id = self.get_id(element)
+        slot_id = int(self.get_child_text(element, './/fx:SLOT-ID'))
+        base_cycle = int(self.get_child_text(element, './/fx:BASE-CYCLE'))
+        cycle_repitition = int(self.get_child_text(element, './/fx:CYCLE-REPETITION'))
+        frame_ref = self.get_child_attribute(element, './/fx:FRAME-REF', 'ID-REF')
+        ret = self.__conf_factory__.create_frame_triggering(id, slot_id, base_cycle, cycle_repitition, frame_ref)
+        return ret
 
     def interpret_datatype(self, element, utils, serialization_attributes):
         ret = None
@@ -1174,6 +1257,26 @@ class FibexParser(AbstractParser):
         self.parse_topology(root, verbose)
         if verbose:
             print("")
+
+        if verbose:
+            print("*** Parsing PDUs ***")
+        self.parse_pdus(root)
+        if verbose:
+            print("")
+
+        if verbose:
+            print("*** Parsing FrameTriggering***")
+        self.parse_frame_triggerings(root)
+        if verbose:
+            print("")
+
+        if verbose:
+            print("*** Parsing Frames ***")
+        self.parse_frames(root)
+        if verbose:
+            print("")
+
+
 
 
 def main():
