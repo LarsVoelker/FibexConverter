@@ -852,6 +852,9 @@ class SOMEIPBaseServiceField(BaseItem):
             ret += p.size_min_bits()
         return bits_to_bytes(ret)
 
+    def params(self):
+        return self.__params__
+
     def size_max_in(self):
         ret = 0
         for p in self.__params__:
