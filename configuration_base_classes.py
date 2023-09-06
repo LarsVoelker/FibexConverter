@@ -34,13 +34,18 @@ class BaseConfigurationFactory(object):
         return BaseVLAN(name, vlanid, prio)
 
     def create_multicast_path(self, switchport_tx, vlan_tx, source_ip, switchport_rx, vlan_rx, multicast_ip, comment):
-        return BaseMulticastPath(switchport_tx, vlan_tx, source_ip, switchport_rx, vlan_rx, multicast_ip, comment)
+        sip = ipaddress.ip_address(source_ip)
+        mip = ipaddress.ip_address(multicast_ip)
+        return BaseMulticastPath(switchport_tx, vlan_tx, sip, switchport_rx, vlan_rx, mip, comment)
 
     def create_switch(self, name, ecu, ports):
         return BaseSwitch(name, ecu, ports)
 
     def create_switch_port(self, portid, ctrl, port, default_vlan, vlans):
         return BaseSwitchPort(portid, ctrl, port, default_vlan, vlans)
+
+    def create_ethernet_bus(self, name, connected_ctrls, switch_ports):
+        return BaseEthernetBus(name, connected_ctrls, switch_ports)
 
     def create_ecu(self, name, controllers):
         return BaseECU(name, controllers)
@@ -139,6 +144,13 @@ class BaseConfigurationFactory(object):
     def create_legacy_signal(self, id, name, compu_scale, compu_consts):
         return SOMEIPBaseLegacySignal(id, name, compu_scale, compu_consts)
 
+    def create_pdu_route(self, sender_socket, receiving_socket, pdu_name, pdu_id):
+        if sender_socket.is_multicast():
+            print(f"ERROR: Multicast Sockets cannot be used for sending!"
+                  f" {sender_socket.ip()} -> {receiving_socket.ip()}: {pdu_name} 0x{pdu_id:08x}")
+            return False
+        return True
+
 
 class BaseItem(object):
     def legacy(self):
@@ -185,12 +197,18 @@ class BaseMulticastPath(BaseItem):
         return self.__mc_ip__
 
     def switchport_tx(self):
+        return self.__swport_tx__
+
+    def switchport_tx_name(self):
         if self.__swport_tx__ is None:
             return None
         else:
             return self.__swport_tx__.portid()
 
     def switchport_rx(self):
+        return self.__swport_rx__
+
+    def switchport_rx_name(self):
         if self.__swport_rx__ is None:
             return None
         else:
@@ -199,15 +217,30 @@ class BaseMulticastPath(BaseItem):
     def comment(self):
         return self.__comment__
 
+    def __append_to_comment__(self, txt):
+        self.__comment__ += txt
+
 
 class BaseSwitchPort(BaseItem):
+    # TODO: we need to add ethernet_bus to init!?
     def __init__(self, portid, ctrl, port, default_vlan, vlans):
+        assert(ctrl is None or port is None)
+
         self.__portid__ = portid
         self.__ctrl__ = ctrl
         self.__port__ = port
+        self.__eth_bus__ = None
         self.__default_vlan__ = default_vlan
         self.__vlans__ = vlans
         self.__switch__ = None
+
+    def __repr__(self):
+        switch_name = "<unknown>"
+        if self.__switch__ is not None:
+            switch_name = self.__switch__.name()
+
+        return f"{switch_name}.{self.__portid__}"
+
 
     def portid(self):
         return self.__portid__
@@ -219,15 +252,38 @@ class BaseSwitchPort(BaseItem):
         return self.__switch__
 
     def set_connected_port(self, peer_port):
+        assert (peer_port is not None)
         assert (self.__port__ is None)
+
+        if self.__ctrl__ is not None or self.__eth_bus__ is not None != 0:
+            print(f"WARNING: SwitchPort {self.__portid__} adds port but was connected before! Overwritting!")
+
         self.__port__ = peer_port
 
     def connected_to_port(self):
         return self.__port__
 
+    def set_ethernet_bus(self, eth_bus):
+        assert(eth_bus is not None)
+        assert(self.__eth_bus__ is None)
+
+        if self.__ctrl__ is not None or self.__eth_bus__ is not None:
+            print(f"WARNING: SwitchPort {self.__portid__} adds eth bus but was connected before! Overwritting!")
+
+        self.__eth_bus__ = eth_bus
+
+    def connected_to_eth_bus(self):
+        return self.__eth_bus__
+
     def set_connected_ctrl(self, peer_ctrl):
+        assert (peer_ctrl is not None)
         assert (self.__ctrl__ is None)
+
+        if self.__port__ is not None or self.__eth_bus__ is not None:
+            print(f"WARNING: SwitchPort {self.__portid__} adds ctrl to port but was connected before! Overwritting!")
+
         self.__ctrl__ = peer_ctrl
+        peer_ctrl.set_switch_port(self)
 
     def connected_to_ecu_ctrl(self):
         return self.__ctrl__
@@ -277,6 +333,26 @@ class BaseSwitch(BaseItem):
         return self.__ports__
 
 
+class BaseEthernetBus(BaseItem):
+    def __init__(self, name, connected_ctrls, switch_ports):
+        self.__name__ = name
+        self.__ctrls__ = connected_ctrls
+        self.__ports__ = switch_ports
+
+        # connect the controllers to us!
+        for ctrl in connected_ctrls:
+            ctrl.set_eth_bus(self)
+
+    def name(self):
+        return self.__name__
+
+    def connected_controllers(self):
+        return self.__ctrls__
+
+    def switch_ports(self):
+        return self.__ports__
+
+
 class BaseECU(BaseItem):
     def __init__(self, name, controllers):
         self.__name__ = name
@@ -304,6 +380,8 @@ class BaseController(BaseItem):
         self.__name__ = name
         self.__interfaces__ = interfaces
         self.__ecu__ = None
+        self.__peer_port__ = None
+        self.__eth_bus__ = None
 
         for i in interfaces:
             i.set_controller(self)
@@ -314,12 +392,39 @@ class BaseController(BaseItem):
     def interfaces(self):
         return self.__interfaces__
 
+    def vlans(self):
+        ret = []
+        vlans = []
+
+        for interface in self.__interfaces__:
+            if interface.vlanid() is None:
+                vlans += [0]
+            else:
+                vlans += [int(interface.vlanid())]
+
+        return sorted(vlans)
+
     def set_ecu(self, ecu):
         self.__ecu__ = ecu
 
     def ecu(self):
         return self.__ecu__
 
+    def set_switch_port(self, peer_port):
+        assert(self.__peer_port__ is None)
+        assert(self.__eth_bus__ is None)
+        self.__peer_port__ = peer_port
+
+    def get_switch_port(self):
+        return self.__peer_port__
+
+    def set_eth_bus(self, eth_buf):
+        assert(self.__peer_port__ is None)
+        assert(self.__eth_bus__ is None)
+        self.__eth_bus__ = eth_buf
+
+    def get_eth_bus(self):
+        return self.__eth_bus__
 
 class BaseInterface(BaseItem):
     def __init__(self, vlanname, vlanid, ips, sockets):
@@ -391,6 +496,18 @@ class BaseSocket(BaseItem):
             for i in eventgroupreceivers:
                 i.setsocket(self)
 
+    # TODO: XXX REMOVE AGAIN?
+    def __eq__(self, other):
+        if not isinstance(other, BaseSocket):
+            # don't attempt to compare against unrelated types
+            return NotImplemented
+
+        self_if = None if self.__interface__ is None else self.__interface__.controller().name()
+        othr_if = None if other.__interface__ is None else other.__interface__.controller().name()
+
+        return self.__name__ == other.__name__ and self.__ip__ == other.__ip__ \
+               and self.__ipaddress__ == other.__ipaddress__ and self.__proto__ == other.__proto__ \
+               and  self.__portnumber__ == other.__portnumber__ and self_if != othr_if
 
     def name(self):
         return self.__name__
@@ -851,9 +968,6 @@ class SOMEIPBaseServiceField(BaseItem):
         for p in self.__params__:
             ret += p.size_min_bits()
         return bits_to_bytes(ret)
-
-    def params(self):
-        return self.__params__
 
     def size_max_in(self):
         ret = 0
