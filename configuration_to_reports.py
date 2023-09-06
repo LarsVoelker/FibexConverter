@@ -24,7 +24,7 @@ import time
 import os.path
 import argparse
 
-from parser import *  # @UnusedWildImport
+from parser_dispatcher import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
 
 
@@ -618,18 +618,6 @@ def read_hex_integer_file(f):
     return ret
 
 
-def parse_arguments():
-    parser = argparse.ArgumentParser(description='Converting configuration to reports.')
-    parser.add_argument('type', choices=['FIBEX'], help='format')
-    parser.add_argument('filename', help='filename')
-    parser.add_argument('--ignore-ecus', type=argparse.FileType('r'), default=None, help='ignore-ecus-list')
-    parser.add_argument('--ignore-services', type=argparse.FileType('r'), default=None, help='ignore-services-list')
-    parser.add_argument('--ecu-order', type=argparse.FileType('r'), default=None, help='ecu-order')
-
-    args = parser.parse_args()
-    return args
-
-
 def order_ecunames(ecunames, ecu_order):
     ret = []
 
@@ -943,12 +931,20 @@ def generate_service_matrix(target_dir, filenoext, postfix, ecunames, ignored_ec
     f.close()
 
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Converting configuration to reports.')
+    parser.add_argument('type', choices=parser_formats, help='format')
+    parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
+    parser.add_argument('--ignore-ecus', type=argparse.FileType('r'), default=None, help='ignore-ecus-list')
+    parser.add_argument('--ignore-services', type=argparse.FileType('r'), default=None, help='ignore-services-list')
+    parser.add_argument('--ecu-order', type=argparse.FileType('r'), default=None, help='ecu-order')
+
+    args = parser.parse_args()
+    return args
+
+
 def main():
     print("Converting configuration to reports")
-
-    # if len(sys.argv)!=5:
-    #    help_and_exit()
-    # 
     args = parse_arguments()
 
     # load configs

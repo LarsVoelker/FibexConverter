@@ -22,8 +22,9 @@
 import sys
 import time
 import os.path
+import argparse
 
-from parser import *  # @UnusedWildImport
+from parser_dispatcher import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
 
 
@@ -560,27 +561,21 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
         f.write("%s</Choice>\n" % identtabs)
 
 
-def help_and_exit():
-    print("illegal arguments!")
-    print(f"  {sys.argv[0]} type filename")
-    print(f"  example: {sys.argv[0]} FIBEX test.xml")
-    sys.exit(-1)
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Converting configuration to peach xml.')
+    parser.add_argument('type', choices=parser_formats, help='format')
+    parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
+
+    args = parser.parse_args()
+    return args
 
 
 def main():
     print("Converting configuration to peach xml\n")
+    args = parse_arguments()
 
-    if len(sys.argv) != 3:
-        help_and_exit()
-
-    (t, filename) = sys.argv[1:]
-
-    # we only support single files
-    if not os.path.isfile(filename):
-        help_and_exit()
-
-    confFactory = PeachConfigurationFactory()
-    output_dir = parse_input_files(filename, t, confFactory)
+    conf_factory = PeachConfigurationFactory()
+    output_dir = parse_input_files(args.filename, args.type, conf_factory)
 
     target_dir = os.path.join(output_dir, "peach")
 
@@ -588,7 +583,7 @@ def main():
         os.makedirs(target_dir)
         time.sleep(0.5)
 
-    confFactory.generate_configs(target_dir)
+    conf_factory.generate_configs(target_dir)
 
     print("Done.")
 

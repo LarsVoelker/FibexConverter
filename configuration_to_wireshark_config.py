@@ -23,7 +23,7 @@ import sys
 import time
 import os.path
 
-from parser import * # @UnusedWildImport
+from parser_dispatcher import * # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
 
 DEBUG_LEGACY_STRIPPING = False

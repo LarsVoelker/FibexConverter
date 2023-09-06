@@ -22,8 +22,9 @@
 import sys
 import time
 import os.path
+import argparse
 
-from parser import *  # @UnusedWildImport
+from parser_dispatcher import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
 
 
@@ -647,38 +648,29 @@ class SOMEIPLegacySignal(SOMEIPBaseLegacySignal):
         return ret + "\n"
 
 
-################################################################################
-# just a simple main for testing the code of this file ...
-#
+def parse_arguments():
+    parser = argparse.ArgumentParser(description='Converting configuration to text.')
+    parser.add_argument('type', choices=parser_formats, help='format')
+    parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
 
-def help_and_exit():
-    print("illegal arguments!")
-    print(f"  {sys.argv[0]} type filename")
-    print(f"  example: {sys.argv[0]} FIBEX test.xml")
-    sys.exit(-1)
+    args = parser.parse_args()
+    return args
 
 
 def main():
     print("Converting configuration to text")
-
-    if len(sys.argv) != 3:
-        help_and_exit()
-
-    (t, filename) = sys.argv[1:]
+    args = parse_arguments()
 
     conf_factory = SimpleConfigurationFactory()
-    output_dir = parse_input_files(filename, t, conf_factory)
-
-    if output_dir is None:
-        help_and_exit()
+    output_dir = parse_input_files(args.filename, args.type, conf_factory)
 
     print("Generating output directories:")
 
-    if os.path.isdir(filename):
+    if os.path.isdir(args.filename):
         target_dir = os.path.join(output_dir, "text")
         textfile = os.path.join(target_dir, "all_files" + ".txt")
-    elif os.path.isfile(filename):
-        (path, f) = os.path.split(filename)
+    elif os.path.isfile(args.filename):
+        (path, f) = os.path.split(args.filename)
         filenoext = '.'.join(f.split('.')[:-1])
         target_dir = os.path.join(output_dir, "text")
         textfile = os.path.join(target_dir, filenoext + ".txt")
