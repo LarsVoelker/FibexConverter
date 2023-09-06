@@ -157,14 +157,14 @@ class BaseConfigurationFactory(object):
     def create_controller(self, name, interfaces):
         return BaseController(name, interfaces)
 
-    def create_interface(self, name, vlanid, ips, sockets):
-        return BaseInterface(name, vlanid, ips, sockets)
+    def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
+        return BaseInterface(name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel)
 
     def create_socket(self, name, ip, proto, portnumber,
-                      serviceinstances, serviceinstanceclients, eventhandlers, evengroupreceivers
+                      serviceinstances, serviceinstanceclients, eventhandlers, eventgroupreceivers
                       ):
         return BaseSocket(name, ip, proto, portnumber,
-                          serviceinstances, serviceinstanceclients, eventhandlers, evengroupreceivers
+                          serviceinstances, serviceinstanceclients, eventhandlers, eventgroupreceivers
                           )
 
     def create_someip_service_instance(self, service, instanceid, protover):
@@ -245,8 +245,37 @@ class BaseConfigurationFactory(object):
     def create_someip_parameter_union_member(self, index, name, mandatory, child):
         return SOMEIPBaseParameterUnionMember(index, name, mandatory, child)
 
-    def create_legacy_signal(self, id, name, compu_scale, compu_consts):
-        return SOMEIPBaseLegacySignal(id, name, compu_scale, compu_consts)
+    def create_signal(self, id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen):
+        return BaseSignal(id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen)
+
+    def create_signal_instance(self, id, signal_ref, bit_position, is_high_low_byte_order):
+        return BaseSignalInstance(id, signal_ref, bit_position, is_high_low_byte_order)
+
+    def create_pdu(self, id, short_name, byte_length, pdu_type, signal_instances):
+        return BasePDU(id, short_name, byte_length, pdu_type, signal_instances)
+
+    def create_multiplex_pdu(self, id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
+                             static_segs, static_pdu):
+        return BaseMultiplexPDU(id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
+                                static_segs, static_pdu)
+
+    def create_multiplex_switch(self, id, short_name, bit_position, is_high_low_byte_order, bit_length):
+        return BaseMultiplexPDUSwitch(id, short_name, bit_position, is_high_low_byte_order, bit_length)
+
+    def create_multiplex_segment_position(self, bit_pos, is_high_low, bit_length):
+        return BaseMultiplexPDUSegmentPosition(bit_pos, is_high_low, bit_length)
+
+    def create_pdu_instance(self, id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position):
+        return BasePDUInstance(id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position)
+
+    def create_frame(self, id, short_name, byte_length, frame_type, pdu_instances):
+        return BaseFrame(id, short_name, byte_length, frame_type, pdu_instances)
+
+    def create_frame_triggering_can(self, id, frame, can_id):
+        return BaseFrameTriggeringCAN(id, frame, can_id)
+
+    def create_frame_triggering_flexray(self, id, frame, slot_id, cycle_counter, base_cycle, cycle_repetition):
+        return BaseFrameTriggeringFlexRay(id, frame, slot_id, cycle_counter, base_cycle, cycle_repetition)
 
     def create_pdu_route(self, sender_socket, receiving_socket, pdu_name, pdu_id):
         if sender_socket.is_multicast():
@@ -261,6 +290,21 @@ class BaseConfigurationFactory(object):
 class BaseItem(object):
     def legacy(self):
         return False
+
+class BaseCoding(BaseItem):
+    def __init__(self, id, name, coded_basetype, coded_category, coded_termination, coded_bit_length, coded_max_length, compu_scale, compu_consts):
+        self.__id__ = id
+        self.__name__ = name
+        self.__coded_basetype__ = coded_basetype
+        self.__coded_category__ = coded_category
+        self.__coded_termination__ = coded_termination
+        self.__coded_bit_length__ = coded_bit_length
+        self.__coded_max_length__ = coded_max_length
+        self.__compu_scale__ = compu_scale
+        self.__compu_consts__ = compu_consts
+
+    def name(self):
+        return self.__name__
 
 
 class BaseVLAN(BaseItem):
@@ -290,7 +334,7 @@ class BaseMulticastPath(BaseItem):
         if vlanid_tx != vlanid_rx:
             print(f"Currently only Multicast Path with same VLAN supported Addr:{multicast_addr} vlan_tx:{vlanid_tx} "
                   f"vlan_rx:{vlanid_rx}!")
-            return None
+            raise ValueError
 
         self.__vlanid__ = vlanid_tx
         self.__tx_addr__ = source_addr
@@ -562,7 +606,7 @@ class BaseController(BaseItem):
         return self.__eth_bus__
 
 class BaseInterface(BaseItem):
-    def __init__(self, vlanname, vlanid, ips, sockets):
+    def __init__(self, vlanname, vlanid, ips, sockets, frame_triggerings_in, frame_triggerings_out, fr_channel):
         self.__vlanname__ = vlanname
         self.__sockets__ = sockets
         self.__ips__ = ips
@@ -576,6 +620,11 @@ class BaseInterface(BaseItem):
 
         for s in sockets:
             s.set_interface(self)
+
+        self.__frame_triggerings_in__ = frame_triggerings_in
+        self.__frame_triggerings_out__ = frame_triggerings_out
+
+        self.__flexray_channel__ = fr_channel
 
     def vlanname(self):
         return self.__vlanname__
@@ -606,6 +655,60 @@ class BaseInterface(BaseItem):
 
     def controller(self):
         return self.__controller__
+
+    def frame_triggerings_in(self):
+        return self.__frame_triggerings_in__
+
+    def frame_triggerings_out(self):
+        return self.__frame_triggerings_out__
+
+    def flexray_channel(self):
+        return self.__flexray_channel__
+
+    def is_can(self):
+        for trig in self.__frame_triggerings_in__.values():
+            if trig.is_can():
+                return True
+
+        for trig in self.__frame_triggerings_out__.values():
+            if trig.is_can():
+                return True
+
+        return False
+
+    def is_flexray(self):
+        for trig in self.__frame_triggerings_in__.values():
+            if trig.is_flexray():
+                return True
+
+        for trig in self.__frame_triggerings_out__.values():
+            if trig.is_flexray():
+                return True
+
+        return False
+
+    def is_ethernet(self):
+        for trig in self.__frame_triggerings_in__.values():
+            if trig.is_ethernet():
+                return True
+
+        for trig in self.__frame_triggerings_out__.values():
+            if trig.is_ethernet():
+                return True
+
+        return False
+
+    def is_more_than_one_type(self):
+        ret = 0
+
+        if self.is_can():
+            ret += 1
+        if self.is_flexray():
+            ret += 1
+        if self.is_ethernet():
+            ret += 1
+
+        return ret > 1
 
 
 class BaseSocket(BaseItem):
@@ -1405,7 +1508,7 @@ class SOMEIPBaseParameterArrayDim(BaseItem):
 
     def calc_size_min_bits(self, inner_length):
         ret = self.__lowerlimit__ * inner_length
-        # XXX - padTo completly untested since export dont have BIT-ALIGNMENT set (its counted in bits)
+        # XXX - padTo completly untested since export do not have BIT-ALIGNMENT set (its counted in bits)
         if self.__padTo__ > 0:
             ret += ret % self.__padTo__
 
@@ -1413,7 +1516,7 @@ class SOMEIPBaseParameterArrayDim(BaseItem):
 
     def calc_size_max_bits(self, inner_length):
         ret = self.__upperlimit__ * inner_length
-        # XXX - padTo completly untested since export dont have BIT-ALIGNMENT set (its counted in bits)
+        # XXX - padTo completly untested since export do not have BIT-ALIGNMENT set (its counted in bits)
         if self.__padTo__ > 0:
             ret += ret % self.__padTo__
 
@@ -1712,12 +1815,17 @@ class SOMEIPBaseParameterUnionMember(BaseItem):
         )
 
 
-class SOMEIPBaseLegacySignal(BaseItem):
-    def __init__(self, id, name, compu_scale, compu_const):
+class BaseSignal(BaseItem):
+    def __init__(self, id, name, compu_scale, compu_const, bit_length, min_length, max_length, basetype, basetypelen):
         self.__id__ = id
         self.__name__ = name
         self.__compu_scale__ = compu_scale
         self.__compu_consts__ = compu_const
+        self.__bit_length__ = bit_length
+        self.__min_length__ = min_length
+        self.__max_length__ = max_length
+        self.__basetype__ = basetype
+        self.__basetypelen__ = basetypelen
 
     def id(self):
         return self.__id__
@@ -1728,8 +1836,35 @@ class SOMEIPBaseLegacySignal(BaseItem):
     def compu_scale(self):
         return self.__compu_scale__
 
+    def scaler(self):
+        if self.compu_scale() is not None and len(self.compu_scale()) == 3:
+            num0, num1, denom = self.compu_scale()
+            return float(num1) / float(denom)
+        return 1
+
+    def offset(self):
+        if self.compu_scale() is not None and len(self.compu_scale()) == 3:
+            num0, num1, denom = self.compu_scale()
+            return float(num0)
+        return 0
+
     def compu_consts(self):
         return self.__compu_consts__
+
+    def bit_length(self):
+        return self.__bit_length__
+
+    def min_length(self):
+        return self.__min_length__
+
+    def max_length(self):
+        return self.__max_length__
+
+    def basetype(self):
+        return self.__basetype__
+
+    def basetype_length(self):
+        return self.__basetypelen__
 
     def __eq__(self, other):
         if not isinstance(other, self.__class__):
@@ -1739,5 +1874,280 @@ class SOMEIPBaseLegacySignal(BaseItem):
                 self.id() == self.id() and
                 self.name() == other.name() and
                 self.compu_scale() == other.compu_scale() and
+                self.basetype() == other.basetype() and
                 self.compu_consts() == other.compu_consts()
         )
+
+
+class BaseSignalInstance(BaseItem):
+    def __init__(self, id, signal_ref, bit_position, is_high_low_byte_order):
+        self.__id__ = id
+        self.__signal_ref__ = signal_ref
+        self.__bit_position__ = bit_position
+        self.__is_high_low_byte_order__ = is_high_low_byte_order
+        self.__signal__ = None
+
+    def add_signal(self, signal):
+        self.__signal__ = signal
+
+    def bit_position(self):
+        return self.__bit_position__
+
+    def is_high_low_byte_order(self):
+        return self.__is_high_low_byte_order__
+
+    def signal(self):
+        return self.__signal__
+
+
+class BaseAbstractPDU(BaseItem):
+    def __init__(self, id, short_name, byte_length, pdu_type):
+        self.__id__ = id
+        self.__short_name__ = short_name
+        self.__byte_length__ = byte_length
+        self.__pdu_type__ = pdu_type
+
+    def id(self):
+        return self.__id__
+
+    def name(self):
+        return self.__short_name__
+
+    def byte_length(self):
+        return self.__byte_length__
+
+    def pdu_type(self):
+        return self.__pdu_type__
+
+    def is_multiplex_pdu(self):
+        return False
+
+
+class BasePDU(BaseAbstractPDU):
+    def __init__(self, id, short_name, byte_length, pdu_type, signal_instances):
+        super(BasePDU, self).__init__(id, short_name, byte_length, pdu_type)
+
+        self.__signal_instances__ = signal_instances
+
+    def signal_instances(self):
+        return self.__signal_instances__
+
+    def signal_instances_sorted_by_bit_position(self):
+        tmp = {}
+        for si in self.__signal_instances__.values():
+            if si.bit_position() in tmp.keys():
+                print(f"ERROR: PDU {self.name()} has multiple Signals starting at same position! Overwritting!")
+            tmp[si.bit_position()] = si
+
+        ret = []
+        for key in sorted(tmp.keys()):
+            ret.append(tmp[key])
+
+        return ret
+
+class BaseMultiplexPDU(BaseAbstractPDU):
+    def __init__(self, id, short_name, byte_length, pdu_type, switch, segment_positions, pdu_instances,
+                 static_segs, static_pdu):
+        super(BaseMultiplexPDU, self).__init__(id, short_name, byte_length, pdu_type)
+
+        if switch is None and len(segment_positions) != 0:
+            print(f"ERROR: PDU: {short_name} has Dynamic Segments but no Switch!")
+            raise ValueError
+
+        if switch is not None and len(segment_positions) == 0:
+            print(f"ERROR: PDU: {short_name} has a Switch but no Dynamic Segments!")
+            #raise ValueError
+
+        if len(segment_positions) > 1:
+            print(f"ERROR: We only support up to 1 Dynamic Segment per PDU! "
+                   f"PDU {short_name} has {len(segment_positions)}")
+            raise ValueError
+
+        if static_pdu is None and len(static_segs) != 0:
+            print(f"ERROR: PDU: {short_name} has Static Segments but no Static PDU!")
+            raise ValueError
+
+        if static_pdu is not None and len(static_segs) == 0:
+            print(f"ERROR: PDU: {short_name} has a Static PDU but not Static Segments!")
+            raise ValueError
+
+        if len(static_segs) > 1:
+            print(f"ERROR: We only support up to 1 Static Segment per PDU. "
+                   f"PDU {short_name} has {len(static_segs)}")
+            raise ValueError
+
+
+        self.__switch__ = switch
+        self.__segment_positions__ = segment_positions
+        self.__pdu_instances__ = pdu_instances
+        self.__static_segments__ = static_segs
+        self.__static_pdu__ = static_pdu
+
+    def switch(self):
+        return self.__switch__
+
+    def segment_positions(self):
+        return self.__segment_positions__
+
+    def pdu_instances(self):
+        return self.__pdu_instances__
+
+    def static_segments(self):
+        return self.__static_segments__
+
+    def static_pdu(self):
+        return self.__static_pdu__
+
+    def is_multiplex_pdu(self):
+        return True
+
+
+class BaseMultiplexPDUSwitch(BaseItem):
+    def __init__(self, id, short_name, bit_position, is_high_low_byte_order, bit_length):
+        self.__id__ = id
+        self.__short_name__ = short_name
+        self.__bit_position__ = bit_position
+        self.__is_high_low_byte_order__ = is_high_low_byte_order
+        self.__bit_length__ = bit_length
+
+    def id(self):
+        return self.__id__
+
+    def name(self):
+        return self.__short_name__
+
+    def bit_position(self):
+        return self.__bit_position__
+
+    def is_high_low_byte_order(self):
+        return self.__is_high_low_byte_order__
+
+    def bit_length(self):
+        return self.__bit_length__
+
+
+class BaseMultiplexPDUSegmentPosition(BaseItem):
+    def __init__(self, bit_position, is_high_low_byte_order, bit_length):
+        self.__bit_position__ = bit_position
+        self.__is_high_low_byte_order__ = is_high_low_byte_order
+        self.__bit_length__ = bit_length
+
+    def bit_position(self):
+        return self.__bit_position__
+
+    def is_high_low_byte_order(self):
+        return self.__is_high_low_byte_order__
+
+    def bit_length(self):
+        return self.__bit_length__
+
+
+class BasePDUInstance(BaseItem):
+    def __init__(self, id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position):
+        self.__id__ = id
+        self.__pdu_ref__ = pdu_ref
+        self.__bit_position__ = bit_position
+        self.__is_high_low_byte_order__ = is_high_low_byte_order
+        self.__pdu_update_bit_position__ = pdu_update_bit_position
+        self.__pdu__ = None
+
+    def add_pdu(self, pdu):
+        self.__pdu__ = pdu
+
+    def pdu(self):
+        return self.__pdu__
+
+    def bit_position(self):
+        return self.__bit_position__
+
+    def pdu_update_bit_position(self):
+        return self.__pdu_update_bit_position__
+
+class BaseFrame(BaseItem):
+    def __init__(self, id, short_name, frame_type, byte_length, pdu_instances):
+        self.__id__ = id
+        self.__short_name__ = short_name
+        self.__byte_length__ = byte_length
+        self.__frame_type__ = frame_type
+        self.__pdu_instances__ = pdu_instances
+
+    def add_pdu_instance(self, pdu_instance):
+        self.__pdu_instances__[pdu_instance.__pdu_ref__] = pdu_instance
+
+    def id(self):
+        return self.__id__
+
+    def name(self):
+        return self.__short_name__
+
+    def byte_length(self):
+        return self.__byte_length__
+
+    def frame_type(self):
+        return self.__frame_type__
+
+    def pdu_instances(self):
+        return self.__pdu_instances__
+
+class BaseFrameTriggering(BaseItem):
+    def __init__(self, id, frame):
+        self.__id__ = id
+        self.__frame__ = frame
+
+    def id(self):
+        return self.__id__
+
+    def calc_key(self):
+        return self.__id__
+
+    def frame(self):
+        return self.__frame__
+
+    def is_can(self):
+        return False
+
+    def is_flexray(self):
+        return False
+
+    def is_ethernet(self):
+        return False
+
+class BaseFrameTriggeringCAN(BaseFrameTriggering):
+    def __init__(self, id, frame, can_id):
+        super(BaseFrameTriggeringCAN, self).__init__(id, frame)
+
+        self.__can_id__ = can_id
+
+    def can_id(self):
+        return self.__can_id__
+
+    def calc_key(self):
+        return f"CAN-0x{self.__can_id__:04x}"
+
+    def is_can(self):
+        return True
+
+
+class BaseFrameTriggeringFlexRay(BaseFrameTriggering):
+    def __init__(self, id, frame, slot_id, cycle_counter, base_cycle, cycle_repetition):
+        super(BaseFrameTriggeringFlexRay, self).__init__(id, frame)
+
+        self.__slot_id__ = slot_id
+        self.__cycle_counter__ = cycle_counter
+        self.__base_cycle__ = base_cycle
+        self.__cycle_repetition__ = cycle_repetition
+
+    def scheduling(self):
+        return self.__slot_id__, self.__cycle_counter__, self.__base_cycle__, self.__cycle_repetition__
+
+    def calc_key(self):
+        tmp_cycle_counter = 0 if self.__cycle_counter__ is None else self.__cycle_counter__
+        tmp_base_cycle = 0 if self.__base_cycle__ is None else self.__base_cycle__
+        tmp_cycle_repetition = 0 if self.__cycle_repetition__ is None else self.__cycle_repetition__
+
+        ret  = f"FlexRay-0x{self.__slot_id__:04x}-0x{tmp_cycle_counter:04x}-0x{tmp_base_cycle:04x}-" \
+               f"0x{tmp_cycle_repetition:04x}"
+        return ret
+
+    def is_flexray(self):
+        return True
