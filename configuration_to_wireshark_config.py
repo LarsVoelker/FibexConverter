@@ -480,28 +480,19 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         for ecuname in self.__ecus__:
             for controller in self.__ecus__[ecuname].controllers():
                 for interface in controller.interfaces():
-                    for socket in interface.sockets():
-                        try:
-                            ip = socket.ip()
-                            # check for multicast!
-                            # assume IPv4
-                            tmp = ip.split('.')
-                            if len(tmp) == 4:
-                                start = int(tmp[0])
-                                if start < 224:
-                                    if ip not in ips.keys():
-                                        ips[ip] = dict()
-                                    ips[ip][ecuname] = ecuname
-                            else:
-                                # assume IPv6
-                                if not ip.startswith("ff"):
-                                    if ip not in ips.keys():
-                                        ips[ip] = dict()
-                                    ips[ip][ecuname] = ecuname
-                        except ValueError:
-                            pass
 
-        for ip in sorted(ips):
+                    for socket in interface.sockets():
+                        if not is_ip_mcast(socket.ip()):
+                            tmp = ips.setdefault(socket.ip(), {})
+                            tmp[ecuname] = ecuname
+
+                    # let us also include IPs without sockets
+                    for ip in interface.ips():
+                        if is_ip(ip) and not is_ip_mcast(ip):
+                            tmp = ips.setdefault(ip, {})
+                            tmp[ecuname] = ecuname
+
+        for ip in sorted(ips.keys(), key=lambda x: ip_to_key(x)):
             ecu_names = "__".join(ips[ip])
             f.write(f"{ip}\t{ecu_names}\n")
 

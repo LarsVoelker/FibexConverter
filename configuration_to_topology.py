@@ -30,46 +30,7 @@ from parser_dispatcher import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
 
 DUMMY_SWITCH_NAME = ""
-
 CSV_DELIM = ";"
-
-def is_ip(ip):
-    try:
-        ip = ipaddress.ip_address(ip)
-    except ValueError:
-        return False
-
-    return True
-
-
-def is_ip_mcast(ip):
-    try:
-        ip = ipaddress.ip_address(ip)
-    except ValueError:
-        return False
-
-    if ip.version == 4 and 224 <= ip.packed[0] <= 239:
-        return True
-
-
-def ip_to_key(ip):
-    tmp = ipaddress.ip_address(ip)
-    key = f"ipvx-{ip}"
-
-    if tmp.version == 4:
-        key = f"ipv4-{tmp.packed[0]:03}.{tmp.packed[1]:03}.{tmp.packed[2]:03}.{tmp.packed[3]:03}"
-    elif tmp.version == 6:
-        key = f"ipv6-{tmp.exploded}"
-    return key
-
-
-
-def ip_mcast_to_mac_mcast(ip):
-    if is_ip_mcast(ip):
-        tmp = ipaddress.ip_address(ip)
-        return f"01:00:5e:{(tmp.packed[1] & 127):02x}:{tmp.packed[2]:02x}:{tmp.packed[3]:02x}"
-
-    return ""
 
 
 class TopologyTableEntry:
