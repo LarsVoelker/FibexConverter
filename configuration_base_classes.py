@@ -941,6 +941,9 @@ class SOMEIPBaseServiceField(BaseItem):
     def name(self):
         return self.__name__
 
+    def params(self):
+        return self.__params__
+
     def getter(self):
         return self.__getter__
 
