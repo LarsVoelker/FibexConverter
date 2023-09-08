@@ -54,7 +54,11 @@ def ip_to_key(ip):
     if ip is None:
         return f"None"
 
-    tmp = ipaddress.ip_address(ip)
+    try:
+        tmp = ipaddress.ip_address(ip)
+    except ValueError:
+        return f"None"
+
     key = f"ipvx-{ip}"
 
     if tmp.version == 4:
