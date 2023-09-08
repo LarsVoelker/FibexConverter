@@ -51,6 +51,9 @@ def is_ip_mcast(ip):
 
 
 def ip_to_key(ip):
+    if ip is None:
+        return f"None"
+
     tmp = ipaddress.ip_address(ip)
     key = f"ipvx-{ip}"
 
@@ -490,6 +493,18 @@ class BaseInterface(BaseItem):
 
     def ips(self):
         return self.__ips__
+
+    def ips_without_socket(self):
+        tmp = []
+        for socket in self.__sockets__:
+            tmp.append(socket.ip())
+
+        ret = []
+        for ip in self.__ips__:
+            if ip not in tmp:
+                ret.append(ip)
+
+        return ret
 
     def sockets(self):
         return self.__sockets__

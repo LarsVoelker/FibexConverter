@@ -274,8 +274,15 @@ class Interface(BaseInterface):
     def str(self, indent):
         ret = indent * " "
         ret += f"Interface {self.__vlanname__} (VLAN-ID: 0x{self.__vlanid__:x})\n"
+
+        for ip in sorted(self.ips(), key=lambda x: ip_to_key(x)):
+            if is_ip(ip) and not is_ip_mcast(ip):
+                ret += (indent + 2) * " "
+                ret += f"IP: {ip}\n"
+
         for s in self.__sockets__:
             ret += s.str(indent + 2)
+
         return ret
 
 
