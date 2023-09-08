@@ -678,9 +678,10 @@ def generate_event_multiple_eg(target_dir, filenoext, postfix, conf_factory):
 
         providers = []
         for si in service.instances():
-            tmp = [si.instanceid(), si.socket().interface().controller().ecu().name()]
-            if tmp not in providers:
-                providers.append(tmp)
+            if si.socket() is not None:
+                tmp = [si.instanceid(), si.socket().interface().controller().ecu().name()]
+                if tmp not in providers:
+                    providers.append(tmp)
 
         # transform into ref matrices
         for eg in service.eventgroups().values():
