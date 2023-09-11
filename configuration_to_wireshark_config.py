@@ -561,7 +561,6 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 scaler = 1
                 offset = 0
 
-                s = m.signal()
                 if m.signal() is not None and m.signal().compu_scale() is not None and \
                         len(m.signal().compu_scale()) == 3:
                     num0, num1, denom = m.signal().compu_scale()
@@ -608,26 +607,25 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
             scaler = 1
             offset = 0
 
-            s = p.signal()
             if p.signal() is not None and p.signal().compu_scale() is not None and len(p.signal().compu_scale()) == 3:
                 num0, num1, denom = p.signal().compu_scale()
                 offset = float(num0)
                 scaler = float(num1) / float(denom)
 
-                if p.signal() is not None and p.signal().compu_consts() is not None:
-                    cc = p.signal().compu_consts()
-                    for value, start, end in p.signal().compu_consts():
-                        if int(start) >= 0:
-                            f_enum.write(f"\"{pdu_id:08x}\","
-                                         f"\"{p.position()}\","
-                                         f"\"{len(cc)}\","
-                                         f"\"{start}\","
-                                         f"\"{end}\","
-                                         f"\"{cleanup_string(value)}\""
-                                         "\n"
-                                         )
-                        else:
-                            print(f"Warning: CompuConst<0 unsupported! {pdu_id:08x}:{p.position()} {start}-{end} {value}")
+            if p.signal() is not None and p.signal().compu_consts() is not None:
+                cc = p.signal().compu_consts()
+                for value, start, end in p.signal().compu_consts():
+                    if int(start) >= 0:
+                        f_enum.write(f"\"{pdu_id:08x}\","
+                                     f"\"{p.position()}\","
+                                     f"\"{len(cc)}\","
+                                     f"\"{start}\","
+                                     f"\"{end}\","
+                                     f"\"{cleanup_string(value)}\""
+                                     "\n"
+                                     )
+                    else:
+                        print(f"Warning: CompuConst<0 unsupported! {pdu_id:08x}:{p.position()} {start}-{end} {value}")
 
             f.write(f"\"{pdu_id:08x}\","
                     f"\"{len(params)}\","
