@@ -19,12 +19,13 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import argparse
+import csv
+from graphviz import Graph
+import os.path
+import pprint
 import sys
 import time
-import os.path
-from graphviz import Graph
-import pprint
-import argparse
 
 from parser_dispatcher import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
@@ -117,23 +118,23 @@ class AccessControlTableEntries:
         self.__switch_port_from__ = swport_from
         self.__ecu_to__ = ecu_to
         self.__ctrl_to__ = ctrl_to
-        self.__ips_per_vlans__ = ips_per_vlans
+        self.__addrs_per_vlans__ = ips_per_vlans
 
 
     def to_output_set_dict(self, delim):
         ret = {}
 
-        if self.__ips_per_vlans__ is not None:
-            for vlan, ips in self.__ips_per_vlans__.items():
-                if ips is not None:
-                    for ip in ips:
-                        if is_ip_mcast(ip):
+        if self.__addrs_per_vlans__ is not None:
+            for vlan, addrs in self.__addrs_per_vlans__.items():
+                if addrs is not None:
+                    for addr in addrs:
+                        if is_ip_mcast(addr) or is_mac_mcast(addr):
                             key = f"{self.__ecu_from__}{delim}{self.__switch_from__}{delim}{self.__switch_port_from__}" \
                                   f"{delim}0x{vlan:x}"
 
                             data = (key, [])
                             tmp = ret.setdefault(key, data)
-                            tmp[1].append(str(ip))
+                            tmp[1].append(str(addr))
 
         return ret
 
@@ -142,14 +143,14 @@ class AccessControlTableEntries:
     def to_output_set(self, escape_for_excel):
         ret = []
 
-        if self.__ips_per_vlans__ is not None:
-            for vlan, ips in self.__ips_per_vlans__.items():
-                if ips is not None:
-                    for ip in ips:
-                        escaped_ip = f"\"=\"\"{ip}\"\"\"" if escape_for_excel else f"{ip}"
+        if self.__addrs_per_vlans__ is not None:
+            for vlan, addrs in self.__addrs_per_vlans__.items():
+                if addrs is not None:
+                    for addr in addrs:
+                        escaped_addr = f"\"=\"\"{addr}\"\"\"" if escape_for_excel else f"{addr}"
                         ret += [(f"{self.__ecu_from__}", f"{self.__switch_from__}", f"{self.__switch_port_from__}",
                                 f"{self.__ecu_to__}", f"{self.__ctrl_to__}",
-                                f"0x{vlan:x}", escaped_ip, f"{ip_mcast_to_mac_mcast(ip)}")]
+                                f"0x{vlan:x}", escaped_addr, f"{mcast_addr_to_mac_mcast(addr)}")]
 
         return ret
 
@@ -239,12 +240,13 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def get_multicast_columns(self, sort_columns=True):
         if sort_columns:
-            return sorted(self.all_multicast_ips(), key=lambda x: ip_to_key(x))
+            return sorted(self.all_multicast_addresses(), key=lambda x: addr_to_key(x))
         else:
-            return sorted(self.all_multicast_ips())
+            return sorted(self.all_multicast_addresses())
 
-    def create_multicast_path(self, switchport_tx, vlan_tx, source_ip, switchport_rx, vlan_rx, multicast_ip, comment):
-        tmp = MulticastPath(switchport_tx, vlan_tx, source_ip, switchport_rx, vlan_rx, multicast_ip, comment)
+    def create_multicast_path(self, switchport_tx, vlan_tx, src_addr, switchport_rx, vlan_rx, mcast_addr, comment):
+        tmp = MulticastPath(switchport_tx, vlan_tx, src_addr, switchport_rx, vlan_rx, mcast_addr, comment)
+
         if tmp.to_key() not in self.__multicast_paths__.keys():
             self.__multicast_paths__[tmp.to_key()] = tmp
         elif comment is not None and comment != "":
@@ -259,10 +261,12 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         mcast_entries = dict()
 
+        # TODO: Support MAC Addresses too
+
         # let us make sure to reduce the duplicates...
         for k, p in self.__multicast_paths__.items():
             vlan_id = p.vlanid()
-            mc_ip = p.mc_ip()
+            mc_ip = p.mc_addr()
             sw_port_tx = p.switchport_tx()
             sw_port_rx = p.switchport_rx()
 
@@ -285,6 +289,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             vlan_id = mcast_entries[key]["vlan_id"]
             mc_ip = mcast_entries[key]["mc_ip"]
             for rx_port in mcast_entries[key]["sw_ports_rx"]:
+                if rx_port is None:
+                    print(f"DEUBG: mcast_entries: {mcast_entries}")
+                    print(f"DEBUG: key: {key}")
                 rx_port.require_mcast_address(vlan_id, mc_ip)
 
         for key in sorted(mcast_entries.keys()):
@@ -295,20 +302,27 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         self.__mcast_entries__ = mcast_entries
 
+    def ecu_switch_key(self, switch):
+        if switch is None:
+            print(f"Warning: ecu_switch_key cannot generate key with Switch = None")
+            return "None.None"
+
+        return switch.key()
+
     def create_switch(self, name, ecu, ports):
         if ecu is None:
             ecu = self.__dummy_ecu__
 
         ret = Switch(name, ecu, ports)
-        assert (name not in self.__switches__)
-        self.__switches__[name] = ret
+
+        assert (self.ecu_switch_key(ret) not in self.__switches__)
+        self.__switches__[self.ecu_switch_key(ret)] = ret
+
         return ret
 
     def create_switch_port(self, portid, ctrl, port, default_vlan, vlans):
-        ret = SwitchPort(portid, ctrl, port, default_vlan, vlans)
-
-        self.__switch_ports__[portid] = ret
-        return ret
+        # the portid is not unique and may be reused!
+        return SwitchPort(portid, ctrl, port, default_vlan, vlans)
 
     def create_ethernet_bus(self, name, connected_ctrls, switch_ports):
         ret = EthernetBus(name, connected_ctrls, switch_ports)
@@ -443,7 +457,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         else:
                             self.__add_service_instance_provider_socket__(si.service().serviceid(),
                                                                           si.instanceid(),
-                                                                          swport.portid(), socket)
+                                                                          swport.portid_full(), socket)
                     if socket.is_multicast():
                         for si in socket.serviceinstanceclients():
                             sid = si.service().serviceid()
@@ -460,7 +474,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                                 # relation should be ceg.socket() -> ceg.sender().socket()
                                 self.__add_service_instance_consumer_socket__(si.service().serviceid(),
                                                                               si.instanceid(),
-                                                                              swport.portid(), socket)
+                                                                              swport.portid_full(), socket)
     def __check_busports_someip_multicast__(self):
         for ethbus in self.__ethernet_busses__.values():
             for swport in ethbus.switch_ports():
@@ -500,6 +514,12 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         vlanid_tx = snd_socket.interface().vlanid()
                         vlanid_rx = socket.interface().vlanid()
 
+                        if swport_tx is None or swport_rx is None:
+                            print(f"DEBUG: self.__switch_ports__: {self.__switch_ports__}")
+
+                        assert(swport_tx is not None)
+                        assert(swport_rx is not None)
+
                         ip_string = socket.ip()
                         comment_str = f"MC SOME/IP {sid_iid}"
                         mcpath = self.create_multicast_path(swport_tx, vlanid_tx, snd_socket.ip(),
@@ -510,30 +530,36 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
                         tmp[mcpath.to_key()].add_sid_iid(sid_iid)
 
-    def all_multicast_ips(self):
+    def all_multicast_addresses(self):
         ret = []
 
         for key, item in self.__multicast_paths__.items():
-            mc_ip = item.mc_ip()
-            if mc_ip not in ret:
-                ret.append(mc_ip)
+            mc_addr = item.mc_addr()
+            if mc_addr not in ret:
+                ret.append(mc_addr)
 
         return ret
 
-    def create_multicast_csv(self, mc_ip=None):
+    def create_multicast_csv(self, mc_addr=None):
         ret = []
 
         for key in sorted(self.__multicast_paths__.keys()):
-            if mc_ip is None or self.__multicast_paths__[key].mc_ip() == mc_ip:
+            if mc_addr is None or self.__multicast_paths__[key].mc_addr() == mc_addr:
                 ret.append(self.__multicast_paths__[key].to_csv_line())
 
         return ret
 
+    def parsing_done(self):
+        # fill switch_ports
+
+        for sw in self.__switches__.values():
+            for port in sw.ports():
+                self.__switch_ports__[port.portid_full()] = port
 
 class MulticastPath(BaseMulticastPath):
-    def __init__(self, switchport_tx, vlan_tx, source_ip, switchport_rx, vlan_rx, multicast_ip, comment):
+    def __init__(self, switchport_tx, vlan_tx, source_addr, switchport_rx, vlan_rx, multicast_addr, comment):
         self.__sid_iids__ = []
-        super().__init__(switchport_tx, vlan_tx, source_ip, switchport_rx, vlan_rx, multicast_ip, comment)
+        super().__init__(switchport_tx, vlan_tx, source_addr, switchport_rx, vlan_rx, multicast_addr, comment)
 
     def add_sid_iid(self, sid_iid):
         if sid_iid not in self.__sid_iids__:
@@ -546,15 +572,15 @@ class MulticastPath(BaseMulticastPath):
         return "__".join(sorted(self.__sid_iids__))
 
     def to_key(self):
-        ret = f"{self.switchport_tx_name()};{self.vlanid()};{self.source_ip()};" \
-              f"{self.switchport_rx_name()};{self.vlanid()};{self.mc_ip()};"
+        ret = f"{self.switchport_tx_name()};{self.vlanid()};{self.source_addr()};" \
+              f"{self.switchport_rx_name()};{self.vlanid()};{self.mc_addr()};"
         return ret
 
     def to_csv_line(self):
         ret = f"{self.switchport_tx_name()}{CSV_DELIM}{self.vlanid()}{CSV_DELIM}" \
-              f"\"=\"\"{self.source_ip()}\"\"\"{CSV_DELIM}" \
+              f"\"=\"\"{self.source_addr()}\"\"\"{CSV_DELIM}" \
               f"{self.switchport_rx_name()}{CSV_DELIM}{self.vlanid()}{CSV_DELIM}" \
-              f"\"=\"\"{self.mc_ip()}\"\"\"{CSV_DELIM}" \
+              f"\"=\"\"{self.mc_addr()}\"\"\"{CSV_DELIM}" \
               f"{self.comment()}{self.sid_iids_to_string()}"
         return ret
 
@@ -591,8 +617,8 @@ class Switch(BaseSwitch):
             sw_ports.append(sw_port)
 
     def __add_local_fwd_entries__(self, add_multicast):
-        if self.__fwd_table_local_ready__:
-            print(f"WARNING: Recalculating Forwarding Table for Switch {self.name()}")
+        #if self.__fwd_table_local_ready__:
+        #    print(f"WARNING: Recalculating Forwarding Table for Switch {self.name()}")
 
         for swport in self.ports():
             ctrls = []
@@ -726,7 +752,7 @@ class Switch(BaseSwitch):
         ret = []
 
         for vlan_id in sorted(self.__fwd_table__.keys()):
-            for address in sorted(self.__fwd_table__[vlan_id].keys(), key=lambda x: ip_to_key(x)):
+            for address in sorted(self.__fwd_table__[vlan_id].keys(), key=lambda x: addr_to_key(x)):
 
                 if skip_multicast and is_ip_mcast(address):
                     continue
@@ -793,12 +819,6 @@ class Switch(BaseSwitch):
         return self.__fwd_table__
 
 class SwitchPort(BaseSwitchPort):
-    def portid_full(self):
-        if self.switch() is not None:
-            return f"{self.switch().name()}__{self.__portid__}"
-        else:
-            return f"__{self.__portid__}"
-
     def incoming_fwd_info(self, vlan_id, address, ecu, ctrl, multicast, count):
         return self.switch().incoming_fwd_info(vlan_id, address, self, ecu, ctrl, multicast, count)
 
@@ -897,7 +917,8 @@ class ECU(BaseECU):
                         print(f"ERROR: topology_table: peerswitch.ecu() is None for peerport {peerport.portid()}")
                     else:
                         tmp = TopologyTableEntry(self.name(), None, switch.name(), swport.portid(),
-                                                 peerswitch.ecu().name(), None, peerswitch.name(), peerport.portid(),
+                                                 peerswitch.ecu().name(), None, peerswitch.name(),
+                                                 peerport.portid(),
                                                  swport.vlans())
                         tmp2 = tmp.to_output_set(vlan_cols)
 
@@ -965,9 +986,61 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Converting configuration to topology.')
     parser.add_argument('type', choices=parser_formats, help='format')
     parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
+    parser.add_argument('--mcast-list', type=argparse.FileType('r'), default=None,
+                        help='Semicolon Separated List of Static Multicast Entries')
 
     args = parser.parse_args()
     return args
+
+
+def add_multicast_file(conf_factory, f, verbose=False):
+    if verbose:
+        print(f"Reading multicast file...")
+
+    csvreader = csv.reader(f, delimiter=';', quotechar='|')
+    for row in csvreader:
+        if verbose:
+            print("  " + ', '.join(row))
+
+        if len(row) < 7:
+            print(f"Error: Line in Multicast File too short: {', '.join(row)}")
+            continue
+
+        swport_src, vlanid_src, addr_src, swport_dst, vlanid_dst, addr_dst, comment = row[:7]
+
+        if swport_src not in conf_factory.__switch_ports__.keys():
+            print(f"Error: {swport_src} not a valid Switchport! Expected Format: ecu_name.switch_name.port_name!")
+            continue
+
+        try:
+            vlanid_src = int(vlanid_src)
+        except ValueError:
+            print(f"Error: {vlanid_src} not a valid VLAN ID! Expected Format: integer")
+            continue
+
+        if not is_mac(addr_src) and not is_ip(addr_src):
+            print(f"Error: {addr_src} not a valid IP or MAC Address!")
+            continue
+
+        if swport_dst not in conf_factory.__switch_ports__.keys():
+            print(f"Error: {swport_dst} not a valid Switchport! Expected Format: ecu_name.switch_name.port_name!")
+            continue
+
+        try:
+            vlanid_dst = int(vlanid_dst)
+        except ValueError:
+            print(f"Error: {vlanid_dst} not a valid VLAN ID! Expected Format: integer")
+            continue
+
+        if not is_mac(addr_dst) and not is_ip(addr_dst):
+            print(f"Error: {addr_dst} not a valid IP or MAC Address!")
+            continue
+
+        conf_factory.create_multicast_path(conf_factory.__switch_ports__[swport_src], vlanid_src, addr_src,
+                                           conf_factory.__switch_ports__[swport_dst], vlanid_dst, addr_dst,
+                                           comment)
+
+    return
 
 
 def main():
@@ -980,7 +1053,6 @@ def main():
     output_dir = parse_input_files(args.filename, args.type, conf_factory)
 
     print("Making sure output directory exists...")
-
     if os.path.isdir(args.filename):
         target_dir_gv = os.path.join(output_dir, "topology")
         gvfile = os.path.join(target_dir_gv, "all_files" + ".gv")
@@ -1023,6 +1095,8 @@ def main():
 
     print("Calculating unicast and multicast relations...")
     conf_factory.add_multicast_someip()
+
+    add_multicast_file(conf_factory, args.mcast_list, verbose=True)
 
     # yes, we must call calc_fwd_tables twice or else the result is wrong (mcast with any)
     conf_factory.calc_fwd_tables()
@@ -1079,10 +1153,10 @@ def main():
         for i in tmp:
             f.write(f"{i}\n")
 
-    for mc_ip in sorted(conf_factory.all_multicast_ips(), key=lambda x: ip_to_key(x)):
-        file_name = f"{mcrfiles}_{mc_ip}.csv"
+    for mc_addr in sorted(conf_factory.all_multicast_addresses(), key=lambda x: addr_to_key(x)):
+        file_name = f"{mcrfiles}_{mc_addr}.csv"
         with open(file_name, "w") as f:
-            tmp = conf_factory.create_multicast_csv(mc_ip=mc_ip)
+            tmp = conf_factory.create_multicast_csv(mc_addr=mc_addr)
             f.write(csv_header)
             for i in tmp:
                 f.write(f"{i}\n")

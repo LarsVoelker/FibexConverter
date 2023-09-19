@@ -58,4 +58,6 @@ def parse_input_files(filename, t, conf_factory, print_filename=True, file_filte
         print(f"Type {t} not known/supported!")
         sys.exit(-2)
 
+    conf_factory.parsing_done()
+
     return output_dir

@@ -20,6 +20,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import ipaddress
+import macaddress
 
 
 def bits_to_bytes(bits):
@@ -27,6 +28,59 @@ def bits_to_bytes(bits):
         return bits // 8
     else:
         return (bits // 8) + 1
+
+
+def is_mcast(addr):
+    if is_ip_mcast(addr):
+        return True
+
+    if is_mac_mcast(addr):
+        return True
+
+    return False
+
+
+def addr_to_key(addr):
+    if is_ip(addr):
+        return ip_to_key(addr)
+
+    if is_mac(addr):
+        return mac_to_key(addr)
+
+    print(f"Warning: addr_to_key was called with {addr} and this seems to be no IP or MAC Address!")
+    return "None"
+
+def is_mac(mac):
+    if mac is None:
+        return False
+
+    try:
+        tmp = macaddress.EUI48(mac)
+    except ValueError:
+        return False
+
+    return True
+
+
+def is_mac_mcast(mac):
+    try:
+        tmp = macaddress.EUI48(mac)
+    except ValueError:
+        return False
+
+    return (tmp.__bytes__()[0] & 0x01) == 0x01
+
+
+def mac_to_key(mac):
+    if mac is None:
+        return f"None"
+
+    try:
+        tmp = macaddress.EUI48(mac)
+    except ValueError:
+        return False
+
+    return f"mac-{str(tmp)}"
 
 
 def is_ip(ip):
@@ -49,7 +103,6 @@ def is_ip_mcast(ip):
 
     return ip.is_multicast
 
-
 def ip_to_key(ip):
     if ip is None:
         return f"None"
@@ -68,9 +121,12 @@ def ip_to_key(ip):
     return key
 
 
-def ip_mcast_to_mac_mcast(ip):
-    if is_ip_mcast(ip):
-        tmp = ipaddress.ip_address(ip)
+def mcast_addr_to_mac_mcast(addr):
+    if is_mac_mcast(addr):
+        return addr
+
+    if is_ip_mcast(addr):
+        tmp = ipaddress.ip_address(addr)
         return f"01:00:5e:{(tmp.packed[1] & 127):02x}:{tmp.packed[2]:02x}:{tmp.packed[3]:02x}"
 
     return ""
@@ -80,10 +136,8 @@ class BaseConfigurationFactory(object):
     def create_vlan(self, name, vlanid, prio):
         return BaseVLAN(name, vlanid, prio)
 
-    def create_multicast_path(self, switchport_tx, vlan_tx, source_ip, switchport_rx, vlan_rx, multicast_ip, comment):
-        sip = ipaddress.ip_address(source_ip)
-        mip = ipaddress.ip_address(multicast_ip)
-        return BaseMulticastPath(switchport_tx, vlan_tx, sip, switchport_rx, vlan_rx, mip, comment)
+    def create_multicast_path(self, switchport_tx, vlan_tx, src_addr, switchport_rx, vlan_rx, mcast_addr, comment):
+        return BaseMulticastPath(switchport_tx, vlan_tx, src_addr, switchport_rx, vlan_rx, mcast_addr, comment)
 
     def create_switch(self, name, ecu, ports):
         return BaseSwitch(name, ecu, ports)
@@ -198,6 +252,8 @@ class BaseConfigurationFactory(object):
             return False
         return True
 
+    def parsing_done(self):
+        pass
 
 class BaseItem(object):
     def legacy(self):
@@ -221,15 +277,15 @@ class BaseVLAN(BaseItem):
 
 
 class BaseMulticastPath(BaseItem):
-    def __init__(self, switchport_tx, vlanid_tx, source_ip, switchport_rx, vlanid_rx, multicast_ip, comment):
+    def __init__(self, switchport_tx, vlanid_tx, source_addr, switchport_rx, vlanid_rx, multicast_addr, comment):
         if vlanid_tx != vlanid_rx:
-            print(f"Currently only Multicast Path with same vlan supported IP:{multicast_ip} vlan_tx:{vlanid_tx} "
+            print(f"Currently only Multicast Path with same VLAN supported Addr:{multicast_addr} vlan_tx:{vlanid_tx} "
                   f"vlan_rx:{vlanid_rx}!")
             return None
 
         self.__vlanid__ = vlanid_tx
-        self.__tx_ip__ = source_ip
-        self.__mc_ip__ = multicast_ip
+        self.__tx_addr__ = source_addr
+        self.__mc_addr__ = multicast_addr
         self.__swport_tx__ = switchport_tx
         self.__swport_rx__ = switchport_rx
         self.__comment__ = comment
@@ -237,11 +293,11 @@ class BaseMulticastPath(BaseItem):
     def vlanid(self):
         return self.__vlanid__
 
-    def source_ip(self):
-        return self.__tx_ip__
+    def source_addr(self):
+        return self.__tx_addr__
 
-    def mc_ip(self):
-        return self.__mc_ip__
+    def mc_addr(self):
+        return self.__mc_addr__
 
     def switchport_tx(self):
         return self.__swport_tx__
@@ -288,6 +344,13 @@ class BaseSwitchPort(BaseItem):
 
         return f"{switch_name}.{self.__portid__}"
 
+    def portid_full(self):
+        if self.switch() is not None:
+            if self.switch().ecu() is not None:
+                return f"{self.switch().ecu().name()}.{self.switch().name()}.{self.__portid__}"
+            return f".{self.switch().name()}.{self.__portid__}"
+        else:
+            return f"..{self.__portid__}"
 
     def portid(self):
         return self.__portid__
@@ -379,6 +442,11 @@ class BaseSwitch(BaseItem):
     def ports(self):
         return self.__ports__
 
+    def key(self):
+        if self.__ecu__ is None:
+            return f"None.{self.name()}"
+
+        return f"{self.ecu().name()}.{self.name()}"
 
 class BaseEthernetBus(BaseItem):
     def __init__(self, name, connected_ctrls, switch_ports):
