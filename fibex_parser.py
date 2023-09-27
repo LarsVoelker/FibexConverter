@@ -219,6 +219,9 @@ class FibexParser(AbstractParser):
                 self.__signals__[s.id()] = s
 
     def interpret_datatype(self, element, utils, serialization_attributes):
+        if element is None:
+            return None
+
         ret = None
         p = dict()
 
@@ -228,7 +231,7 @@ class FibexParser(AbstractParser):
         p["Type"] = self.get_attribute(element, 'xsi:type')
 
         if p["ID"] is None or p["Type"] is None:
-            print("ERROR: Datatype should have ID and Type!!!")
+            print(f"ERROR: Cannot interpret datatype {self.get_id(element)}!")
             return None
 
         # coding1 = self.get_from_dict_or_none(utils, "Coding")
@@ -519,7 +522,8 @@ class FibexParser(AbstractParser):
         dt = self.get_child_attribute(param, './fx:DATATYPE-REF', 'ID-REF')
         p["Datatype"] = self.get_from_dict_or_none(self.__datatypes__, dt)
         if p["Datatype"] is None:
-            print("ERROR: Parameter without datatype is kind of strange!!!")
+            print(f"ERROR: Parameter (ID: {self.get_id(param)}) references datatype {dt}, which does not exit!")
+            return p["Position"], None
 
         s = self.get_child_attribute(param, './fx:SIGNAL-REF', 'ID-REF')
         signal = None
@@ -553,11 +557,17 @@ class FibexParser(AbstractParser):
         inparams = dict()
         for param in element.findall('./service:INPUT-PARAMETERS/service:INPUT-PARAMETER', self.__ns__):
             (pos, p) = self.parse_parameter(param)[:2]
+            if p is None:
+                return id, None
+
             inparams[pos] = p
 
         outparams = dict()
         for param in element.findall('./service:RETURN-PARAMETERS/service:RETURN-PARAMETER', self.__ns__):
             (pos, p) = self.parse_parameter(param)[:2]
+            if p is None:
+                return id, None
+
             outparams[pos] = p
 
         debouncereq = -1
@@ -590,6 +600,9 @@ class FibexParser(AbstractParser):
         params = dict()
         for param in element.findall('./service:INPUT-PARAMETERS/service:INPUT-PARAMETER', self.__ns__):
             (pos, p) = self.parse_parameter(param)[:2]
+            if p is None:
+                return id, None
+
             params[pos] = p
 
         m = self.__conf_factory__.create_someip_service_event(
@@ -624,12 +637,12 @@ class FibexParser(AbstractParser):
         dt = self.get_child_attribute(element, './fx:DATATYPE-REF', 'ID-REF')
         if dt is None:
             print(f"ERROR: We are missing a datatype for {element}")
-            return None
+            return None, None
 
         datatype = self.get_from_dict_or_none(self.__datatypes__, dt)
         if datatype is None:
             print(f"ERROR: Unknown Datatype: {dt}")
-            return None
+            return None, None
 
         signal = None
         s = self.get_child_attribute(element, './fx:SIGNAL-REF', 'ID-REF')
@@ -637,7 +650,7 @@ class FibexParser(AbstractParser):
             signal = self.get_from_dict_or_none(self.__signals__, s)
             if signal is None:
                 print(f"ERROR: Unknown Signal: {s}")
-                return None
+                return None, None
 
         utils = self.parse_utilization(element)
         serialization_attributes = self.parse_serialization_attributes(element)
@@ -699,12 +712,20 @@ class FibexParser(AbstractParser):
         methods = dict()
         for method in service.findall('./service:METHODS/service:METHOD', self.__ns__):
             id, m = self.parse_method(method)
+            if m is None:
+                print(f"ERROR: Skipping a method in Service {name}, since input file is broken!")
+                continue
+
             methods[m.methodid()] = m
 
         eventids = dict()
         events = dict()
         for event in service.findall('./service:EVENTS/service:EVENT', self.__ns__):
             id, e = self.parse_event(event)
+            if e is None:
+                print(f"ERROR: Skipping an event in Service {name}, since input file is broken!")
+                continue
+
             events[e.methodid()] = e
             eventids[id] = e.methodid()
 
@@ -712,12 +733,19 @@ class FibexParser(AbstractParser):
         fields = dict()
         for field in service.findall('./service:FIELDS/service:FIELD', self.__ns__):
             id, f = self.parse_field(field)
+            if id is None:
+                print(f"ERROR: Skipping an field in Service {name}, since input file is broken!")
+                continue
+
             fields[f.id()] = f
             fieldids[id] = f.notifierid()
 
         eventgroups = dict()
         for eg in service.findall('./service:EVENT-GROUPS/service:EVENT-GROUP', self.__ns__):
             id, eg = self.parse_eventgroup(eg, id, eventids, fieldids)
+            if id is None:
+                continue
+
             eventgroups[eg.id()] = eg
 
         s = self.__conf_factory__.create_someip_service(name, service_id, major_version, minor_version, methods, events,

@@ -38,6 +38,9 @@ class AbstractParser(object):
         return c.text
 
     def get_attribute(self, element, attribkey):
+        if element is None:
+            return None
+
         if self.__ns__ is not None and len(attribkey.split(':')) > 1:
             prefix, elem = attribkey.split(':')
             if prefix in self.__ns__:

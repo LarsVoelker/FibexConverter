@@ -942,7 +942,8 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
             self.__parent_service__ = service
             self.__parent_method__ = method
 
-            self.__child__ = self.__child__.create_backlinks(factory, service, method)
+            if self.__child__ is not None:
+                self.__child__ = self.__child__.create_backlinks(factory, service, method)
 
             return self
         else:
@@ -964,8 +965,14 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
             print(f"    Warning: array ({self.name()}) is not attached to service!")
 
         ret = ""
+
+        if self is None or self.child() is None:
+            print(f"    ERROR: array not defined correctly! Broken Input File?")
+            return ret
+
         for key in self.dims():
             d = self.dims()[key]
+
             ret += "\"%08x\",\"%s\",\"%d\",\"%08x\",\"%d\"" % (self.globalid(),
                                                                self.name(),
                                                                self.child().paramtype(),
@@ -1104,7 +1111,8 @@ class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
             self.__parent_service__ = service
             self.__parent_method__ = method
 
-            self.__child__ = self.__child__.create_backlinks(factory, service, method)
+            if self.__child__ is not None:
+                self.__child__ = self.__child__.create_backlinks(factory, service, method)
 
             return self
         else:
@@ -1121,6 +1129,10 @@ class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
 
     def ws_config_line(self, version=1):
         # Typedef ID,Typedef Name,Data Type,Datatype ID
+
+        if self is None or self.child() is None:
+            print(f"    ERROR: typedef not defined correctly! Broken Input File?")
+            return ""
 
         ret = "\"%08x\",\"%s\",\"%d\",\"%08x\"\n" % (self.globalid(),
                                                      self.name(),
@@ -1151,6 +1163,11 @@ class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
         # "136c9","Enumeration1","1","12ff6","6","2","One"
         # "136c9","Enumeration1","1","12ff6","6","3","Two"
         ret = ""
+
+        if self is None or self.child() is None:
+            print(f"    ERROR: enum not defined correctly! Broken Input File?")
+            return ret
+
         for i in self.items():
             ret += "\"%08x\",\"%s\",\"%d\",\"%08x\",\"%d\",\"%x\",\"%s\"\n" % (self.globalid(),
                                                                                self.name(),
@@ -1201,6 +1218,7 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
             print(f"    Warning: union ({self.name()}) is not attached to service!")
 
         ret = ""
+
         for key in self.members():
             m = self.members()[key]
             ret += "\"%08x\",\"%s\",\"%d\",\"%d\",\"%d\",\"%d\"" % (self.globalid(),
