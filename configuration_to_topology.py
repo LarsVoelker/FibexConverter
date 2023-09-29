@@ -32,7 +32,7 @@ from configuration_base_classes import *  # @UnusedWildImport
 
 DUMMY_SWITCH_NAME = ""
 CSV_DELIM = ";"
-
+g_gen_portid = False
 
 class TopologyTableEntry:
     # only ctrl or switch+swport can be used each (from/to)
@@ -457,7 +457,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         else:
                             self.__add_service_instance_provider_socket__(si.service().serviceid(),
                                                                           si.instanceid(),
-                                                                          swport.portid_full(), socket)
+                                                                          swport.portid_full(gen_name=g_gen_portid),
+                                                                          socket)
                     if socket.is_multicast():
                         for si in socket.serviceinstanceclients():
                             sid = si.service().serviceid()
@@ -474,7 +475,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                                 # relation should be ceg.socket() -> ceg.sender().socket()
                                 self.__add_service_instance_consumer_socket__(si.service().serviceid(),
                                                                               si.instanceid(),
-                                                                              swport.portid_full(), socket)
+                                                                              swport.portid_full(gen_name=g_gen_portid),
+                                                                              socket)
 
     def __check_busports_someip_multicast__(self):
         for ethbus in self.__ethernet_busses__.values():
@@ -555,7 +557,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         for sw in self.__switches__.values():
             for port in sw.ports():
-                self.__switch_ports__[port.portid_full()] = port
+                self.__switch_ports__[port.portid_full(gen_name=g_gen_portid)] = port
 
     def endpoints(self):
         header = ("ECU", "Controller", "VLAN", "VLAN NAME", "IP")
@@ -735,7 +737,8 @@ class Switch(BaseSwitch):
                 ecu_name = entry.get("ecu", "unknown")
                 ctrl_name = entry.get("ctrl", "unknown")
                 for sw_port in sw_ports:
-                    actes = AccessControlTableEntries(self.ecu().name(), self.name(), sw_port.portid(),
+                    actes = AccessControlTableEntries(self.ecu().name(), self.name(),
+                                                      sw_port.portid(gen_name=g_gen_portid),
                                                       ecu_name, ctrl_name, {vlan_id: [address]})
 
                     for i in actes.to_output_set_dict(";").values():
@@ -772,8 +775,9 @@ class Switch(BaseSwitch):
                 sw_ports = entry.get("sw_ports", [])
                 ecu_name = entry.get("ecu", "unknown")
                 ctrl_name = entry.get("ctrl", "unknown")
-                for sw_port in sorted(sw_ports, key=lambda x: x.portid_full()):
-                    tmp = AccessControlTableEntries(self.ecu().name(), self.name(), sw_port.portid(),
+                for sw_port in sorted(sw_ports, key=lambda x: x.portid_full(gen_name=g_gen_portid)):
+                    tmp = AccessControlTableEntries(self.ecu().name(), self.name(),
+                                                    sw_port.portid(gen_name=g_gen_portid),
                                                     ecu_name, ctrl_name, {vlan_id: [address]})
                     for i in tmp.to_output_set(escape_for_excel):
                         ret.append(";".join(i))
@@ -810,7 +814,8 @@ class Switch(BaseSwitch):
                                 ips_per_vlan[vlanid].append(ip)
 
 
-                tmp = AccessControlTableEntries(self.ecu().name(), self.name(), swport.portid(),
+                tmp = AccessControlTableEntries(self.ecu().name(), self.name(),
+                                                swport.portid(gen_name=g_gen_portid),
                                                 ctrl.ecu().name(), ctrl.name(), ips_per_vlan)
                 for entry in tmp.to_output_set(escape_for_excel):
                     ret.append(";".join(entry))
@@ -846,12 +851,14 @@ class SwitchPort(BaseSwitchPort):
                 if vlan not in self.vlans():
                     return ret
 
-        ret += [(switch_or_bus.name(), self.portid_full(), self.vlans())]
-        parent.node(self.portid_full(), label=self.__portid__)
+        ret += [(switch_or_bus.name(), self.portid_full(gen_name=g_gen_portid), self.vlans())]
+        parent.node(self.portid_full(gen_name=g_gen_portid), label=self.portid(gen_name=g_gen_portid))
         if self.__port__ is not None and self.__port__.switch() is not None:
-            ret += [(self.portid_full(), self.__port__.portid_full(), self.vlans())]
+            ret += [(self.portid_full(gen_name=g_gen_portid),
+                     self.__port__.portid_full(gen_name=g_gen_portid),
+                     self.vlans())]
         elif self.__ctrl__ is not None:
-            ret += [(self.portid_full(), self.__ctrl__.name(), self.vlans())]
+            ret += [(self.portid_full(gen_name=g_gen_portid), self.__ctrl__.name(), self.vlans())]
 
         return ret
 
@@ -867,11 +874,11 @@ class EthernetBus(BaseEthernetBus):
 
         for port in self.switch_ports():
             if vlans is None:
-                ret += [(self.name(), port.portid_full(), port.vlans())]
+                ret += [(self.name(), port.portid_full(gen_name=g_gen_portid), port.vlans())]
             else:
                 for vlan in vlans:
                     if vlan in port.vlans():
-                        ret += [(self.name(), port.portid_full(), port.vlans())]
+                        ret += [(self.name(), port.portid_full(gen_name=g_gen_portid), port.vlans())]
                         continue
 
         for ctrl in self.__ctrls__:
@@ -915,20 +922,23 @@ class ECU(BaseECU):
                 ctrl = swport.connected_to_ecu_ctrl()
                 peerport = swport.connected_to_port()
                 if ctrl is not None:
-                    tmp = TopologyTableEntry(self.name(), None, switch.name(), swport.portid(),
+                    tmp = TopologyTableEntry(self.name(), None, switch.name(), swport.portid(gen_name=g_gen_portid),
                                              ctrl.ecu().name(), ctrl.name(), None, None,
                                              swport.vlans())
                     ret.append(';'.join(tmp.to_output_set(vlan_cols)))
                 elif peerport is not None:
                     peerswitch = peerport.switch()
                     if peerswitch is None:
-                        print(f"ERROR: topology_table: peerswitch is None for peerport {peerport.portid()}")
+                        print(f"ERROR: topology_table: peerswitch is None for peerport "
+                              f"{peerport.portid(gen_name=g_gen_portid)}")
                     elif peerswitch.ecu() is None:
-                        print(f"ERROR: topology_table: peerswitch.ecu() is None for peerport {peerport.portid()}")
+                        print(f"ERROR: topology_table: peerswitch.ecu() is None for peerport "
+                              f"{peerport.portid(gen_name=g_gen_portid)}")
                     else:
-                        tmp = TopologyTableEntry(self.name(), None, switch.name(), swport.portid(),
+                        tmp = TopologyTableEntry(self.name(), None, switch.name(),
+                                                 swport.portid(gen_name=g_gen_portid),
                                                  peerswitch.ecu().name(), None, peerswitch.name(),
-                                                 peerport.portid(),
+                                                 peerport.portid(gen_name=g_gen_portid),
                                                  swport.vlans())
                         tmp2 = tmp.to_output_set(vlan_cols)
 
@@ -938,16 +948,20 @@ class ECU(BaseECU):
                         # checking for asymmetry
                         if len(swport.vlans()) != len(peerport.vlans()):
                             print(f"Warning: Different number of vlans for "
-                                  f"{self.name()} {switch.name()} {swport.portid()} -> "
-                                  f"{peerswitch.ecu().name()} {peerswitch.name()} {peerport.portid()}")
+                                  f"{self.name()} {switch.name()} {swport.portid(gen_name=g_gen_portid)} -> "
+                                  f"{peerswitch.ecu().name()} {peerswitch.name()} "
+                                  f"{peerport.portid(gen_name=g_gen_portid)}")
                         else:
                             for v in swport.vlans():
                                 if v not in peerport.vlans():
                                     print(f"Warning: VLAN {v} not found in peer port "
-                                          f"{self.name()} {switch.name()} {swport.portid()} -> "
-                                          f"{peerswitch.ecu().name()} {peerswitch.name()} {peerport.portid()}")
+                                          f"{self.name()} {switch.name()} {swport.portid(gen_name=g_gen_portid)}"
+                                          f" -> "
+                                          f"{peerswitch.ecu().name()} {peerswitch.name()} "
+                                          f"{peerport.portid(gen_name=g_gen_portid)}")
                 else:
-                    tmp = TopologyTableEntry(self.name(), None, switch.name(), swport.portid(),
+                    tmp = TopologyTableEntry(self.name(), None, switch.name(),
+                                             swport.portid(gen_name=g_gen_portid),
                                              "...", None, None, None,
                                              swport.vlans())
                     ret.append(';'.join(tmp.to_output_set(vlan_cols)))
@@ -1009,6 +1023,7 @@ def parse_arguments():
     parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
     parser.add_argument('--mcast-list', type=argparse.FileType('r'), default=None,
                         help='Semicolon Separated List of Static Multicast Entries')
+    parser.add_argument('--generate-switch-port-names', action='store_true')
 
     args = parser.parse_args()
     return args
@@ -1065,10 +1080,14 @@ def add_multicast_file(conf_factory, f, verbose=False):
 
 
 def main():
+    global g_gen_portid
+
     remove_gv = True
 
     print("Converting configuration to topology")
     args = parse_arguments()
+
+    g_gen_portid = args.generate_switch_port_names
 
     conf_factory = SimpleConfigurationFactory()
     output_dir = parse_input_files(args.filename, args.type, conf_factory)

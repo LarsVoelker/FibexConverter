@@ -344,15 +344,29 @@ class BaseSwitchPort(BaseItem):
 
         return f"{switch_name}.{self.__portid__}"
 
-    def portid_full(self):
+    def portid_full(self, gen_name=False):
+        portid = self.portid(gen_name=gen_name)
         if self.switch() is not None:
             if self.switch().ecu() is not None:
-                return f"{self.switch().ecu().name()}.{self.switch().name()}.{self.__portid__}"
-            return f".{self.switch().name()}.{self.__portid__}"
+                return f"{self.switch().ecu().name()}.{self.switch().name()}.{portid}"
+            return f".{self.switch().name()}.{portid}"
         else:
-            return f"..{self.__portid__}"
+            return f"..{portid}"
 
-    def portid(self):
+    def portid(self, gen_name=False):
+        if gen_name:
+            return self.portid_generated()
+
+        return self.__portid__
+
+    def portid_generated(self):
+        if self.__port__ is not None:
+            return f"couplingPort_ConnectTo_{self.__port__.switch().name()}"
+        if self.__ctrl__ is not None:
+            return f"couplingPort_ConnectTo_{self.__ctrl__.name()}"
+        if self.__eth_bus__ is not None:
+            return f"couplingPort_ConnectTo_{self.__eth_bus__.name()}"
+
         return self.__portid__
 
     def set_parent_switch(self, switch):
