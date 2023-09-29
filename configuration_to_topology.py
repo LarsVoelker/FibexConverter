@@ -1119,7 +1119,8 @@ def main():
     print("Calculating unicast and multicast relations...")
     conf_factory.add_multicast_someip()
 
-    add_multicast_file(conf_factory, args.mcast_list, verbose=True)
+    if args.mcast_list is not None:
+        add_multicast_file(conf_factory, args.mcast_list, verbose=True)
 
     # yes, we must call calc_fwd_tables twice or else the result is wrong (mcast with any)
     conf_factory.calc_fwd_tables()
