@@ -475,6 +475,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                                 self.__add_service_instance_consumer_socket__(si.service().serviceid(),
                                                                               si.instanceid(),
                                                                               swport.portid_full(), socket)
+
     def __check_busports_someip_multicast__(self):
         for ethbus in self.__ethernet_busses__.values():
             for swport in ethbus.switch_ports():
@@ -555,6 +556,15 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         for sw in self.__switches__.values():
             for port in sw.ports():
                 self.__switch_ports__[port.portid_full()] = port
+
+    def endpoints(self):
+        header = ("ECU", "Controller", "VLAN", "VLAN NAME", "IP")
+        ret = [header]
+
+        for ecuname in sorted(self.__ecus__):
+            ret = self.__ecus__[ecuname].export_endpoints(ret)
+
+        return ret
 
 class MulticastPath(BaseMulticastPath):
     def __init__(self, switchport_tx, vlan_tx, source_addr, switchport_rx, vlan_rx, multicast_addr, comment):
@@ -970,6 +980,17 @@ class ECU(BaseECU):
 
         return ret
 
+    def export_endpoints(self, ret):
+        for controller in self.__controllers__:
+            for interface in controller.interfaces():
+                for ip in interface.ips():
+                    ret.append((self.name(),
+                                controller.name(),
+                                hex(interface.vlanid()) if interface.vlanid() is not None else hex(0),
+                                interface.vlanname(),
+                                str(ip) if ip is not None else "dynamic"))
+        return ret
+
 class Controller(BaseController):
     pass
 
@@ -1066,6 +1087,7 @@ def main():
         aclfile3 = os.path.join(target_dir_gv, "all_files" + "_switch_port_mcast_matrix.csv")
         mcrfile = os.path.join(target_dir_gv, "all_files" + "_multicast_routes.csv")
         mcrfiles = os.path.join(target_dir_gv, "all_files" + "_multicast_routes")
+        endpfile = os.path.join(target_dir_gv, "all_files" + "_endpoints.csv")
     elif os.path.isfile(args.filename):
         (path, f) = os.path.split(args.filename)
 
@@ -1086,6 +1108,7 @@ def main():
         aclfile3 = os.path.join(target_dir_gv, filenoext + "_switch_port_mcast_matrix.csv")
         mcrfile = os.path.join(target_dir_gv, filenoext + "_multicast_routes.csv")
         mcrfiles = os.path.join(target_dir_gv, filenoext + "_multicast_routes")
+        endpfile = os.path.join(target_dir_gv, filenoext + "_endpoints.csv")
     else:
         return
 
@@ -1160,6 +1183,13 @@ def main():
             f.write(csv_header)
             for i in tmp:
                 f.write(f"{i}\n")
+
+    print(f"Exporting endpoints..")
+    with open(endpfile, "w") as f:
+        endpoints = conf_factory.endpoints()
+
+        for line in endpoints:
+            f.write(CSV_DELIM.join(line) + "\n")
 
     print("Done.")
 
