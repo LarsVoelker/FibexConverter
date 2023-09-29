@@ -21,6 +21,7 @@
 
 import argparse
 import csv
+import json
 from graphviz import Graph
 import os.path
 import pprint
@@ -419,7 +420,21 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         return ret
 
-    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True):
+    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True, file_format="csv"):
+        if file_format == "json":
+            ret = dict()
+            for ecuname, ecu in sorted(self.__ecus__.items()):
+                if ecuname is None or ecuname == "":
+                    continue
+
+                ret[ecuname] = ecu.extended_access_control_table(factory,
+                                                                 skip_multicast=skip_multicast,
+                                                                 escape_for_excel=escape_for_excel,
+                                                                 file_format="json")
+
+            return ret
+
+        # default = csv
         header = "ECU;Switch;SwPort;ECU;Ctrl;VLAN;IP;MAC;"
         ret = [header]
 
@@ -427,8 +442,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             ret += ecu.extended_access_control_table(factory,
                                                      skip_multicast=skip_multicast,
                                                      escape_for_excel=escape_for_excel)
-
         return ret
+
 
     def extended_access_control_matrix(self, factory):
         multicast_cols = self.get_multicast_columns()
@@ -761,7 +776,26 @@ class Switch(BaseSwitch):
 
         return ret
 
-    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True):
+    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True, file_format="csv"):
+        if file_format == "json":
+            ret = dict()
+
+            for vlan_id in sorted(self.__fwd_table__.keys()):
+                for address in sorted(self.__fwd_table__[vlan_id].keys(), key=lambda x: addr_to_key(x)):
+                    if skip_multicast and is_ip_mcast(address):
+                        continue
+
+                    entry = self.__fwd_table__[vlan_id][address]
+                    sw_ports = entry.get("sw_ports", [])
+
+                    for sw_port in sw_ports:
+                        portid = sw_port.portid(gen_name=g_gen_portid)
+                        vlan_addresses = (ret.setdefault(portid, {})).setdefault(vlan_id, [])
+                        vlan_addresses.append(address)
+
+            return ret
+
+        # default = csv
         ret = []
 
         for vlan_id in sorted(self.__fwd_table__.keys()):
@@ -976,7 +1010,27 @@ class ECU(BaseECU):
 
         return ret
 
-    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True):
+    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True, file_format="csv"):
+        if file_format == "json":
+            ret = {}
+
+            switches = ret.setdefault("switches", {})
+            for switch in self.__switches__:
+                switches[switch.name()] = switch.extended_access_control_table(factory,
+                                                                               skip_multicast=skip_multicast,
+                                                                               escape_for_excel=escape_for_excel,
+                                                                               file_format=file_format)
+
+            ctrls = ret.setdefault("controllers", {})
+            for ctrl in self.__controllers__:
+                ctrls[ctrl.name()] = ctrl.extended_access_control_table(factory,
+                                                                        skip_multicast=skip_multicast,
+                                                                        escape_for_excel=escape_for_excel,
+                                                                        file_format=file_format)
+
+            return ret
+
+        # default = csv
         ret = []
 
         for switch in self.__switches__:
@@ -1006,7 +1060,22 @@ class ECU(BaseECU):
         return ret
 
 class Controller(BaseController):
-    pass
+
+    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True, file_format="csv"):
+        if file_format == "json":
+            ret = {}
+
+            for iface in self.interfaces():
+                addresses = ret.setdefault(hex(iface.vlanid()), [])
+                for address in sorted(iface.ips(), key=lambda x: addr_to_key(x)):
+                    if skip_multicast and is_ip_mcast(address):
+                        continue
+
+                    addresses.append(address)
+
+            return ret
+
+        return None
 
 
 class Interface(BaseInterface):
@@ -1103,6 +1172,7 @@ def main():
         aclfile = os.path.join(target_dir_gv, "all_files" + "_switch_port_addresses.csv")
         aclfile2 = os.path.join(target_dir_gv, "all_files" + "_switch_port_addresses_ext.csv")
         aclfile2u = os.path.join(target_dir_gv, "all_files" + "_access_control_ext.csv")
+        aclfile2uj = os.path.join(target_dir_gv, "all_files" + "_access_control_ext.json")
         aclfile3 = os.path.join(target_dir_gv, "all_files" + "_switch_port_mcast_matrix.csv")
         mcrfile = os.path.join(target_dir_gv, "all_files" + "_multicast_routes.csv")
         mcrfiles = os.path.join(target_dir_gv, "all_files" + "_multicast_routes")
@@ -1124,6 +1194,7 @@ def main():
         aclfile = os.path.join(target_dir_gv, filenoext + "_switch_port_addresses.csv")
         aclfile2 = os.path.join(target_dir_gv, filenoext + "_switch_port_addresses_ext.csv")
         aclfile2u = os.path.join(target_dir_gv, filenoext + "_access_control_ext.csv")
+        aclfile2uj = os.path.join(target_dir_gv, filenoext + "_access_control_ext.json")
         aclfile3 = os.path.join(target_dir_gv, filenoext + "_switch_port_mcast_matrix.csv")
         mcrfile = os.path.join(target_dir_gv, filenoext + "_multicast_routes.csv")
         mcrfiles = os.path.join(target_dir_gv, filenoext + "_multicast_routes")
@@ -1179,9 +1250,18 @@ def main():
             f.write(f"{i}\n")
 
     with open(aclfile2u, "w") as f:
-        tmp = conf_factory.extended_access_control_table(conf_factory, skip_multicast=True, escape_for_excel=False)
+        tmp = conf_factory.extended_access_control_table(conf_factory,
+                                                         skip_multicast=True,
+                                                         escape_for_excel=False)
         for i in tmp:
             f.write(f"{i}\n")
+
+    with open(aclfile2uj, "w") as f:
+        tmp = conf_factory.extended_access_control_table(conf_factory,
+                                                         skip_multicast=True,
+                                                         escape_for_excel=False,
+                                                         file_format="json")
+        json.dump(tmp, f, indent=4)
 
     with open(aclfile3, "w") as f:
         tmp = conf_factory.extended_access_control_matrix(conf_factory)
