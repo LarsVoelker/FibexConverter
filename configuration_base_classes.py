@@ -41,6 +41,9 @@ def is_mcast(addr):
 
 
 def addr_to_key(addr):
+    if addr is None:
+        return "None"
+
     if is_ip(addr):
         return ip_to_key(addr)
 
