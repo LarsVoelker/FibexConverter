@@ -1163,20 +1163,22 @@ def main():
 
     print("Making sure output directory exists...")
     if os.path.isdir(args.filename):
-        target_dir_gv = os.path.join(output_dir, "topology")
-        gvfile = os.path.join(target_dir_gv, "all_files" + ".gv")
-        gvfile_prefix = os.path.join(target_dir_gv, "all_files")
-        fwdtableprefix = os.path.join(target_dir_gv, "all_files" + "_fwd_table_")
+        target_dir = os.path.join(output_dir, "topology")
+        target_dir_details = os.path.join(target_dir, "details")
+
+        gvfile = os.path.join(target_dir, "all_files" + ".gv")
+        gvfile_prefix = os.path.join(target_dir, "all_files")
+        fwdtableprefix = os.path.join(target_dir_details, "all_files" + "_fwd_table_")
         fwdtablepostfix = ".txt"
-        topofile = os.path.join(target_dir_gv, "all_files" + "_topology.csv")
-        aclfile = os.path.join(target_dir_gv, "all_files" + "_switch_port_addresses.csv")
-        aclfile2 = os.path.join(target_dir_gv, "all_files" + "_switch_port_addresses_ext.csv")
-        aclfile2u = os.path.join(target_dir_gv, "all_files" + "_access_control_ext.csv")
-        aclfile2uj = os.path.join(target_dir_gv, "all_files" + "_access_control_ext.json")
-        aclfile3 = os.path.join(target_dir_gv, "all_files" + "_switch_port_mcast_matrix.csv")
-        mcrfile = os.path.join(target_dir_gv, "all_files" + "_multicast_routes.csv")
-        mcrfiles = os.path.join(target_dir_gv, "all_files" + "_multicast_routes")
-        endpfile = os.path.join(target_dir_gv, "all_files" + "_endpoints.csv")
+        topofile = os.path.join(target_dir, "all_files" + "_topology.csv")
+        aclfile = os.path.join(target_dir, "all_files" + "_switch_port_addresses.csv")
+        aclfile2 = os.path.join(target_dir, "all_files" + "_switch_port_addresses_ext.csv")
+        aclfile2u = os.path.join(target_dir, "all_files" + "_access_control_ext.csv")
+        aclfile2uj = os.path.join(target_dir, "all_files" + "_access_control_ext.json")
+        aclfile3 = os.path.join(target_dir, "all_files" + "_switch_port_mcast_matrix.csv")
+        mcrfile = os.path.join(target_dir, "all_files" + "_multicast_routes.csv")
+        mcrfiles = os.path.join(target_dir_details, "all_files" + "_multicast_routes")
+        endpfile = os.path.join(target_dir, "all_files" + "_endpoints.csv")
     elif os.path.isfile(args.filename):
         (path, f) = os.path.split(args.filename)
 
@@ -1185,25 +1187,31 @@ def main():
             f = f.replace("#", "_")
 
         filenoext = '.'.join(f.split('.')[:-1])
-        target_dir_gv = os.path.join(output_dir, "topology")
-        gvfile = os.path.join(target_dir_gv, filenoext + ".gv")
-        gvfile_prefix = os.path.join(target_dir_gv, filenoext)
-        fwdtableprefix = os.path.join(target_dir_gv, filenoext + "_fwd_table_")
+        target_dir = os.path.join(output_dir, "topology")
+        target_dir_details = os.path.join(target_dir, "details")
+
+        gvfile = os.path.join(target_dir, filenoext + ".gv")
+        gvfile_prefix = os.path.join(target_dir, filenoext)
+        fwdtableprefix = os.path.join(target_dir_details, filenoext + "_fwd_table_")
         fwdtablepostfix = ".txt"
-        topofile = os.path.join(target_dir_gv, filenoext + "_topology.csv")
-        aclfile = os.path.join(target_dir_gv, filenoext + "_switch_port_addresses.csv")
-        aclfile2 = os.path.join(target_dir_gv, filenoext + "_switch_port_addresses_ext.csv")
-        aclfile2u = os.path.join(target_dir_gv, filenoext + "_access_control_ext.csv")
-        aclfile2uj = os.path.join(target_dir_gv, filenoext + "_access_control_ext.json")
-        aclfile3 = os.path.join(target_dir_gv, filenoext + "_switch_port_mcast_matrix.csv")
-        mcrfile = os.path.join(target_dir_gv, filenoext + "_multicast_routes.csv")
-        mcrfiles = os.path.join(target_dir_gv, filenoext + "_multicast_routes")
-        endpfile = os.path.join(target_dir_gv, filenoext + "_endpoints.csv")
+        topofile = os.path.join(target_dir, filenoext + "_topology.csv")
+        aclfile = os.path.join(target_dir, filenoext + "_switch_port_addresses.csv")
+        aclfile2 = os.path.join(target_dir, filenoext + "_switch_port_addresses_ext.csv")
+        aclfile2u = os.path.join(target_dir, filenoext + "_access_control_ext.csv")
+        aclfile2uj = os.path.join(target_dir, filenoext + "_access_control_ext.json")
+        aclfile3 = os.path.join(target_dir, filenoext + "_switch_port_mcast_matrix.csv")
+        mcrfile = os.path.join(target_dir, filenoext + "_multicast_routes.csv")
+        mcrfiles = os.path.join(target_dir_details, filenoext + "_multicast_routes")
+        endpfile = os.path.join(target_dir, filenoext + "_endpoints.csv")
     else:
         return
 
-    if not os.path.exists(target_dir_gv):
-        os.makedirs(target_dir_gv)
+    if not os.path.exists(target_dir):
+        os.makedirs(target_dir)
+        time.sleep(0.5)
+
+    if not os.path.exists(target_dir_details):
+        os.makedirs(target_dir_details)
         time.sleep(0.5)
 
     print("Calculating unicast and multicast relations...")
