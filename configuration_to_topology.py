@@ -32,7 +32,7 @@ from parser_dispatcher import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
 
 DUMMY_SWITCH_NAME = ""
-CSV_DELIM = ";"
+CSV_DELIM = ","
 g_gen_portid = False
 
 class TopologyTableEntry:
@@ -175,14 +175,22 @@ class MulticastPathEntry:
         return ret
 
     def to_csv_line(self):
-        ret = (f"0x{self.__sid_iid__:08x};"
-               f"{self.__tx_swport__};{self.__tx_socket__.interface().vlanid()};{self.__tx_socket__.ip()};"
-               f"{self.__rx_swport__};{self.__rx_socket__.interface().vlanid()};{self.__rx_socket__.ip()}")
+        ret = (f"0x{self.__sid_iid__:08x}{CSV_DELIM}"
+               f"{self.__tx_swport__}{CSV_DELIM}"
+               f"{self.__tx_socket__.interface().vlanid()}{CSV_DELIM}"
+               f"{self.__tx_socket__.ip()}{CSV_DELIM}"
+               f"{self.__rx_swport__}{CSV_DELIM}"
+               f"{self.__rx_socket__.interface().vlanid()}{CSV_DELIM}"
+               f"{self.__rx_socket__.ip()}")
         return ret
 
     def to_key_string(self):
-        ret = (f"{self.__tx_swport__};{self.__tx_socket__.interface().vlanid()};{self.__tx_socket__.ip()};"
-               f"{self.__rx_swport__};{self.__rx_socket__.interface().vlanid()};{self.__rx_socket__.ip()}")
+        ret = (f"{self.__tx_swport__}{CSV_DELIM}"
+               f"{self.__tx_socket__.interface().vlanid()}{CSV_DELIM}"
+               f"{self.__tx_socket__.ip()}{CSV_DELIM}"
+               f"{self.__rx_swport__}{CSV_DELIM}"
+               f"{self.__rx_socket__.interface().vlanid()}{CSV_DELIM}"
+               f"{self.__rx_socket__.ip()}")
         return ret
 
     def sid_iid(self):
@@ -251,7 +259,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         if tmp.to_key() not in self.__multicast_paths__.keys():
             self.__multicast_paths__[tmp.to_key()] = tmp
         elif comment is not None and comment != "":
-            self.__multicast_paths__[tmp.to_key()].__append_to_comment__(f", {comment}")
+            # do not use CSV_DELIM here since we want to merge
+            self.__multicast_paths__[tmp.to_key()].__append_to_comment__(f"; {comment}")
 
         return tmp
 
@@ -375,7 +384,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     v = vlans
                 for vlan in v:
                     if vlan_label != "":
-                        vlan_label += "; "
+                        vlan_label += f"{CSV_DELIM} "
                     vlan_label += f"0x{vlan:x}"
             g.edge(a, b, label=vlan_label)
 
@@ -388,13 +397,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def topology_table(self):
         vlan_cols = self.get_vlan_columns()
 
-        header = "Type;ECU;Switch;SwPort;Type;ECU;Switch|Ctrl;SwPort|None"
+        header = f"Type{CSV_DELIM}ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}" \
+                 f"Type{CSV_DELIM}ECU{CSV_DELIM}Switch|Ctrl{CSV_DELIM}SwPort|None"
         for vlan in sorted(vlan_cols):
             if vlan == 0:
-                header += ";Untagged"
+                header += f"{CSV_DELIM}Untagged"
             else:
                 vlanname = self.__vlans__[vlan].name()
-                header += f";0x{vlan:x} {vlanname}"
+                header += f"{CSV_DELIM}0x{vlan:x} {vlanname}"
 
         ret = [header]
 
@@ -412,7 +422,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             ecu.print_fwd_tables(fn_prefix, fn_postfix)
 
     def access_control_table(self):
-        header = "ECU;Switch;SwPort;ECU;Ctrl;VLAN;IP"
+        header = f"ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}ECU{CSV_DELIM}Ctrl{CSV_DELIM}VLAN{CSV_DELIM}IP"
         ret = [header]
 
         for ecuname, ecu in sorted(self.__ecus__.items()):
@@ -435,7 +445,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             return ret
 
         # default = csv
-        header = "ECU;Switch;SwPort;ECU;Ctrl;VLAN;IP;MAC;"
+        header = f"ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}" \
+                 f"ECU{CSV_DELIM}Ctrl{CSV_DELIM}VLAN{CSV_DELIM}IP{CSV_DELIM}MAC{CSV_DELIM}"
         ret = [header]
 
         for ecuname, ecu in sorted(self.__ecus__.items()):
@@ -447,10 +458,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def extended_access_control_matrix(self, factory):
         multicast_cols = self.get_multicast_columns()
-        header = "ECU;Switch;SwPort;VLAN"
+        header = f"ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}VLAN"
 
         for mcast_addr in self.get_multicast_columns():
-            header += f";{mcast_addr}"
+            header += f"{CSV_DELIM}{mcast_addr}"
 
         ret = [header]
 
@@ -599,8 +610,8 @@ class MulticastPath(BaseMulticastPath):
         return "__".join(sorted(self.__sid_iids__))
 
     def to_key(self):
-        ret = f"{self.switchport_tx_name()};{self.vlanid()};{self.source_addr()};" \
-              f"{self.switchport_rx_name()};{self.vlanid()};{self.mc_addr()};"
+        ret = f"{self.switchport_tx_name()}{CSV_DELIM}{self.vlanid()}{CSV_DELIM}{self.source_addr()}{CSV_DELIM}" \
+              f"{self.switchport_rx_name()}{CSV_DELIM}{self.vlanid()}{CSV_DELIM}{self.mc_addr()}{CSV_DELIM}"
         return ret
 
     def to_csv_line(self):
@@ -756,7 +767,7 @@ class Switch(BaseSwitch):
                                                       sw_port.portid(gen_name=g_gen_portid),
                                                       ecu_name, ctrl_name, {vlan_id: [address]})
 
-                    for i in actes.to_output_set_dict(";").values():
+                    for i in actes.to_output_set_dict(CSV_DELIM).values():
                         ips = tmp.setdefault(i[0], [])
                         for ip in i[1]:
                             if ip not in ips:
@@ -768,9 +779,9 @@ class Switch(BaseSwitch):
 
             for ip in factory.get_multicast_columns():
                 if ip in tmp[key]:
-                    output_line += f";{ip}"
+                    output_line += f"{CSV_DELIM}{ip}"
                 else:
-                    output_line += f";"
+                    output_line += f"{CSV_DELIM}"
 
             ret.append(output_line)
 
@@ -814,7 +825,7 @@ class Switch(BaseSwitch):
                                                     sw_port.portid(gen_name=g_gen_portid),
                                                     ecu_name, ctrl_name, {vlan_id: [address]})
                     for i in tmp.to_output_set(escape_for_excel):
-                        ret.append(";".join(i))
+                        ret.append(CSV_DELIM.join(i))
 
         return ret
 
@@ -852,7 +863,7 @@ class Switch(BaseSwitch):
                                                 swport.portid(gen_name=g_gen_portid),
                                                 ctrl.ecu().name(), ctrl.name(), ips_per_vlan)
                 for entry in tmp.to_output_set(escape_for_excel):
-                    ret.append(";".join(entry))
+                    ret.append(CSV_DELIM.join(entry))
 
         return ret
 
@@ -959,7 +970,7 @@ class ECU(BaseECU):
                     tmp = TopologyTableEntry(self.name(), None, switch.name(), swport.portid(gen_name=g_gen_portid),
                                              ctrl.ecu().name(), ctrl.name(), None, None,
                                              swport.vlans())
-                    ret.append(';'.join(tmp.to_output_set(vlan_cols)))
+                    ret.append(CSV_DELIM.join(tmp.to_output_set(vlan_cols)))
                 elif peerport is not None:
                     peerswitch = peerport.switch()
                     if peerswitch is None:
@@ -977,7 +988,7 @@ class ECU(BaseECU):
                         tmp2 = tmp.to_output_set(vlan_cols)
 
                         if tmp2 is not None:
-                            ret.append(';'.join(tmp2))
+                            ret.append(CSV_DELIM.join(tmp2))
 
                         # checking for asymmetry
                         if len(swport.vlans()) != len(peerport.vlans()):
@@ -998,7 +1009,7 @@ class ECU(BaseECU):
                                              swport.portid(gen_name=g_gen_portid),
                                              "...", None, None, None,
                                              swport.vlans())
-                    ret.append(';'.join(tmp.to_output_set(vlan_cols)))
+                    ret.append(CSV_DELIM.join(tmp.to_output_set(vlan_cols)))
 
         return ret
 
@@ -1102,8 +1113,17 @@ def add_multicast_file(conf_factory, f, verbose=False):
     if verbose:
         print(f"Reading multicast file...")
 
-    csvreader = csv.reader(f, delimiter=';', quotechar='|')
+    csvreader = csv.reader(f, delimiter=',', quotechar='|')
+    skip_first_line = True
     for row in csvreader:
+        if skip_first_line:
+            skip_first_line = False
+            continue
+
+        # skip empty lines
+        if len(row) == 0 or row[0] == "" or row[0] == "":
+            continue
+
         if verbose:
             print("  " + ', '.join(row))
 
@@ -1168,6 +1188,7 @@ def main():
 
         gvfile = os.path.join(target_dir, "all_files" + ".gv")
         gvfile_prefix = os.path.join(target_dir, "all_files")
+        gvfile_prefix_details = os.path.join(target_dir_details, "all_files")
         fwdtableprefix = os.path.join(target_dir_details, "all_files" + "_fwd_table_")
         fwdtablepostfix = ".txt"
         topofile = os.path.join(target_dir, "all_files" + "_topology.csv")
@@ -1192,6 +1213,7 @@ def main():
 
         gvfile = os.path.join(target_dir, filenoext + ".gv")
         gvfile_prefix = os.path.join(target_dir, filenoext)
+        gvfile_prefix_details = os.path.join(target_dir_details, filenoext)
         fwdtableprefix = os.path.join(target_dir_details, filenoext + "_fwd_table_")
         fwdtablepostfix = ".txt"
         topofile = os.path.join(target_dir, filenoext + "_topology.csv")
@@ -1229,7 +1251,7 @@ def main():
     print("Generating outputs...")
     for vlan in sorted(conf_factory.__vlans__):
         print(f"Generating plot for VLAN {vlan}")
-        fn_tmp = gvfile_prefix + f"__vlan_0x{vlan:x}.gv"
+        fn_tmp = gvfile_prefix_details + f"__vlan_0x{vlan:x}.gv"
         conf_factory.graphviz(fn_tmp, vlans=[vlan], show=False, label_links=True)
         if remove_gv:
             os.remove(fn_tmp)
