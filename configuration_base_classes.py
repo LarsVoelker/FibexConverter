@@ -275,6 +275,12 @@ class BaseVLAN(BaseItem):
     def vlanid(self):
         return self.__vlan_id__
 
+    def vlanid_str(self):
+        if self.vlanid() is None:
+            return "untagged"
+        else:
+            return f"0x{int(self.vlanid()):x}"
+
     def priority(self):
         return self.__priority__
 
@@ -426,16 +432,13 @@ class BaseSwitchPort(BaseItem):
 
         return sorted(vlans)
 
-    def vlans_as_strings(self):
-        ret = []
+    def vlans_objs(self):
+        vlans = []
 
-        for vlan in self.vlans():
-            if vlan == 0:
-                ret += ["untagged"]
-            else:
-                ret += [f"0x{vlan:x}"]
+        for vlan in self.__vlans__:
+            vlans.append(vlan)
 
-        return ret
+        return sorted(vlans, key=lambda x: -1 if x.vlanid() is None else x.vlanid())
 
 
 class BaseSwitch(BaseItem):

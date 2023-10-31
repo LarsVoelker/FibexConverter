@@ -1108,10 +1108,13 @@ class FibexParser(AbstractParser):
                     channel_ref = self.get_child_attribute(v, "fx:CHANNEL-REF", "ID-REF")
                     channel_ref_name = (self.__channels__.get(channel_ref, {})).get("name", "")
                     default_prio = self.get_child_text(v, "ethernet:DEFAULT-PRIORITY/fx:PRIORITY")
+                    default_prio = 0 if default_prio is None else int(default_prio)
+
                     if verbose:
                         print(f"    VLAN Channel:{channel_ref} ({channel_ref_name}) Default-Prio:{default_prio}")
 
                     channel = self.__channels__.get(channel_ref, {})
+                    channel["vlanid"] = None if channel.get("vlanid", None) is None else int(channel["vlanid"])
                     vlans.append(self.__conf_factory__.create_vlan(channel["name"], channel["vlanid"], default_prio))
 
                 tmp = self.__conf_factory__.create_switch_port(coupling_port_id, controller, coupling_port,

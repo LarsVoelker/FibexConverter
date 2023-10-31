@@ -230,6 +230,15 @@ class Switch(BaseSwitch):
 
 
 class SwitchPort(BaseSwitchPort):
+    def str_vlans(self, indent):
+        ret = ""
+
+        for vlan in self.vlans_objs():
+            ret += indent * " "
+            ret += f"VLAN (ID: {vlan.vlanid_str()}, Prio: {vlan.priority()})\n"
+
+        return ret
+
     def str(self, indent):
         ret = indent * " "
         ret += f"SwitchPort {self.__portid__} <-> "
@@ -242,7 +251,8 @@ class SwitchPort(BaseSwitchPort):
             ret += "\n"
 
         ret += (indent + 2) * " "
-        ret += f"VLANs ({','.join(self.vlans_as_strings())})\n"
+        ret += f"VLANs:\n"
+        ret += self.str_vlans(indent + 4)
         return ret
 
 
