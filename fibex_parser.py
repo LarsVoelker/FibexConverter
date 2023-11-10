@@ -31,6 +31,7 @@ class FibexParser(AbstractParser):
                        'ho': 'http://www.asam.net/xml',
                        'xsi': 'http://www.w3.org/2001/XMLSchema-instance',
                        'ethernet': 'http://www.asam.net/xml/fbx/ethernet',
+                       'flexray': 'http://www.asam.net/xml/fbx/flexray',
                        'it': 'http://www.asam.net/xml/fbx/it',
                        'service': 'http://www.asam.net/xml/fbx/services'}
 
@@ -42,6 +43,11 @@ class FibexParser(AbstractParser):
         self.__controllers__ = dict()
         self.__ecus__ = dict()
         self.__coupling_ports__ = dict()
+
+        self.__frames__ = dict()
+        self.__frame_triggerings__ = dict()
+        self.__pdus__ = dict()
+        self.__signals__ = dict()
 
         # FIBEX-ID -> (FIBEX-ID of Service, Eventgroup-ID)
         self.__eventgrouprefs__ = dict()
@@ -55,6 +61,19 @@ class FibexParser(AbstractParser):
         # FIBEX-ID -> (PSIS[], CSIS[], EH[], CEGS[])
         self.__aeps__ = dict()
 
+    def get_signal(self, signal_ref):
+        for _, value in self.__signals__.items():
+            if value.__id__ == signal_ref:
+                return value
+
+        return None
+
+    def get_pdu(self, pdu_ref):
+        for _, value in self.__pdus__.items():
+            if value.__id__ == pdu_ref:
+                return value
+
+        return None
     def get_id(self, element):
         return self.get_attribute(element, 'ID')
 
@@ -205,11 +224,19 @@ class FibexParser(AbstractParser):
         code_id = self.get_child_attribute(element, './fx:CODING-REF', 'ID-REF')
         coding = self.get_from_dict_or_none(self.__codings__, code_id)
         if coding is None:
-            print(f"Warning: Signal Coding == None!")
+            print(f"WARNING: Signal Coding for Signal {name} is None")
+        basetype = self.get_from_dict_or_none(coding, 'Basetype')
         compu_scale = self.get_from_dict_or_none(coding, 'CompuScale')
         compu_consts = self.get_from_dict_or_none(coding, 'CompuConsts')
-        ret = self.__conf_factory__.create_legacy_signal(id, name, compu_scale, compu_consts)
+        bit_len = self.get_from_dict_or_none(coding, 'BitLength')
+        min_len = self.get_from_dict_or_none(coding, 'MinLength')
+        max_len = self.get_from_dict_or_none(coding, 'MaxLength')
 
+        basetypelen = self.basetype_length(coding)
+
+        ret = self.__conf_factory__.create_signal(id, name, compu_scale, compu_consts, bit_len, min_len, max_len,
+                                                  basetype, basetypelen)
+        self.__signals__[name] = ret
         return ret
 
     def parse_signals(self, root):
@@ -217,6 +244,227 @@ class FibexParser(AbstractParser):
             s = self.parse_signal(signal)
             if s is not None:
                 self.__signals__[s.id()] = s
+
+    def parse_signal_instance(self, element):
+        id = self.get_id(element)
+        bit_position = self.get_child_text(element, './fx:BIT-POSITION')
+        is_high_low_byte_order = self.get_child_text(element, './fx:IS-HIGH-LOW-BYTE-ORDER')
+        signal_ref = self.get_child_attribute(element, './fx:SIGNAL-REF', 'ID-REF')
+
+        ret = self.__conf_factory__.create_signal_instance(id, signal_ref, int(bit_position), is_high_low_byte_order)
+        return ret
+
+    def parse_multiplexer(self, element):
+        # Switch
+        id = self.get_child_attribute(element, './fx:SWITCH', 'ID')
+        name = self.get_child_text(element, './fx:SWITCH/ho:SHORT-NAME')
+        bit_pos = int(self.get_child_text(element, './fx:SWITCH/fx:BIT-POSITION'))
+        is_high_low_byte_order = self.get_child_text(element, './fx:SWITCH/fx:IS-HIGH-LOW-BYTE-ORDER')
+        bit_length = int(self.get_child_text(element, './fx:SWITCH/ho:BIT-LENGTH'))
+        switch = self.__conf_factory__.create_multiplex_switch(id, name, bit_pos, is_high_low_byte_order, bit_length)
+
+        # segment positions
+        segs = []
+        for seg in element.findall('./fx:DYNAMIC-PART/fx:SEGMENT-POSITIONS/fx:SEGMENT-POSITION', self.__ns__):
+            bit_pos = int(self.get_child_text(seg, './fx:BIT-POSITION'))
+            high_low = self.get_child_text(seg, './fx:IS-HIGH-LOW-BYTE-ORDER')
+            bit_len = int(self.get_child_text(seg, './ho:BIT-LENGTH'))
+            segs.append(self.__conf_factory__.create_multiplex_segment_position(bit_pos, high_low, bit_len))
+
+        # switched pdu instances
+        pdus = {}
+        for switched_pdu in element.findall('./fx:DYNAMIC-PART/fx:SWITCHED-PDU-INSTANCES/fx:SWITCHED-PDU-INSTANCE',
+                                            self.__ns__):
+            switch_code = self.get_child_text(switched_pdu, './fx:SWITCH-CODE')
+            pdu_ref = self.get_child_attribute(switched_pdu, './fx:PDU-REF', 'ID-REF')
+            pdus[int(switch_code)] = self.__pdus__.get(pdu_ref, None)
+
+        # static segment positions
+        static_segs = []
+        for seg in element.findall('./fx:STATIC-PART/fx:SEGMENT-POSITIONS/fx:SEGMENT-POSITION', self.__ns__):
+            bit_pos = int(self.get_child_text(seg, './fx:BIT-POSITION'))
+            high_low = self.get_child_text(seg, './fx:IS-HIGH-LOW-BYTE-ORDER')
+            bit_len = int(self.get_child_text(seg, './ho:BIT-LENGTH'))
+            static_segs.append(self.__conf_factory__.create_multiplex_segment_position(bit_pos, high_low, bit_len))
+
+        # static pdu instances
+        static_pdu = self.get_child_attribute(element, './fx:STATIC-PART/fx:STATIC-PDU-INSTANCE/fx:PDU-REF', 'ID-REF')
+
+        return switch, segs, pdus, static_segs, static_pdu
+
+    def parse_signal_pdu(self, element, verbose):
+        id = self.get_id(element)
+        short_name = self.get_child_text(element, 'ho:SHORT-NAME')
+        byte_length = int(self.get_child_text(element, 'fx:BYTE-LENGTH'))
+        pdu_type = self.get_child_text(element, 'fx:PDU-TYPE')
+
+        if verbose:
+            print(f"DEBUG: parse_pdu: {short_name} byte_length:{byte_length} pdu_type:{pdu_type}")
+
+        signal_instances = dict()
+        for signal_instance in element.findall('./fx:SIGNAL-INSTANCES/fx:SIGNAL-INSTANCE', self.__ns__):
+            si = self.parse_signal_instance(signal_instance)
+            si.add_signal(self.get_signal(si.__signal_ref__))
+            if si is not None:
+                signal_instances[si.__id__] = si
+
+        ret = self.__conf_factory__.create_pdu(id, short_name, byte_length, pdu_type, signal_instances)
+        self.__pdus__[short_name] = ret
+        return ret
+
+    def parse_multiplex_pdu(self, element, verbose):
+        id = self.get_id(element)
+        short_name = self.get_child_text(element, 'ho:SHORT-NAME')
+        byte_length = int(self.get_child_text(element, 'fx:BYTE-LENGTH'))
+        pdu_type = self.get_child_text(element, 'fx:PDU-TYPE')
+
+        if verbose:
+            print(f"DEBUG: parse_pdu:{short_name} byte_length:{byte_length} pdu_type:{pdu_type}")
+
+        multiplexer = element.find('./fx:MULTIPLEXER', self.__ns__)
+
+        switch, seg_pos, pdu_instances, static_segs, static_pdu_id = self.parse_multiplexer(multiplexer)
+
+        static_pdu = self.__pdus__.get(static_pdu_id, None)
+        ret = self.__conf_factory__.create_multiplex_pdu(id, short_name, byte_length, pdu_type,
+                                                         switch, seg_pos, pdu_instances, static_segs, static_pdu)
+
+        self.__pdus__[short_name] = ret
+        return ret
+
+    def parse_pdus(self, root, verbose):
+        # first pass without MULTIPLEXER
+        for pdu in root.findall('.//fx:PDUS/fx:PDU', self.__ns__):
+            if pdu.find('./fx:MULTIPLEXER', self.__ns__) is None:
+                p = self.parse_signal_pdu(pdu, verbose)
+                if p is not None:
+                    self.__pdus__[p.id()] = p
+
+        # second pass MULTIPLEXER only, since static PDUs need to already be parsed
+        for pdu in root.findall('.//fx:PDUS/fx:PDU/fx:MULTIPLEXER/..', self.__ns__):
+            p = self.parse_multiplex_pdu(pdu, verbose)
+            if p is not None:
+                self.__pdus__[p.id()] = p
+
+    def parse_pdu_instance(self, element):
+        id = self.get_id(element)
+        pdu_ref = self.get_child_attribute(element, './fx:PDU-REF', 'ID-REF')
+
+        bit_position = int(self.get_child_text(element, './fx:BIT-POSITION'))
+        is_high_low_byte_order = self.get_child_text(element, './fx:IS-HIGH-LOW-BYTE-ORDER')
+        pdu_update_bit_position = self.get_child_text(element, './/fx:PDU-UPDATE-BIT-POSITION')
+        if pdu_update_bit_position is not None:
+            pdu_update_bit_position = int(pdu_update_bit_position)
+
+        ret = self.__conf_factory__.create_pdu_instance(id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position)
+        return ret
+
+    def parse_frame_triggering(self, element):
+        id = self.get_id(element)
+        frame_ref = self.get_child_attribute(element, './fx:FRAME-REF', 'ID-REF')
+        frame = self.__frames__.get(frame_ref, None)
+
+        # let us find out what we have here...
+
+        # CAN:
+        identifier_tmp = self.get_child_text(element, './fx:IDENTIFIER/fx:IDENTIFIER-VALUE')
+
+        # FlexRay
+        slot_id_tmp = self.get_child_text(element, './fx:TIMINGS/fx:ABSOLUTELY-SCHEDULED-TIMING/fx:SLOT-ID')
+        cycle_counter_tmp = self.get_child_text(element, './fx:TIMINGS/fx:ABSOLUTELY-SCHEDULED-TIMING/fx:CYCLE-COUNTER')
+        base_cycle_tmp = self.get_child_text(element, './fx:TIMINGS/fx:ABSOLUTELY-SCHEDULED-TIMING/fx:BASE-CYCLE')
+        cycle_repetition_tmp = self.get_child_text(element, './fx:TIMINGS/fx:ABSOLUTELY-SCHEDULED-TIMING/fx:CYCLE-REPETITION')
+
+        if slot_id_tmp is not None and ((cycle_counter_tmp is not None) or
+                                        (base_cycle_tmp is not None and cycle_repetition_tmp is not None)):
+            # FlexRay
+            slot_id = int(slot_id_tmp)
+
+            # two options in standard: CYCLE-COUNTER or BASE-CYCLE + REPETITION
+            cycle_counter = None if cycle_counter_tmp is None else int(cycle_counter_tmp)
+            base_cycle = None if base_cycle_tmp is None else int(base_cycle_tmp)
+            cycle_repetition = None if cycle_repetition_tmp is None else int(cycle_repetition_tmp)
+
+            ret = self.__conf_factory__.create_frame_triggering_flexray(id, frame, slot_id, cycle_counter,
+                                                                        base_cycle, cycle_repetition)
+            return ret
+
+        elif identifier_tmp is not None:
+            can_id = int(identifier_tmp)
+
+            ret = self.__conf_factory__.create_frame_triggering_can(id, frame, can_id)
+            return ret
+
+        return None
+
+    def parse_frame_triggerings(self, root):
+        for frame_triggering in root.findall('.//fx:FRAME-TRIGGERING', self.__ns__):
+            f = self.parse_frame_triggering(frame_triggering)
+            if f is not None:
+                if f.id() in self.__frame_triggerings__.keys():
+                    print(f"WARNING: creating another Frame Triggering with ID: {f.id()}")
+                self.__frame_triggerings__[f.id()] = f
+
+    def parse_frame(self, element, verbose):
+        id = self.get_id(element)
+        short_name = self.get_child_text(element, './ho:SHORT-NAME')
+        byte_length = self.get_child_text(element, './fx:BYTE-LENGTH')
+        frame_type = self.get_child_text(element, './fx:FRAME-TYPE')
+
+        pdu_instances = dict()
+        for pdu_instance in element.findall('./fx:PDU-INSTANCES/fx:PDU-INSTANCE', self.__ns__):
+            pi = self.parse_pdu_instance(pdu_instance)
+            if pi is not None:
+                pdu = self.get_pdu(pi.__pdu_ref__)
+                if pdu is None:
+                    print(f"ERROR: Frame {short_name} references unknown PDU {pi.__pdu_ref__}!")
+                else:
+                    pi.add_pdu(pdu)
+
+                pdu_instances[pi.__id__] = pi
+
+        ret = self.__conf_factory__.create_frame(id, short_name, byte_length, frame_type, pdu_instances)
+        return ret
+
+    def parse_frames(self, root, verbose):
+        for frame in root.findall('.//fx:FRAMES/fx:FRAME', self.__ns__):
+            f = self.parse_frame(frame, verbose)
+            if f is not None:
+                self.__frames__[f.id()] = f
+
+    def basetype_length(self, coding_dict):
+        basetype = self.get_from_dict(coding_dict, "Basetype", "--INVALID--")
+
+        if basetype in ['A_UINT8', 'A_INT8']:
+            return 8
+
+        if basetype in ['A_UINT16', 'A_INT16']:
+            return 16
+
+        if basetype in ['A_UINT32', 'A_INT32', 'A_FLOAT32']:
+            return 32
+
+        if basetype in ['A_UINT64', 'A_INT64', 'A_FLOAT64']:
+            return 64
+
+        # 'A_ASCIISTRING', 'A_UNICODE2STRING', 'A_BYTEFIELD', 'A_BITFIELD', 'OTHER'
+        return -1
+
+    def basetype_is_int(self, coding_dict):
+        basetype = self.get_from_dict(coding_dict, "Basetype", "--INVALID--")
+        return basetype in ['A_UINT8', 'A_INT8', 'A_UINT16', 'A_INT16', 'A_UINT32', 'A_INT32', 'A_UINT64', 'A_INT64']
+
+    def basetype_is_float(self, coding_dict):
+        basetype = self.get_from_dict(coding_dict, "Basetype", "--INVALID--")
+        return basetype in ['A_FLOAT32', 'A_FLOAT64']
+
+    def basetype_is_string(self, coding_dict):
+        basetype = self.get_from_dict(coding_dict, "Basetype", "--INVALID--")
+        return basetype in ['A_ASCIISTRING', 'A_UNICODE2STRING']
+
+    def basetype_is_other(self, coding_dict):
+        basetype = self.get_from_dict(coding_dict, "Basetype", "--INVALID--")
+        return basetype in ['A_BYTEFIELD', 'A_BITFIELD', 'OTHER']
 
     def interpret_datatype(self, element, utils, serialization_attributes):
         ret = None
@@ -238,14 +486,7 @@ class FibexParser(AbstractParser):
             coding2 = self.__codings__[self.get_attribute(coding_ref, 'ID-REF')]
 
         if p["Type"] == "fx:COMMON-DATATYPE-TYPE" or p["Type"] == "fx:ENUM-DATATYPE-TYPE":
-
-            t_ints = ['A_UINT8', 'A_INT8', 'A_UINT16', 'A_INT16', 'A_UINT32', 'A_INT32', 'A_UINT64', 'A_INT64']
-            t_floats = ['A_FLOAT32', 'A_FLOAT64']
-            t_strings = ['A_ASCIISTRING', 'A_UNICODE2STRING']
-            # t_other = ['A_BYTEFIELD', 'A_BITFIELD', 'OTHER']
-
-            basetype = self.get_from_dict(coding2, "Basetype", "--INVALID--")
-            if basetype in (t_ints + t_floats):
+            if self.basetype_is_int(coding2) or self. basetype_is_float(coding2):
                 bitlenbase = self.get_from_dict(coding2, "BitLength", -1)
                 bitlenenct = self.get_from_dict(utils, "BitLength", -1)
                 if bitlenenct == -1:
@@ -269,7 +510,7 @@ class FibexParser(AbstractParser):
                         bitlenenct
                     )
 
-            elif basetype in t_strings:
+            elif self.basetype_is_string(coding2):
                 bitlen = self.get_from_dict(utils, "BitLength", -1)
                 minlen = self.get_from_dict(utils, "MinBitLength", -1)
                 maxlen = self.get_from_dict(utils, "MaxBitLength", -1)
@@ -386,7 +627,6 @@ class FibexParser(AbstractParser):
                     ret = self.__conf_factory__.create_someip_parameter_struct(p["Name"], len_of_len, padto, members)
 
                 elif self.get_from_dict_or_none(p, "ComplexClass") == "UNION":
-
                     members = dict()
                     for m in p["Members"]:
                         child = self.interpret_datatype(
@@ -505,7 +745,6 @@ class FibexParser(AbstractParser):
         return self.__conf_factory__.create_someip_parameter_array(name, dims, child)
 
     def parse_parameter(self, param):
-
         p = dict()
         p["ID"] = self.get_id(param)
         p["OID"] = self.get_oid(param)
@@ -771,8 +1010,12 @@ class FibexParser(AbstractParser):
             channel["id"] = self.get_id(ch)
             channel["name"] = self.get_child_text(ch, "ho:SHORT-NAME")
 
+            channel["flexray-channel-name"] = self.get_child_text(ch, "flexray:FLEXRAY-CHANNEL-NAME")
+
             channel["vlanid"] = None
             channel["vlanname"] = None
+
+            channel["frametriggerings"] = {}
 
             for v in ch.findall('ethernet:VIRTUAL-LAN', self.__ns__):
                 # = self.ID(v)
@@ -917,6 +1160,26 @@ class FibexParser(AbstractParser):
                 else:
                     print(f"ERROR in FIBEX: Cannot find PSI {psiid}")
 
+    def parse_generic_frame_triggering_ref(self, root, path, frametriggerings):
+        ret = {}
+        for port in root.findall(path, self.__ns__):
+            frame_triggering_id = self.get_child_attribute(port, "./fx:FRAME-TRIGGERING-REF", "ID-REF")
+
+            tmp = self.__frame_triggerings__.get(frame_triggering_id, None)
+            if tmp is None:
+                print(f"WARNING: FrameTriggering {frame_triggering_id} not found!")
+            else:
+                ret[tmp.calc_key()] = tmp
+                frametriggerings[tmp.calc_key()] = tmp
+
+        return ret
+
+    def parse_inputs_outputs(self, root, channel_fts):
+        input_ports = self.parse_generic_frame_triggering_ref(root, "./fx:INPUTS/fx:INPUT-PORT", channel_fts)
+        output_ports = self.parse_generic_frame_triggering_ref(root, "./fx:OUTPUTS/fx:OUTPUT-PORT", channel_fts)
+
+        return input_ports, output_ports
+
     @staticmethod
     def lookup_dyn_port(name):
         # we could add code here to determine real port based on name
@@ -961,9 +1224,13 @@ class FibexParser(AbstractParser):
 
                 if channelref in self.__channels__:
                     channel = self.__channels__[channelref]
+                    channel_fts = channel.get("frametriggerings", {})
                 else:
                     channel = None
                     print(f"ERROR in FIBEX: I cannot find channel {channelref}")
+                    channel_fts = {}
+
+                input_frame_trigs, output_frame_trigs = self.parse_inputs_outputs(c, channel_fts)
 
                 interface_ips = []
                 sockets = []
@@ -1046,7 +1313,8 @@ class FibexParser(AbstractParser):
                 # build interfaces
                 if channel is not None:
                     iface = self.__conf_factory__.create_interface(channel["name"], channel["vlanid"], interface_ips,
-                                                                   sockets)
+                                                                   sockets, input_frame_trigs, output_frame_trigs,
+                                                                   channel["flexray-channel-name"])
                     if ctrl is not None:
                         ctrl["ifaces"] += [iface]
 
@@ -1167,6 +1435,24 @@ class FibexParser(AbstractParser):
             print("")
 
         if verbose:
+            print("*** Parsing PDUs ***")
+        self.parse_pdus(root, verbose)
+        if verbose:
+            print("")
+
+        if verbose:
+            print("*** Parsing Frames ***")
+        self.parse_frames(root, verbose)
+        if verbose:
+            print("")
+
+        if verbose:
+            print("*** Parsing FrameTriggering ***")
+        self.parse_frame_triggerings(root)
+        if verbose:
+            print("")
+
+        if verbose:
             print("*** Parsing ECUs ***")
         self.parse_ecus(root)
         if verbose:
@@ -1177,6 +1463,7 @@ class FibexParser(AbstractParser):
         self.parse_topology(root, verbose)
         if verbose:
             print("")
+
 
 
 def main():

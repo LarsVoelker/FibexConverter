@@ -36,6 +36,11 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__switches__ = dict()
         self.__ecus__ = dict()
 
+        self.__codings__ = dict()
+        self.__frame_triggerings__ = dict()
+        self.__frames__ = dict()
+        self.__channels__ = dict()
+
     def create_switch(self, name, ecu, ports):
         ret = Switch(name, ecu, ports)
         assert (name not in self.__switches__)
@@ -55,8 +60,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = Controller(name, interfaces)
         return ret
 
-    def create_interface(self, name, vlanid, ips, sockets):
-        ret = Interface(name, vlanid, ips, sockets)
+    def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
+        ret = Interface(name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel)
+        channel = self.__channels__.setdefault(name, {})
+        frame_triggerings = channel.setdefault("frametriggerings", {})
+
+        for key, value in input_frame_trigs.items():
+            frame_triggerings[key] = value
+        for key, value in output_frame_trigs.items():
+            frame_triggerings[key] = value
+
         return ret
 
     def create_socket(self, name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
@@ -165,8 +178,59 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterUnionMember(index, name, mandatory, child)
         return ret
 
-    def create_legacy_signal(self, id, name, compu_scale, compu_consts):
-        ret = SOMEIPLegacySignal(id, name, compu_scale, compu_consts)
+    def create_signal(self, id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen):
+        ret = Signal(id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen)
+        return ret
+
+    def create_signal_instance(self, id, signal_ref, bit_position, is_high_low_byte_order):
+        ret = SignalInstance(id, signal_ref, bit_position, is_high_low_byte_order)
+        return ret
+
+    def create_pdu(self, id, short_name, byte_length, pdu_type, signal_instances):
+        ret = PDU(id, short_name, byte_length, pdu_type, signal_instances)
+        return ret
+
+    def create_multiplex_pdu(self, id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
+                            static_segs, static_pdu):
+        ret = MultiplexPDU(id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
+                           static_segs, static_pdu)
+        return ret
+
+    def create_multiplex_switch(self, id, short_name, bit_position, is_high_low_byte_order, bit_length):
+        return MultiplexPDUSwitch(id, short_name, bit_position, is_high_low_byte_order, bit_length)
+
+    def create_multiplex_segment_position(self, bit_position, is_high_low_byte_order, bit_length):
+        return MultiplexPDUSegmentPosition(bit_position, is_high_low_byte_order, bit_length)
+
+    def create_pdu_instance(self, id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position):
+        ret = PDUInstance(id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position)
+        return ret
+
+    def create_frame(self, id, short_name, byte_length, frame_type, pdu_instances):
+        if short_name in self.__frames__:
+            i = 1
+            while i == 1 or tmp_name in self.__frames__:
+                tmp_name = f"{short_name}__duplicate{i}"
+                i += 1
+
+            short_name = tmp_name
+
+        assert (short_name not in self.__frames__)
+
+        ret = Frame(id, short_name, byte_length, frame_type, pdu_instances)
+        self.__frames__[short_name] = ret
+        return ret
+
+    def create_frame_triggering_can(self, id, frame_ref, can_id):
+        ret = FrameTriggeringCAN(id, frame_ref, can_id)
+
+        self.__frame_triggerings__[id] = ret
+        return ret
+
+    def create_frame_triggering_flexray(self, id, frame_ref, slot_id, cycle_counter, base_cycle, cycle_repetition):
+        ret = FrameTriggeringFlexRay(id, frame_ref, slot_id, cycle_counter, base_cycle, cycle_repetition)
+
+        self.__frame_triggerings__[id] = ret
         return ret
 
     def add_service(self, serviceid, majorver, minorver, service):
@@ -208,11 +272,23 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         for serviceid in sorted(self.__services__):
             ret += self.__services__[serviceid].str(2)
 
+        ret += "\nFrames: \n"
+        for name in sorted(self.__frames__):
+            ret += self.__frames__[name].str(2)
+
         ret += "\nECUs: \n"
         for name in sorted(self.__ecus__):
             ret += self.__ecus__[name].str(2)
 
-        ret += "\nSwitches: \n"
+        ret += "\nChannels/Busses/VLANs: \n"
+        for name in sorted(self.__channels__):
+            ret += f"  Channel {name}:\n"
+            fts = self.__channels__[name]["frametriggerings"]
+            for key in sorted(fts):
+                ret += fts[key].str(4)
+            ret += "\n"
+
+        ret += "\nEthernet Topology: \n"
         for name in sorted(self.__switches__):
             ret += self.__switches__[name].str(2, print_ecu_name=True)
 
@@ -283,7 +359,14 @@ class Controller(BaseController):
 class Interface(BaseInterface):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Interface {self.__vlanname__} (VLAN-ID: 0x{self.__vlanid__:x})\n"
+
+        if self.__vlanid__ == 0:
+            vlanstr = ""
+        else:
+            vlanstr = f" (VLAN-ID: 0x{self.__vlanid__:x})"
+        ret += f"Interface/Channel {self.__vlanname__}{vlanstr}\n"
+        for s in self.__sockets__:
+            ret += s.str(indent + 2)
 
         for ip in sorted(self.ips(), key=lambda x: ip_to_key(x)):
             if is_ip(ip) and not is_ip_mcast(ip):
@@ -292,6 +375,18 @@ class Interface(BaseInterface):
 
         for s in self.__sockets__:
             ret += s.str(indent + 2)
+
+        if self.__frame_triggerings_in__ is not None and len(self.__frame_triggerings_in__.keys()) > 0:
+            ret += (indent + 2) * " "
+            ret += "Input Frames:\n"
+            for key in sorted(self.__frame_triggerings_in__.keys()):
+                ret += self.__frame_triggerings_in__[key].str(indent + 4)
+
+        if self.__frame_triggerings_out__ is not None and len(self.__frame_triggerings_out__.keys()) > 0:
+            ret += (indent + 2) * " "
+            ret += "Output Frames:\n"
+            for key in sorted(self.__frame_triggerings_out__.keys()):
+                ret += self.__frame_triggerings_out__[key].str(indent + 4)
 
         return ret
 
@@ -646,23 +741,180 @@ class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
         return ret
 
 
-class SOMEIPLegacySignal(SOMEIPBaseLegacySignal):
-    def str(self, indent):
-        ret = indent * " "
+class Signal(BaseSignal):
+    def str(self, indent, indent_first_line=True, show_basetype=False):
+        if indent_first_line:
+            ret = indent * " "
+        else:
+            ret = ""
+
         ret += f"Signal {self.__name__}"
+        if show_basetype:
+            ret += f" [{self.__basetype__}]"
         if self.__compu_scale__ is not None and len(self.__compu_scale__) == 3:
             ret += f", f(x) = {self.__compu_scale__[0]} + {self.__compu_scale__[1]}/{self.__compu_scale__[2]} * x"
         if self.__compu_consts__ is not None and len(self.__compu_consts__) > 0:
             ret += f", Consts: "
             first = True
             for name, start, end in self.__compu_consts__:
-                if not first:
-                    first = True
+                if first:
+                    first = False
                 else:
                     ret += ", "
                 ret += f"{name} ({start}-{end})"
             ret += f" "
         return ret + "\n"
+
+
+class Frame(BaseFrame):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Frame {self.__short_name__}\n"
+
+        for p in self.__pdu_instances__.keys():
+            ret += self.__pdu_instances__[p].str(indent + 2)
+
+        return ret
+
+
+class PDU(BasePDU):
+    def str(self, indent, indent_first_line=True, start_offset=0):
+        if indent_first_line:
+            ret = indent * " "
+        else:
+            ret = ""
+
+        ret += f"PDU {self.__short_name__} ({self.__pdu_type__})\n"
+
+        for sig_inst in self.signal_instances_sorted_by_bit_position():
+            ret += sig_inst.str(indent + 2, start_offset=start_offset)
+
+        return ret
+
+class MultiplexPDU(BaseMultiplexPDU):
+    def str(self, indent, indent_first_line=True):
+        if indent_first_line:
+            ret = indent * " "
+        else:
+            ret = ""
+
+        ret += f"MUX-PDU {self.__short_name__} ({self.__pdu_type__})\n"
+        ret += self.__switch__.str(indent + 2)
+
+        dyn_seg_start = 0
+        for seg in self.__segment_positions__:
+            ret += seg.str(indent + 2, prefix="Dynamic")
+            dyn_seg_start = seg.bit_position()
+
+        for switch_code in sorted(self.__pdu_instances__):
+            pdu = self.__pdu_instances__[switch_code]
+            pdu_str = pdu.str(indent + 4, indent_first_line=False, start_offset=dyn_seg_start) \
+                      if pdu is not None else "PDU NOT FOUND!\n"
+
+            ret += (indent + 4) * " "
+            ret += f"[Switch Code: {switch_code}]: {pdu_str}"
+
+        static_seg_start = 0
+        if self.__static_segments__ is not None:
+            for seg in self.__static_segments__:
+                ret += seg.str(indent + 2, prefix="Static")
+                static_seg_start = seg.bit_position()
+
+        if self.__static_pdu__ is not None:
+            pdu_str = self.__static_pdu__.str(indent + 4, indent_first_line=False, start_offset=static_seg_start)\
+                      if self.__static_pdu__ is not None else "PDU NOT FOUND!\n"
+
+            ret += (indent + 4) * " "
+            ret += f"[Static PDU] {pdu_str}"
+
+
+        return ret
+
+class MultiplexPDUSwitch(BaseMultiplexPDUSwitch):
+    def str(self, indent, indent_first_line=True):
+        if indent_first_line:
+            ret = indent * " "
+        else:
+            ret = ""
+
+        end_bit = self.__bit_position__ + self.__bit_length__ - 1
+        high_low = "high low byte order" if self.__is_high_low_byte_order__ else "low high byte order"
+        ret += f"[Bit pos.: {self.__bit_position__}..{end_bit}] Switch {self.__short_name__} {self.__bit_length__} bits ({high_low})  \n"
+
+        return ret
+
+class MultiplexPDUSegmentPosition(BaseMultiplexPDUSegmentPosition):
+    def str(self, indent, indent_first_line=True, prefix=""):
+        if indent_first_line:
+            ret = indent * " "
+        else:
+            ret = ""
+
+        end_bit = self.__bit_position__ + self.__bit_length__ - 1
+        high_low = "high low byte order" if self.__is_high_low_byte_order__ else "low high byte order"
+        ret += f"[Bit pos.: {self.__bit_position__}..{end_bit}] " \
+               f"{prefix} Segment {self.__bit_length__} bits ({high_low})  \n"
+
+        return ret
+
+
+class PDUInstance(BasePDUInstance):
+    def str(self, indent):
+        ret = indent * " "
+        end_bit = self.__bit_position__ + 8 * self.__pdu__.byte_length() - 1
+        ret += f"[Bit pos.: {self.__bit_position__}..{end_bit}] "
+
+        if self.__pdu__ is not None:
+            ret += self.__pdu__.str(indent + 2, indent_first_line=False)
+        else:
+            ret += f" *** missing PDU ***\n"
+
+        return ret
+
+
+class SignalInstance(BaseSignalInstance):
+    def str(self, indent, start_offset=0):
+        bit_length = self.__signal__.bit_length()
+        ret = indent * " "
+
+        bit_start = int(self.__bit_position__) + start_offset
+
+        if bit_length == -1:
+            ret += f"[Bit pos.: {bit_start}] "
+        else:
+            bit_end = bit_start + bit_length - 1
+            ret += f"[Bit pos.: {bit_start}..{bit_end}] "
+        ret += self.__signal__.str(indent + 2, indent_first_line=False, show_basetype=True)
+        return ret
+
+
+class FrameTriggeringCAN(BaseFrameTriggeringCAN):
+    def str(self, indent):
+        ret = indent * " "
+
+        frame = self.__frame__.name() if self.__frame__ is not None else "undefined"
+        frame_id = self.__frame__.id() if self.__frame__ is not None else "undefined"
+
+        ret += f"FrameTriggeringCAN (CAN-ID: {self.__can_id__}) for Frame {frame}\n"
+        return ret
+
+
+class FrameTriggeringFlexRay(BaseFrameTriggeringFlexRay):
+    def str(self, indent):
+        ret = indent * " "
+
+        if self.__cycle_counter__ is not None:
+            timing = f"Cycle Counter: {self.__cycle_counter__}"
+        elif self.__base_cycle__ is not None and self.__cycle_repetition__ is not None:
+            timing = f"Base Cycle: {self.__base_cycle__}, Cycle Rep: {self.__cycle_repetition__}"
+        else:
+            timing = f"Undefined Timing"
+
+        frame = self.__frame__.name() if self.__frame__ is not None else "undefined"
+        frame_id = self.__frame__.id() if self.__frame__ is not None else "undefined"
+
+        ret += f"FrameTriggeringFlexRay (Slot ID: {self.__slot_id__}, {timing}) for Frame {frame}\n"
+        return ret
 
 
 def parse_arguments():

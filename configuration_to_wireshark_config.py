@@ -45,15 +45,20 @@ def cleanup_string(tmp):
 
 
 def cleanup_datatype_string(tmp):
-    ret = tmp[2:].lower()
-    if ret.startswith("uint"):
+    ret = tmp.lower()
+    if ret.startswith("uint") or ret.startswith("a_uint"):
         ret = "uint"
-    if ret.startswith("int"):
+    if ret.startswith("int") or ret.startswith("a_int"):
         ret = "int"
-    if ret.startswith("float"):
+    if ret.startswith("float") or ret.startswith("a_float"):
         ret = "float"
     return ret
 
+def translate_datatype(dt):
+    if dt.lower().startswith("a_"):
+        return dt[2:].lower()
+    else:
+        return dt.lower()
 
 class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
@@ -78,10 +83,32 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         self.__globalid_unions__ = 1
 
         self.__globalid_signal_pdus__ = 1
+        self.__globalid_bus__ = 1
 
         self.__space_optimized__ = True
 
         self.__ecus__ = dict()
+        self.__channels__ = dict()
+        self.__frame_id_pdu_id_mapping__ = dict()
+
+    def next_global_pdu_id(self):
+        ret = self.__globalid_signal_pdus__
+        self.__globalid_signal_pdus__ += 1
+        return ret
+
+    def pdu_id_for_frame(self, frame):
+        key = frame.id()
+        present = key in self.__frame_id_pdu_id_mapping__.keys()
+
+        if not present:
+            self.__frame_id_pdu_id_mapping__[key] = self.next_global_pdu_id()
+
+        return present, self.__frame_id_pdu_id_mapping__[key]
+
+    def next_global_bus_id(self):
+        ret = self.__globalid_bus__
+        self.__globalid_bus__ += 1
+        return ret
 
     def create_backlinks(self):
         for s in self.__services__.values():
@@ -94,6 +121,33 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
             print(f"Detected duplicate ECU {name}")
         self.__ecus__[name] = tmp
         return tmp
+
+    def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
+        ret = BaseInterface(name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel)
+
+        channel = self.__channels__.setdefault(name, {})
+
+        channel.setdefault("is_can", False)
+        channel.setdefault("is_flexray", False)
+        channel.setdefault("is_ethernet", False)
+
+        if ret.is_can():
+            channel["is_can"] = True
+        if ret.is_flexray():
+            channel["is_flexray"] = True
+        if ret.is_ethernet():
+            channel["is_ethernet"] = True
+
+        channel["fr-channel"] = fr_channel
+
+        frame_triggerings = channel.setdefault("frametriggerings", {})
+
+        for key, value in input_frame_trigs.items():
+            frame_triggerings[key] = value
+        for key, value in output_frame_trigs.items():
+            frame_triggerings[key] = value
+
+        return ret
 
     def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
         ret = SOMEIPService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
@@ -359,10 +413,6 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         fm.close()
         fe.close()
 
-        if version == 1:
-            print(f"  Found {count_services} services, {count_methods} methods, and {count_events} events. "
-                  f"This includes the methods and events of {count_fields} fields.")
-
     @staticmethod
     def write_ws_config(filename, arr, version=1):
         f = open(filename, "w")
@@ -517,6 +567,22 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         f.close()
 
+    def write_signal_pdu_configline(self, f, pdu_id, name):
+        # Legacy-ID, Name
+
+        f.write(f"\"{pdu_id:08x}\","
+                f"\"{name}\"\n"
+                )
+
+    def write_can_busid_configline(self, f, interfaceid, busname, busid):
+        if interfaceid is None:
+            interfaceid = 0xffffffff
+
+        f.write(f"\"{interfaceid:08x}\","
+                f"\"{busname}\","
+                f"\"{busid:04x}\"\n"
+                )
+
     def write_signal_pdu_binding_someip_configline(self, f, service, method, msgtype, pdu_id):
         # Service-ID, Method-ID, MessageType, Version, Legacy-ID
 
@@ -530,14 +596,60 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 f"\"{pdu_id:08x}\"\n"
                 )
 
-    def write_someip_signal_pdunames_configline(self, f, pdu_id, name):
-        # Legacy-ID, Name
+    def write_signal_pdu_binding_can_configline(self, f, can_id, bus_id, pdu_id):
+        # uint32 CAN-ID, uint16 Bus-ID, uint32 PDU-ID
 
-        f.write(f"\"{pdu_id:08x}\","
-                f"\"{name}\"\n"
+        f.write(f"\"{can_id:08x}\","
+                f"\"{bus_id:04x}\","
+                f"\"{pdu_id:08x}\"\n"
                 )
 
-    def write_someip_signals_configlines(self, f, f_enum, pdu_id, pdu_name, params):
+    def write_signal_pdu_binding_fr_configline(self, f, channel, slot_id, base_cycle, cycle_rep, cycle_cnt, pdu_id):
+        # channel (0,1), uint8 Cycle, uint16 Frame-ID, uint32 PDU-ID
+
+        # Channel A is default
+        channel_cfg = 0
+        if channel.upper() == "B":
+            channel_cfg = 1
+
+        if cycle_cnt is not None and cycle_cnt != 0:
+            print(f"WARNING: FlexRay Cycle Count {cycle_cnt} currently not supported for Wireshark config!")
+
+        MAX_CYCLE = 64
+
+        cycle = base_cycle
+        while cycle < MAX_CYCLE:
+            f.write(f"\"{channel_cfg:02x}\","
+                    f"\"{cycle:02x}\","
+                    f"\"{slot_id:04x}\","
+                    f"\"{pdu_id:08x}\"\n"
+                    )
+            if cycle_rep == 0:
+                return
+
+            cycle += cycle_rep
+
+    def write_signal_value_configlines(self, f_enum, pdu_id, position, signal):
+        cc = signal.compu_consts()
+
+        if cc is None:
+            return
+
+        for value, start, end in cc:
+            if 0 <= int(start) <= pow(2, 64) and 0 <= int(end) <= pow(2, 64):
+                f_enum.write(f"\"{pdu_id:08x}\","
+                             f"\"{position}\","
+                             f"\"{len(cc)}\","
+                             f"\"{int(start):x}\","
+                             f"\"{int(end):x}\","
+                             f"\"{cleanup_string(value)}\""
+                             "\n"
+                             )
+            else:
+                print(f"WARNING: CompuConst<0 or >2^64 not supported! "
+                      f"{pdu_id:08x}:{position} {start}-{end} {value}")
+
+    def write_someip_signal_configlines(self, f, f_enum, pdu_id, pdu_name, params):
         # signals (f)
         # ID, Num of Sigs, Pos, Name, Data Type, BE (TRUE/FALSE), bitlen base, bitlen coded, scaler, offset,
         # Multiplexer (FALSE), Muliplex value (-1), Hidden (FALSE)
@@ -549,7 +661,6 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
             return
 
         # there might be exactly one struct as wrapper, if we are part of a field
-        tmp = params
         if isinstance(params[0].datatype(), SOMEIPParameterStruct):
             tmp = params[0].datatype().members()
 
@@ -561,27 +672,12 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 scaler = 1
                 offset = 0
 
-                if m.signal() is not None and m.signal().compu_scale() is not None and \
-                        len(m.signal().compu_scale()) == 3:
-                    num0, num1, denom = m.signal().compu_scale()
-                    offset = float(num0)
-                    scaler = float(num1) / float(denom)
+                if m.signal() is not None:
+                    offset = m.signal().offset()
+                    scaler = m.signal().scaler()
 
-                if m.signal() is not None and m.signal().compu_consts() is not None:
-                    cc = m.signal().compu_consts()
-                    for value, start, end in m.signal().compu_consts():
-                        if 0 <= int(start) <= pow(2, 64) and 0 <= int(end) <= pow(2, 64):
-                            f_enum.write(f"\"{pdu_id:08x}\","
-                                         f"\"{m.position()}\","
-                                         f"\"{len(cc)}\","
-                                         f"\"{int(start):x}\","
-                                         f"\"{int(end):x}\","
-                                         f"\"{cleanup_string(value)}\""
-                                         "\n"
-                                         )
-                        else:
-                            print(f"Warning: CompuConst<0 or >2^64 not supported! "
-                                  f"{pdu_id:08x}:{m.position()} {start}-{end} {value}")
+                if m.signal() is not None:
+                    self.write_signal_value_configlines(f_enum, pdu_id, m.position(), m.signal())
 
                 f.write(f"\"{pdu_id:08x}\","
                         f"\"{len(tmp)}\","
@@ -607,25 +703,12 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
             scaler = 1
             offset = 0
 
-            if p.signal() is not None and p.signal().compu_scale() is not None and len(p.signal().compu_scale()) == 3:
-                num0, num1, denom = p.signal().compu_scale()
-                offset = float(num0)
-                scaler = float(num1) / float(denom)
+            if p.signal() is not None:
+                offset = p.signal().offset()
+                scaler = p.signal().scaler()
 
-            if p.signal() is not None and p.signal().compu_consts() is not None:
-                cc = p.signal().compu_consts()
-                for value, start, end in p.signal().compu_consts():
-                    if int(start) >= 0:
-                        f_enum.write(f"\"{pdu_id:08x}\","
-                                     f"\"{p.position()}\","
-                                     f"\"{len(cc)}\","
-                                     f"\"{start}\","
-                                     f"\"{end}\","
-                                     f"\"{cleanup_string(value)}\""
-                                     "\n"
-                                     )
-                    else:
-                        print(f"Warning: CompuConst<0 unsupported! {pdu_id:08x}:{p.position()} {start}-{end} {value}")
+            if p.signal() is not None:
+                self.write_signal_value_configlines(f_enum, pdu_id, p.position(), p.signal())
 
             f.write(f"\"{pdu_id:08x}\","
                     f"\"{len(params)}\","
@@ -644,26 +727,175 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                     "\n"
                     )
 
-    def someip_pdu_id(self):
+    def generate_signal_configline_parts(self, pdu_id, pdu_name, pos, name, dt, endian,
+                                         bitlength_basetype, bitlength_encoded_type,
+                                         scaler, offset, hidden):
+        endian_upper = "TRUE" if endian else "FALSE"
 
-        ret = self.__globalid_signal_pdus__
-        self.__globalid_signal_pdus__ += 1
+        tmp1 = f"\"{pdu_id:08x}\",\""
+        tmp2 = f"\"," \
+               f"\"{pos}\"," \
+               f"\"{name}\"," \
+               f"\"{pdu_name}.{name}\"," \
+               f"\"{cleanup_datatype_string(dt)}\"," \
+               f"\"{endian_upper}\"," \
+               f"\"{bitlength_basetype}\"," \
+               f"\"{bitlength_encoded_type}\"," \
+               f"\"{scaler}\"," \
+               f"\"{offset}\"," \
+               f"\"FALSE\"," \
+               f"\"-1\"," \
+               f"\"{hidden}\"" \
+               "\n"
 
-        return ret
+        return tmp1, tmp2
 
-    def write_pdus_over_someip_config(self, target_dir, fn_bind, fn_id, fn_sig_list, fn_sig_values, version=1):
-        f_bind = open(os.path.join(target_dir, fn_bind), "w")
-        f_bind.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+    def write_signal_pdu_signal_configlines(self, f_sig, f_sigv, pdu_id, name, pdu_instances, debug=False):
+        if len(pdu_instances) == 0:
+            return
 
-        f_id = open(os.path.join(target_dir, fn_id), "w")
-        f_id.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+        if debug and len(pdu_instances) > 1:
+            print(f"WARNING: We might need to merge the PDUs of {name} pdu_id: {pdu_id}.")
+            # TODO: we could use the AUTOSAR I-PDU-M config to have different PDUs...
 
-        f_sig = open(os.path.join(target_dir, fn_sig_list), "w")
-        f_sig.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+        for pdu_instance in pdu_instances.values():
+            if pdu_instance.pdu_update_bit_position() is not None:
+                print(f"WARNING: Update Bits currently not supported! "
+                      f"{name} PDU: {pdu_instance.pdu().name()}. Ignoring the Update Bits!")
+                # TODO: We need to generate the AUTOSAR I-PDU-M config to support Update Bits
 
-        f_sigv = open(os.path.join(target_dir, fn_sig_values), "w")
-        f_sigv.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+        # check and sort pdu intances of frame
+        tmp_pdu_instances = {}
+        for pdu_inst in pdu_instances.values():
+            pdu_start_pos = pdu_inst.bit_position()
 
+            if pdu_start_pos in tmp_pdu_instances.keys():
+                print(f"ERROR: {name} has multiple PDUs starting at same position! Overwritting!")
+
+            if pdu_inst.pdu() is None:
+                print(f"ERROR: {name} has a PDU Instance without PDU! Skipping!")
+            else:
+                tmp_pdu_instances[pdu_start_pos] = pdu_inst
+
+        tmp = []
+        pos = 0
+        dummy_number = 0
+        current_bit_pos = 0
+        for pdu_start_pos in sorted(tmp_pdu_instances.keys()):
+            pdu = tmp_pdu_instances[pdu_start_pos].pdu()
+
+            if pdu.is_multiplex_pdu():
+                print(f"WARNING: Not supporting Multiplex PDUs yet! Skipping Frame: {name}!")
+                # TODO: Parse the Switch and set it to Multiplexer. Generate the rest. Update gap detection.
+                return
+            else:
+                for signal_instance in pdu.signal_instances_sorted_by_bit_position():
+                    start_pos = pdu_start_pos + signal_instance.bit_position()
+
+                    while start_pos > current_bit_pos:
+                        if debug:
+                            print(f"DEBUG: found a gap in PDU {pdu_id} {current_bit_pos} {start_pos}")
+
+                        dummy_length = min(start_pos - current_bit_pos, 32)
+
+                        tmp1, tmp2 = self.generate_signal_configline_parts(pdu_id, pdu.name(), pos,
+                                                                           f"dummy_{dummy_number}",
+                                                                           "uint",
+                                                                           "TRUE",
+                                                                           32,
+                                                                           dummy_length,
+                                                                           1.0, 0.0, "TRUE")
+                        tmp.append((tmp1, tmp2))
+
+                        pos += 1
+                        current_bit_pos += dummy_length
+                        dummy_number += 1
+
+                    if start_pos != current_bit_pos:
+                        print(f"ERROR: The signals seem to be overlapping in PDU {pdu.name()} {pdu_id}! Skipping!")
+                        return
+
+                    signal = signal_instance.signal()
+                    signal_length = signal.bit_length()
+
+                    if debug:
+                        print(f"DEBUG: {pdu_id} {signal.name()} {current_bit_pos} {start_pos} {signal_length}")
+
+                    tmp1, tmp2 = self.generate_signal_configline_parts(pdu_id, pdu.name(), pos, signal.name(),
+                                                                       signal.basetype(),
+                                                                       signal_instance.is_high_low_byte_order(),
+                                                                       signal.basetype_length(),
+                                                                       signal_length,
+                                                                       signal.scaler(), signal.offset(), "FALSE")
+                    tmp.append((tmp1, tmp2))
+
+                    pos += 1
+                    current_bit_pos = start_pos + signal_length
+
+        for left_part, right_part in tmp:
+            f_sig.write(left_part + f"{len(tmp)}" + right_part)
+
+    def has_channel_more_than_one_type(self, key):
+        channel = self.__channels__[key]
+
+        tmp = 0
+        if channel["is_can"]:
+            tmp += 1
+        if channel["is_flexray"]:
+            tmp += 1
+        if channel["is_ethernet"]:
+            tmp += 1
+
+        return tmp > 1
+
+    def write_signal_pdu(self, f_pdu, f_sig, f_sigv, frame):
+        frame_known, pdu_id = self.pdu_id_for_frame(frame)
+        if not frame_known:
+            # we have not written this Signal PDU before, so do it now:
+            self.write_signal_pdu_configline(f_pdu, pdu_id, frame.name())
+            self.write_signal_pdu_signal_configlines(f_sig, f_sigv, pdu_id, frame.name(), frame.pdu_instances())
+
+        return pdu_id
+
+    def write_pdus_over_legacy_bus_configs(self, f_pdu, f_sig, f_sigv, f_can_if, f_bind_can, f_bind_fr, version=2):
+        for name in sorted(self.__channels__.keys()):
+            if self.has_channel_more_than_one_type(name):
+                print(f"WARNING: Channel {name} use more than 1 technology (CAN, FlexRay, Ethernet, ...)! Skipping!")
+                continue
+
+            channel = self.__channels__[name]
+            bus_id = self.next_global_bus_id()
+            frame_triggerings = channel["frametriggerings"]
+
+            if channel["is_can"]:
+                self.write_can_busid_configline(f_can_if, None, name, bus_id)
+
+                for key in sorted(frame_triggerings.keys()):
+                    ft = frame_triggerings[key]
+                    frame = ft.frame()
+                    if frame is None:
+                        print(f"WARNING: FrameTriggering {ft.id()} has no valid frame attached! Skipping!")
+                        continue
+
+                    pdu_id = self.write_signal_pdu(f_pdu, f_sig, f_sigv, frame)
+
+                    self.write_signal_pdu_binding_can_configline(f_bind_can, ft.can_id(), bus_id, pdu_id)
+
+            if channel["is_flexray"]:
+                for key in sorted(frame_triggerings.keys()):
+                    ft = frame_triggerings[key]
+                    frame = ft.frame()
+                    if frame is None:
+                        print(f"WARNING: FrameTriggering {ft.id()} has no valid frame attached! Skipping!")
+                        continue
+
+                    pdu_id = self.write_signal_pdu(f_pdu, f_sig, f_sigv, frame)
+
+                    slot_id, cycle_cnt, base_cycle, cycle_rep = ft.scheduling()
+                    self.write_signal_pdu_binding_fr_configline(f_bind_fr, channel["fr-channel"],
+                                                                slot_id, base_cycle, cycle_rep, cycle_cnt, pdu_id)
+
+    def write_pdus_over_someip_config(self, f_id, f_sig, f_sigv, f_bind, version=2):
         for sid in sorted(self.__services__):
             serv = self.__services__[sid]
 
@@ -675,34 +907,34 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
                 if method.calltype() == "REQUEST_RESPONSE":
                     # Request:
-                    pdu_id = self.someip_pdu_id()
+                    pdu_id = self.next_global_pdu_id()
 
                     # signal pdu
-                    self.write_someip_signal_pdunames_configline(f_id, pdu_id, method.name())
+                    self.write_signal_pdu_configline(f_id, pdu_id, method.name())
 
                     # signals
-                    self.write_someip_signals_configlines(f_sig, f_sigv, pdu_id, method.name(), method.inparams())
+                    self.write_someip_signal_configlines(f_sig, f_sigv, pdu_id, method.name(), method.inparams())
                     # binding
                     self.write_signal_pdu_binding_someip_configline(f_bind, serv, method, 0x00, pdu_id)
 
 
                     # Response:
-                    pdu_id = self.someip_pdu_id()
+                    pdu_id = self.next_global_pdu_id()
 
                     # signal pdu
-                    self.write_someip_signal_pdunames_configline(f_id, pdu_id, method.name())
+                    self.write_signal_pdu_configline(f_id, pdu_id, method.name())
 
                     # signals
-                    self.write_someip_signals_configlines(f_sig, f_sigv, pdu_id, method.name(), method.outparams())
+                    self.write_someip_signal_configlines(f_sig, f_sigv, pdu_id, method.name(), method.outparams())
                     # binding
                     self.write_signal_pdu_binding_someip_configline(f_bind, serv, method, 0x80, pdu_id)
                 else:
-                    pdu_id = self.someip_pdu_id()
+                    pdu_id = self.next_global_pdu_id()
                     # signal pdu
-                    self.write_someip_signal_pdunames_configline(f_id, pdu_id, method.name())
+                    self.write_signal_pdu_configline(f_id, pdu_id, method.name())
 
                     # signals
-                    self.write_someip_signals_configlines(f_sig, f_sigv, pdu_id, method.name(), method.inparams())
+                    self.write_someip_signal_configlines(f_sig, f_sigv, pdu_id, method.name(), method.inparams())
                     # binding
                     self.write_signal_pdu_binding_someip_configline(f_bind, serv, method, 0x01, pdu_id)
 
@@ -712,13 +944,13 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 if not event.legacy():
                     continue
 
-                pdu_id = self.someip_pdu_id()
+                pdu_id = self.next_global_pdu_id()
 
                 # signal pdu
-                self.write_someip_signal_pdunames_configline(f_id, pdu_id, event.name())
+                self.write_signal_pdu_configline(f_id, pdu_id, event.name())
 
                 # signals
-                self.write_someip_signals_configlines(f_sig, f_sigv, pdu_id, event.name(), event.params())
+                self.write_someip_signal_configlines(f_sig, f_sigv, pdu_id, event.name(), event.params())
 
                 # binding
                 self.write_signal_pdu_binding_someip_configline(f_bind, serv, event, 0x02, pdu_id)
@@ -730,13 +962,13 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                     continue
 
                 if field.getter() is not None or field.setter() is not None or field.notifier() is not None:
-                    pdu_id = self.someip_pdu_id()
+                    pdu_id = self.next_global_pdu_id()
 
                     # signal pdu
-                    self.write_someip_signal_pdunames_configline(f_id, pdu_id, field.name())
+                    self.write_signal_pdu_configline(f_id, pdu_id, field.name())
 
                     # signals
-                    self.write_someip_signals_configlines(f_sig, f_sigv, pdu_id, field.name(), field.params())
+                    self.write_someip_signal_configlines(f_sig, f_sigv, pdu_id, field.name(), field.params())
 
                     if field.getter() is not None:
                         # binding (only response has payload)
@@ -751,11 +983,40 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                         # binding
                         self.write_signal_pdu_binding_someip_configline(f_bind, serv, field.notifier(), 0x02, pdu_id)
 
-        f_bind.close()
+    def write_pdu_configs(self, target_dir, fn_id, fn_sig, fn_sigv,
+                          fn_bind_someip, fn_can_if, fn_bind_can, fn_bind_fr, version=2):
+        f_id = open(os.path.join(target_dir, fn_id), "w")
+        f_id.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+        f_sig = open(os.path.join(target_dir, fn_sig), "w")
+        f_sig.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+        f_sigv = open(os.path.join(target_dir, fn_sigv), "w")
+        f_sigv.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+
+        f_bind_someip = open(os.path.join(target_dir, fn_bind_someip), "w")
+        f_bind_someip.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+
+        f_can_if = open(os.path.join(target_dir, fn_can_if), "w")
+        f_can_if.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+
+        f_bind_can = open(os.path.join(target_dir, fn_bind_can), "w")
+        f_bind_can.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+
+        f_bind_fr = open(os.path.join(target_dir, fn_bind_fr), "w")
+        f_bind_fr.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
+
+        print(f"  --> PDUs on SOME/IP: {fn_id}, {fn_sig}, {fn_sigv}, {fn_bind_someip}")
+        self.write_pdus_over_someip_config(f_id, f_sig, f_sigv, f_bind_someip, version=version)
+
+        print(f"  --> PDUs on CAN/FR: {fn_id}, {fn_sig}, {fn_sigv}, {fn_can_if}, {fn_bind_can}, {fn_bind_fr}")
+        self.write_pdus_over_legacy_bus_configs(f_id, f_sig, f_sigv, f_can_if, f_bind_can, f_bind_fr, version=version)
+
         f_id.close()
         f_sig.close()
         f_sigv.close()
-
+        f_bind_someip.close()
+        f_can_if.close()
+        f_bind_can.close()
+        f_bind_fr.close()
 
 class SOMEIPService(SOMEIPBaseService):
     def create_backlinks(self, factory):
@@ -851,13 +1112,6 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
     def paramtype():
         return WiresharkParameterTypes.basetype
 
-    @staticmethod
-    def translate_datatype(dt):
-        if dt.lower().startswith("a_"):
-            return dt[2:].lower()
-        else:
-            return dt.lower()
-
     def ws_config_line(self, version=1):
         # Type-ID,Name,Datatype,BigEndian,BitlengthBase,BiglengthEncoded
 
@@ -865,7 +1119,7 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
             endianess = 1 if self.bigendian() else 0
             return "\"%08x\",\"%s\",\"%s\",\"%d\",\"%d\",\"%d\"\n" % (self.globalid(),
                                                                       self.name(),
-                                                                      self.translate_datatype(self.datatype()),
+                                                                      translate_datatype(self.datatype()),
                                                                       endianess,
                                                                       self.bitlength_basetype(),
                                                                       self.bitlength_encoded_type())
@@ -879,7 +1133,7 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
             endianess = "TRUE" if self.bigendian() else "FALSE"
             return "\"%08x\",\"%s\",\"%s\",\"%s\",\"%d\",\"%d\"\n" % (self.globalid(),
                                                                       self.name(),
-                                                                      self.translate_datatype(self.datatype()),
+                                                                      translate_datatype(self.datatype()),
                                                                       endianess,
                                                                       self.bitlength_basetype(),
                                                                       self.bitlength_encoded_type())
@@ -961,7 +1215,7 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
         # Array-ID,Name,DT-Type,DT-ID,MaxDim,Dim,Min,Max,LenOfLen,PadTo
 
         if self.__parent_service__ is None or self.__parent_method__ is None:
-            print(f"    Warning: array ({self.name()}) is not attached to service!")
+            print(f"    WARNING: array ({self.name()}) is not attached to service!")
 
         ret = ""
         for key in self.dims():
@@ -1022,7 +1276,7 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
         ret = ""
 
         if self.__parent_service__ is None or self.__parent_method__ is None:
-            print(f"    Warning: struct ({self.name()}) is not attached to service!")
+            print(f"    WARNING: struct ({self.name()}) is not attached to service!")
         else:
             if version == 2 and self.__parent_method__.legacy():
                 if DEBUG_LEGACY_STRIPPING:
@@ -1198,7 +1452,7 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
         # Union-ID,Name,Length of length,Length of Type,Align to,Number of items,Index,Name,Data Type,Datatype ID
 
         if self.__parent_service__ is None or self.__parent_method__ is None:
-            print(f"    Warning: union ({self.name()}) is not attached to service!")
+            print(f"    WARNING: union ({self.name()}) is not attached to service!")
 
         ret = ""
         for key in self.members():
@@ -1299,7 +1553,11 @@ def main():
 
     print("Generating configs:")
 
-    print("  SOMEIP_service_identifiers / SOMEIP_method_event_identifiers / SOMEIP_eventgroup_identifiers")
+    print(f"  SOME/IP configs:")
+
+    print("  --> SOMEIP_service_identifiers")
+    print("  --> SOMEIP_method_event_identifiers")
+    print("  --> SOMEIP_eventgroup_identifiers")
     conf_services = os.path.join(target_dir, "SOMEIP_service_identifiers")
     conf_methods = os.path.join(target_dir, "SOMEIP_method_event_identifiers")
     conf_eventgroups = os.path.join(target_dir, "SOMEIP_eventgroup_identifiers")
@@ -1311,60 +1569,65 @@ def main():
     conf_factory.write_name_configs(conf_services, conf_methods, conf_eventgroups, 2)
 
     fn = "SOMEIP_parameter_list"
-    print(f"  {fn}")
+    print(f"  --> {fn}")
     conf_factory.write_parameter_config(os.path.join(target_dir, fn))
     conf_factory.write_parameter_config(os.path.join(target_dir2, fn), 2)
 
     fn = "SOMEIP_parameter_base_types"
-    print(f"  {fn}")
+    print(f"  --> {fn}")
     conf_factory.write_parameter_basetypes(os.path.join(target_dir, fn))
     conf_factory.write_parameter_basetypes(os.path.join(target_dir2, fn), 2)
 
     fn = "SOMEIP_parameter_arrays"
-    print(f"  {fn}")
+    print(f"  --> {fn}")
     conf_factory.write_parameter_arrays(os.path.join(target_dir, fn))
     conf_factory.write_parameter_arrays(os.path.join(target_dir2, fn), 2)
 
     fn = "SOMEIP_parameter_enums"
-    print(f"  {fn}")
+    print(f"  --> {fn}")
     conf_factory.write_parameter_enums(os.path.join(target_dir, fn))
     conf_factory.write_parameter_enums(os.path.join(target_dir2, fn), 2)
 
     fn = "SOMEIP_parameter_strings"
-    print(f"  {fn}")
+    print(f"  --> {fn}")
     conf_factory.write_parameter_strings(os.path.join(target_dir, fn))
     conf_factory.write_parameter_strings(os.path.join(target_dir2, fn), 2)
 
     fn = "SOMEIP_parameter_structs"
-    print(f"  {fn}")
+    print(f"  --> {fn}")
     conf_factory.write_parameter_structs(os.path.join(target_dir, fn))
     conf_factory.write_parameter_structs(os.path.join(target_dir2, fn), 2)
 
     fn = "SOMEIP_parameter_typedefs"
-    print(f"  {fn}")
+    print(f"  --> {fn}")
     conf_factory.write_parameter_typedefs(os.path.join(target_dir, fn))
     conf_factory.write_parameter_typedefs(os.path.join(target_dir2, fn), 2)
 
     fn = "SOMEIP_parameter_unions"
-    print(f"  {fn}")
+    print(f"  --> {fn}")
     conf_factory.write_parameter_unions(os.path.join(target_dir, fn))
     conf_factory.write_parameter_unions(os.path.join(target_dir2, fn), 2)
 
     # PDUs over SOME/IP
-    fn1 = "Signal_PDU_Binding_SOMEIP"
-    fn2 = "Signal_PDU_identifiers"
-    fn3 = "Signal_PDU_signal_list"
-    fn4 = "Signal_PDU_signal_values"
-    print(f"  PDUs over SOME/IP: {fn1}, {fn2}, {fn3}, {fn4}")
-    conf_factory.write_pdus_over_someip_config(target_dir2, fn1, fn2, fn3, fn4)
+    fn1 = "Signal_PDU_identifiers"
+    fn2 = "Signal_PDU_signal_list"
+    fn3 = "Signal_PDU_signal_values"
+    fn4 = "Signal_PDU_Binding_SOMEIP"
+    fn5 = "CAN_interface_mapping"
+    fn6 = "Signal_PDU_Binding_CAN"
+    fn7 = "Signal_PDU_Binding_FlexRay"
+    print(f"\n  PDUs Configs:")
+    conf_factory.write_pdu_configs(target_dir2, fn1, fn2, fn3, fn4, fn5, fn6, fn7, 2)
+
+    print(f"\n  Other Configs:")
 
     fn = "hosts"
-    print(f"  {fn}")
+    print(f"  --> {fn}")
     conf_factory.write_hosts(os.path.join(target_dir, fn))
     conf_factory.write_hosts(os.path.join(target_dir2, fn), 2)
 
     fn = "vlans"
-    print(f"  {fn}")
+    print(f"  --> {fn}")
     conf_factory.write_vlanids(os.path.join(target_dir, fn))
     conf_factory.write_vlanids(os.path.join(target_dir2, fn), 2)
 
