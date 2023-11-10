@@ -33,11 +33,14 @@ def is_file_or_dir_valid(parser, arg):
     else:
         return arg
 
-def parse_input_files(filename, t, conf_factory, print_filename=True, file_filter="/**/FBX*.xml"):
+def parse_input_files(filename, t, conf_factory, print_filename=True, file_filter="", verbose=False):
+    if file_filter == "":
+        if t.upper() == "FIBEX":
+            file_filter = "/**/FBX*.xml"
+
     if os.path.isdir(filename):
         files = glob.glob(filename + file_filter, recursive=True)
         output_dir = filename
-
     elif os.path.isfile(filename):
         files = [filename]
         (path, f) = os.path.split(filename)
@@ -53,7 +56,7 @@ def parse_input_files(filename, t, conf_factory, print_filename=True, file_filte
         for f in files:
             if print_filename:
                 print(f"\nFile: {f}")
-            parser.parse_file(conf_factory, f)
+            parser.parse_file(conf_factory, f, verbose=verbose)
     else:
         print(f"Type {t} not known/supported!")
         sys.exit(-2)
