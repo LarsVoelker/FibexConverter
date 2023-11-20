@@ -141,17 +141,20 @@ class AccessControlTableEntries:
 
 
 
-    def to_output_set(self, escape_for_excel):
+    def to_output_set(self, factory, escape_for_excel):
         ret = []
 
         if self.__addrs_per_vlans__ is not None:
             for vlan, addrs in self.__addrs_per_vlans__.items():
                 if addrs is not None:
                     for addr in addrs:
+                        mask_prefix = factory.get_ipv4_netmask_or_ipv6_prefix_length(addr)
                         escaped_addr = f"\"=\"\"{addr}\"\"\"" if escape_for_excel else f"{addr}"
                         ret += [(f"{self.__ecu_from__}", f"{self.__switch_from__}", f"{self.__switch_port_from__}",
                                 f"{self.__ecu_to__}", f"{self.__ctrl_to__}",
-                                f"0x{vlan:x}", escaped_addr, f"{mcast_addr_to_mac_mcast(addr)}")]
+                                f"0x{vlan:x}", escaped_addr,
+                                mask_prefix,
+                                f"{mcast_addr_to_mac_mcast(addr)}")]
 
         return ret
 
@@ -217,6 +220,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         # create dummy ECU for unconnected switches
         self.__dummy_ecu__ = self.create_ecu(DUMMY_SWITCH_NAME, ())
+
+        self.__ipv4_netmasks__ = {}
+        self.__ipv6_prefix_lengths__ = {}
 
     def __add_service_instance_provider_socket__(self, serviceid, instanceid, swport, socket):
         key = (serviceid << 16) + instanceid
@@ -421,12 +427,13 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         for ecuname, ecu in sorted(self.__ecus__.items()):
             ecu.print_fwd_tables(fn_prefix, fn_postfix)
 
-    def access_control_table(self):
-        header = f"ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}ECU{CSV_DELIM}Ctrl{CSV_DELIM}VLAN{CSV_DELIM}IP"
+    def access_control_table(self, factory):
+        header = f"ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}ECU{CSV_DELIM}Ctrl{CSV_DELIM}" \
+                 f"VLAN{CSV_DELIM}IP{CSV_DELIM}Netmask/Prefix"
         ret = [header]
 
         for ecuname, ecu in sorted(self.__ecus__.items()):
-            ret += ecu.access_control_table()
+            ret += ecu.access_control_table(factory)
 
         return ret
 
@@ -446,7 +453,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         # default = csv
         header = f"ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}" \
-                 f"ECU{CSV_DELIM}Ctrl{CSV_DELIM}VLAN{CSV_DELIM}IP{CSV_DELIM}MAC{CSV_DELIM}"
+                 f"ECU{CSV_DELIM}Ctrl{CSV_DELIM}VLAN{CSV_DELIM}" \
+                 f"IP{CSV_DELIM}Netmask/Prefix{CSV_DELIM}MAC{CSV_DELIM}"
         ret = [header]
 
         for ecuname, ecu in sorted(self.__ecus__.items()):
@@ -454,7 +462,6 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                                                      skip_multicast=skip_multicast,
                                                      escape_for_excel=escape_for_excel)
         return ret
-
 
     def extended_access_control_matrix(self, factory):
         multicast_cols = self.get_multicast_columns()
@@ -578,6 +585,35 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         return ret
 
+    def add_ipv4_address_config(self, ip, netmask):
+        self.__ipv4_netmasks__[ip] = netmask
+
+    def get_ipv4_netmask(self, ip):
+        try:
+            return self.__ipv4_netmasks__.get(ip)
+        except ValueError:
+            return None
+
+    def add_ipv6_address_config(self, ip, prefixlen):
+        tmp = ipaddress.ip_address(ip).exploded
+        self.__ipv6_prefix_lengths__[tmp] = prefixlen
+
+    def get_ipv6_prefix_length(self, ip):
+        try:
+            tmp = ipaddress.ip_address(ip).exploded
+            return self.__ipv6_prefix_lengths__.get(tmp)
+        except ValueError:
+            return None
+
+    def get_ipv4_netmask_or_ipv6_prefix_length(self, ip):
+        if self.get_ipv4_netmask(ip) is not None:
+            return str(self.get_ipv4_netmask(ip))
+
+        if self.get_ipv6_prefix_length(ip) is not None:
+            return str(self.get_ipv6_prefix_length(ip))
+
+        return ""
+
     def parsing_done(self):
         # fill switch_ports
 
@@ -586,11 +622,11 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 self.__switch_ports__[port.portid_full(gen_name=g_gen_portid)] = port
 
     def endpoints(self):
-        header = ("ECU", "Controller", "VLAN", "VLAN NAME", "IP")
+        header = ("ECU", "Controller", "VLAN", "VLAN NAME", "IP", "Netmask/Prefix")
         ret = [header]
 
         for ecuname in sorted(self.__ecus__):
-            ret = self.__ecus__[ecuname].export_endpoints(ret)
+            ret = self.__ecus__[ecuname].export_endpoints(self, ret)
 
         return ret
 
@@ -824,12 +860,12 @@ class Switch(BaseSwitch):
                     tmp = AccessControlTableEntries(self.ecu().name(), self.name(),
                                                     sw_port.portid(gen_name=g_gen_portid),
                                                     ecu_name, ctrl_name, {vlan_id: [address]})
-                    for i in tmp.to_output_set(escape_for_excel):
+                    for i in tmp.to_output_set(factory, escape_for_excel):
                         ret.append(CSV_DELIM.join(i))
 
         return ret
 
-    def access_control_table(self, escape_for_excel=True):
+    def access_control_table(self, factory, escape_for_excel=True):
         ret = []
 
         for swport in self.ports():
@@ -862,7 +898,7 @@ class Switch(BaseSwitch):
                 tmp = AccessControlTableEntries(self.ecu().name(), self.name(),
                                                 swport.portid(gen_name=g_gen_portid),
                                                 ctrl.ecu().name(), ctrl.name(), ips_per_vlan)
-                for entry in tmp.to_output_set(escape_for_excel):
+                for entry in tmp.to_output_set(factory, escape_for_excel):
                     ret.append(CSV_DELIM.join(entry))
 
         return ret
@@ -1013,11 +1049,11 @@ class ECU(BaseECU):
 
         return ret
 
-    def access_control_table(self):
+    def access_control_table(self, factory):
         ret = []
 
         for switch in self.__switches__:
-            ret += switch.access_control_table()
+            ret += switch.access_control_table(factory)
 
         return ret
 
@@ -1059,15 +1095,23 @@ class ECU(BaseECU):
 
         return ret
 
-    def export_endpoints(self, ret):
+    def export_endpoints(self, factory, ret):
         for controller in self.__controllers__:
             for interface in controller.interfaces():
                 for ip in interface.ips():
+                    if ip is not None:
+                        str_ip = str(ip)
+                        str_netmask_prefix = factory.get_ipv4_netmask_or_ipv6_prefix_length(ip)
+                    else:
+                        str_ip = "dynamic"
+                        str_netmask_prefix = "dynamic"
+
                     ret.append((self.name(),
                                 controller.name(),
                                 hex(interface.vlanid()) if interface.vlanid() is not None else hex(0),
                                 interface.vlanname(),
-                                str(ip) if ip is not None else "dynamic"))
+                                str_ip,
+                                str_netmask_prefix))
         return ret
 
 class Controller(BaseController):
@@ -1270,7 +1314,7 @@ def main():
             f.write(f"{i}\n")
 
     with open(aclfile, "w") as f:
-        tmp = conf_factory.access_control_table()
+        tmp = conf_factory.access_control_table(conf_factory)
         for i in tmp:
             f.write(f"{i}\n")
 

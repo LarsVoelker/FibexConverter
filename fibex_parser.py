@@ -1041,6 +1041,9 @@ class FibexParser(AbstractParser):
                 ip["addrsrc"] = self.get_child_text(i, "it:IPV4-ADDRESS-SOURCE")
                 ip["netmask"] = self.get_child_text(i, "it:NETWORKMASK")
                 ipsv4 += [ip]
+
+                if ip["addr"] is not None and ip["netmask"] is not None:
+                    self.__conf_factory__.add_ipv4_address_config(ip["addr"], ip["netmask"] )
             nep["ipsv4"] = ipsv4
 
             ipsv6 = []
@@ -1048,8 +1051,11 @@ class FibexParser(AbstractParser):
                 ip = dict()
                 ip["addr"] = self.get_child_text(i, "it:IPV6-ADDRESS")
                 ip["addrsrc"] = self.get_child_text(i, "it:IPV6-ADDRESS-SOURCE")
-                ip["netmask"] = self.get_child_text(i, "it:IPV6-ADDRESS-PREFIX-LENGTH")
+                ip["prefixlen"] = self.get_child_text(i, "it:IP-ADDRESS-PREFIX-LENGTH")
                 ipsv6 += [ip]
+
+                if ip["addr"] is not None and ip["prefixlen"] is not None:
+                    self.__conf_factory__.add_ipv6_address_config(ip["addr"], ip["prefixlen"] )
             nep["ipsv6"] = ipsv6
 
             neps[nep["id"]] = nep

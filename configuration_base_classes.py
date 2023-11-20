@@ -284,6 +284,18 @@ class BaseConfigurationFactory(object):
             return False
         return True
 
+    def add_ipv4_address_config(self, ip, netmask):
+        pass
+
+    def get_ipv4_netmask(self, ip):
+        return ""
+
+    def add_ipv6_address_config(self, ip, prefixlen):
+        pass
+
+    def get_ipv6_prefix_length(self, ip):
+        return ""
+
     def parsing_done(self):
         pass
 

@@ -41,6 +41,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__frames__ = dict()
         self.__channels__ = dict()
 
+        self.__ipv4_netmasks__ = {}
+        self.__ipv6_prefix_lengths__ = {}
+
     def create_switch(self, name, ecu, ports):
         ret = Switch(name, ecu, ports)
         assert (name not in self.__switches__)
@@ -267,6 +270,35 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             else:
                 return None
 
+    def add_ipv4_address_config(self, ip, netmask):
+        self.__ipv4_netmasks__[ip] = netmask
+
+    def get_ipv4_netmask(self, ip):
+        try:
+            return self.__ipv4_netmasks__.get(ip)
+        except ValueError:
+            return None
+
+    def add_ipv6_address_config(self, ip, prefixlen):
+        tmp = ipaddress.ip_address(ip).exploded
+        self.__ipv6_prefix_lengths__[tmp] = prefixlen
+
+    def get_ipv6_prefix_length(self, ip):
+        try:
+            tmp = ipaddress.ip_address(ip).exploded
+            return self.__ipv6_prefix_lengths__.get(tmp)
+        except ValueError:
+            return None
+
+    def get_ipv4_netmask_or_ipv6_prefix_length(self, ip):
+        if self.get_ipv4_netmask(ip) is not None:
+            return f"/{self.get_ipv4_netmask(ip)}"
+
+        if self.get_ipv6_prefix_length(ip) is not None:
+            return f"/{self.get_ipv6_prefix_length(ip)}"
+
+        return ""
+
     def __str__(self):
         ret = "Services: \n"
         for serviceid in sorted(self.__services__):
@@ -278,7 +310,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         ret += "\nECUs: \n"
         for name in sorted(self.__ecus__):
-            ret += self.__ecus__[name].str(2)
+            ret += self.__ecus__[name].str(2, self)
 
         ret += "\nChannels/Busses/VLANs: \n"
         for name in sorted(self.__channels__):
@@ -290,18 +322,18 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         ret += "\nEthernet Topology: \n"
         for name in sorted(self.__switches__):
-            ret += self.__switches__[name].str(2, print_ecu_name=True)
+            ret += self.__switches__[name].str(2, self, print_ecu_name=True)
 
         return ret
 
 
 class Switch(BaseSwitch):
-    def str(self, indent, print_ecu_name=False):
+    def str(self, indent, factory, print_ecu_name=False):
         ret = indent * " "
         tmp = f" of ECU {self.__ecu__.name()}" if print_ecu_name else ""
         ret += f"Switch {self.__name__}{tmp}\n"
         for port in self.__ports__:
-            ret += port.str(indent + 2)
+            ret += port.str(indent + 2, factory)
         return ret
 
 
@@ -315,7 +347,7 @@ class SwitchPort(BaseSwitchPort):
 
         return ret
 
-    def str(self, indent):
+    def str(self, indent, factory):
         ret = indent * " "
         ret += f"SwitchPort {self.__portid__} <-> "
         if self.__port__ is not None:
@@ -333,31 +365,31 @@ class SwitchPort(BaseSwitchPort):
 
 
 class ECU(BaseECU):
-    def str(self, indent):
+    def str(self, indent, factory):
         ret = indent * " "
         ret += f"ECU {self.__name__}\n"
 
         for c in self.__controllers__:
-            ret += c.str(indent + 2)
+            ret += c.str(indent + 2, factory)
 
         for s in self.__switches__:
-            ret += s.str(indent + 2)
+            ret += s.str(indent + 2, factory)
 
         return ret
 
 
 class Controller(BaseController):
-    def str(self, indent):
+    def str(self, indent, factory):
         ret = indent * " "
         ret += f"CTRL {self.__name__}\n"
         for i in self.__interfaces__:
-            ret += i.str(indent + 2)
+            ret += i.str(indent + 2, factory)
 
         return ret
 
 
 class Interface(BaseInterface):
-    def str(self, indent):
+    def str(self, indent, factory):
         ret = indent * " "
 
         if self.__vlanid__ == 0:
@@ -371,7 +403,7 @@ class Interface(BaseInterface):
         for ip in sorted(self.ips(), key=lambda x: ip_to_key(x)):
             if is_ip(ip) and not is_ip_mcast(ip):
                 ret += (indent + 2) * " "
-                ret += f"IP: {ip}\n"
+                ret += f"IP: {ip}{factory.get_ipv4_netmask_or_ipv6_prefix_length(ip)}\n"
 
         for s in self.__sockets__:
             ret += s.str(indent + 2)
