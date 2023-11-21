@@ -846,10 +846,23 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                     if debug:
                         print(f"DEBUG: {pdu_id} {signal.name()} {current_bit_pos} {start_pos} {signal_length}")
 
+                    # Workaround for a_bytefield
+                    basetype = signal.basetype()
+                    bitlen_base = signal.basetype_length()
+
+                    if basetype.lower() in ("asciistring", "a_asciistring"):
+                        basetype = "STRING"
+                        bitlen_base = 8
+
+                    if basetype.lower() in ("bytefield", "a_bytefield"):
+                        print(f"        WARNING: bytefield support is not complete. Results may be not correct!")
+                        basetype = "UINT"
+                        bitlen_base = 64
+
                     tmp1, tmp2 = self.generate_signal_configline_parts(pdu_id, pdu.name(), pos, signal.name(),
-                                                                       signal.basetype(),
+                                                                       basetype,
                                                                        signal_instance.is_high_low_byte_order(),
-                                                                       signal.basetype_length(),
+                                                                       bitlen_base,
                                                                        signal_length,
                                                                        signal.scaler(), signal.offset(), "FALSE")
                     tmp.append((tmp1, tmp2))
