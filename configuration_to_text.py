@@ -39,6 +39,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__codings__ = dict()
         self.__frame_triggerings__ = dict()
         self.__frames__ = dict()
+        self.__pdus__ = dict()
         self.__channels__ = dict()
 
         self.__ipv4_netmasks__ = {}
@@ -191,12 +192,21 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def create_pdu(self, id, short_name, byte_length, pdu_type, signal_instances):
         ret = PDU(id, short_name, byte_length, pdu_type, signal_instances)
+
+        if id in self.__pdus__:
+            print(f"WARNING: Creating PDU with existing ID {id}!")
+
+        self.__pdus__[id] = ret
         return ret
 
     def create_multiplex_pdu(self, id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
                             static_segs, static_pdu):
         ret = MultiplexPDU(id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
                            static_segs, static_pdu)
+
+        if id in self.__pdus__:
+            print(f"WARNING: Creating Multiplex PDU with existing ID {id}!")
+        self.__pdus__[id] = ret
         return ret
 
     def create_multiplex_switch(self, id, short_name, bit_position, is_high_low_byte_order, bit_length):
@@ -204,6 +214,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def create_multiplex_segment_position(self, bit_position, is_high_low_byte_order, bit_length):
         return MultiplexPDUSegmentPosition(bit_position, is_high_low_byte_order, bit_length)
+
+    def create_ethernet_pdu_instance(self, pdu_ref, header_id):
+        return EthernetPDUInstance(pdu_ref, header_id)
 
     def create_pdu_instance(self, id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position):
         ret = PDUInstance(id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position)
@@ -307,6 +320,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret += "\nFrames: \n"
         for name in sorted(self.__frames__):
             ret += self.__frames__[name].str(2)
+
+        ret += "\nPDUs: \n"
+        for name in sorted(self.__pdus__):
+            ret += self.__pdus__[name].str(2)
 
         ret += "\nECUs: \n"
         for name in sorted(self.__ecus__):
@@ -435,6 +452,17 @@ class Socket(BaseSocket):
             ret += c.str(indent + 2)
         for c in self.__cegs__:
             ret += c.str(indent + 2)
+
+        if len(self.__pdus_in__) > 0:
+            ret += (indent + 2) * " " + "PDUs in:\n"
+            for p in sorted(self.__pdus_in__, key=lambda x: x.header_id()):
+                ret += p.str(indent + 4, show_signals=False)
+
+        if len(self.__pdus_out__) > 0:
+            ret += (indent + 2) * " " + "PDUs out:\n"
+            for p in sorted(self.__pdus_out__, key=lambda x: x.header_id()):
+                ret += p.str(indent + 4, show_signals=False)
+
         return ret
 
 
@@ -784,7 +812,7 @@ class Signal(BaseSignal):
         if show_basetype:
             ret += f" [{self.__basetype__}]"
         if self.__compu_scale__ is not None and len(self.__compu_scale__) == 3:
-            ret += f", f(x) = {self.__compu_scale__[0]} + {self.__compu_scale__[1]}/{self.__compu_scale__[2]} * x"
+            ret += f", f(x) = {self.__compu_scale__[1]}/{self.__compu_scale__[2]} * x + {self.__compu_scale__[0]}"
         if self.__compu_consts__ is not None and len(self.__compu_consts__) > 0:
             ret += f", Consts: "
             first = True
@@ -810,7 +838,7 @@ class Frame(BaseFrame):
 
 
 class PDU(BasePDU):
-    def str(self, indent, indent_first_line=True, start_offset=0):
+    def str(self, indent, indent_first_line=True, start_offset=0, show_signals=True):
         if indent_first_line:
             ret = indent * " "
         else:
@@ -818,8 +846,9 @@ class PDU(BasePDU):
 
         ret += f"PDU {self.__short_name__} ({self.__pdu_type__})\n"
 
-        for sig_inst in self.signal_instances_sorted_by_bit_position():
-            ret += sig_inst.str(indent + 2, start_offset=start_offset)
+        if show_signals:
+            for sig_inst in self.signal_instances_sorted_by_bit_position():
+                ret += sig_inst.str(indent + 2, start_offset=start_offset)
 
         return ret
 
@@ -889,6 +918,16 @@ class MultiplexPDUSegmentPosition(BaseMultiplexPDUSegmentPosition):
 
         return ret
 
+class EthernetPDUInstance(BaseEthernetPDUInstance):
+    def str(self, indent, show_signals=False):
+        ret = indent * " "
+        ret += f"{hex(self.__header_id__)}: "
+        if self.__pdu__ is None:
+            ret += "\n"
+        else:
+            ret += self.__pdu__.str(indent + 2, indent_first_line=False, show_signals=show_signals)
+
+        return ret
 
 class PDUInstance(BasePDUInstance):
     def str(self, indent):
@@ -953,6 +992,8 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Converting configuration to text.')
     parser.add_argument('type', choices=parser_formats, help='format')
     parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
+    parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
+                        default=None)
 
     args = parser.parse_args()
     return args
@@ -963,7 +1004,7 @@ def main():
     args = parse_arguments()
 
     conf_factory = SimpleConfigurationFactory()
-    output_dir = parse_input_files(args.filename, args.type, conf_factory)
+    output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin)
 
     print("Generating output directories:")
 

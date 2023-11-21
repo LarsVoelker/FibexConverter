@@ -216,7 +216,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__service_instance_consumer_sockets__ = dict()
         self.__eg_senders__ = []
 
-        self.__pdu_relations__ = dict()
+        #self.__pdu_relations__ = dict()
 
         # create dummy ECU for unconnected switches
         self.__dummy_ecu__ = self.create_ecu(DUMMY_SWITCH_NAME, ())
@@ -1148,6 +1148,8 @@ def parse_arguments():
     parser.add_argument('--mcast-list', type=argparse.FileType('r'), default=None,
                         help='Semicolon Separated List of Static Multicast Entries')
     parser.add_argument('--generate-switch-port-names', action='store_true')
+    parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
+                        default=None)
 
     args = parser.parse_args()
     return args
@@ -1223,7 +1225,7 @@ def main():
     g_gen_portid = args.generate_switch_port_names
 
     conf_factory = SimpleConfigurationFactory()
-    output_dir = parse_input_files(args.filename, args.type, conf_factory)
+    output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin)
 
     print("Making sure output directory exists...")
     if os.path.isdir(args.filename):

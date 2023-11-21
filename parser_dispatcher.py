@@ -33,7 +33,13 @@ def is_file_or_dir_valid(parser, arg):
     else:
         return arg
 
-def parse_input_files(filename, t, conf_factory, print_filename=True, file_filter="", verbose=False):
+def is_file_valid(parser, arg):
+    if not os.path.isfile(arg):
+        parser.error(f"File does not exist: {arg}")
+    else:
+        return arg
+
+def parse_input_files(filename, t, conf_factory, plugin_file=None, print_filename=True, file_filter="", verbose=False):
     if file_filter == "":
         if t.upper() == "FIBEX":
             file_filter = "/**/FBX*.xml"
@@ -52,7 +58,7 @@ def parse_input_files(filename, t, conf_factory, print_filename=True, file_filte
         return None
 
     if t.upper() == "FIBEX":
-        parser = FibexParser()
+        parser = FibexParser(plugin_file)
         for f in files:
             if print_filename:
                 print(f"\nFile: {f}")
