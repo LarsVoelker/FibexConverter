@@ -285,6 +285,33 @@ class BaseConfigurationFactory(object):
             return False
         return True
 
+    @staticmethod
+    def socket_to_sw_port(socket):
+        # regular switch ethernet
+        ret = socket.interface().controller().get_switch_port()
+        if ret is not None:
+            return ret
+
+        # ethernet bus
+        eth_bus = socket.interface().controller().get_eth_bus()
+
+        if eth_bus is None:
+            print(f"WARNING: cannot find sw_port and not eth bus either for eth bus! "
+                  f"Ctrl: {socket.interface().controller().name()}")
+            return None
+
+        sw_ports = eth_bus.switch_ports()
+
+        if len(sw_ports) == 0:
+            print(f"WARNING: cannot find uplink port to eth bus! "
+                  f"Ctrl: {socket.interface().controller().name()}")
+            return None
+
+        if len(sw_ports) > 1:
+            print(f"ERROR: Eth Bus with more than 1 uplink to switch is unsupported!")
+
+        return sw_ports[0]
+
     def add_ipv4_address_config(self, ip, netmask):
         pass
 
@@ -396,12 +423,15 @@ class BaseSwitchPort(BaseItem):
         assert(ctrl is None or port is None)
 
         self.__portid__ = portid
-        self.__ctrl__ = ctrl
+        self.__ctrl__ = None
         self.__port__ = port
         self.__eth_bus__ = None
         self.__default_vlan__ = default_vlan
         self.__vlans__ = vlans
         self.__switch__ = None
+
+        if ctrl is not None:
+            self.set_connected_ctrl(ctrl)
 
     def __repr__(self):
         switch_name = "<unknown>"
