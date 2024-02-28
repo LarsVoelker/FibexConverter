@@ -306,7 +306,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             mc_ip = mcast_entries[key]["mc_ip"]
             for rx_port in mcast_entries[key]["sw_ports_rx"]:
                 if rx_port is None:
-                    print(f"DEUBG: mcast_entries: {mcast_entries}")
+                    print(f"DEBUG: mcast_entries: {mcast_entries}")
                     print(f"DEBUG: key: {key}")
                 rx_port.require_mcast_address(vlan_id, mc_ip)
 
@@ -763,9 +763,11 @@ class Switch(BaseSwitch):
                         if port not in sw_ports:
                             sw_ports.append(port)
 
-        # does one of my ports already need it? Is this correct????
+        # does one of my ports already need it?
         if len(sw_ports) > 0:
-            ret = True
+            # if the incoming port is the only one, this does not count!
+            if len(sw_ports) > 1 or sw_ports[0] != sw_port:
+                ret = True
 
         return ret
 
@@ -1210,6 +1212,8 @@ def add_multicast_file(conf_factory, f, verbose=False):
         conf_factory.create_multicast_path(conf_factory.__switch_ports__[swport_src], vlanid_src, addr_src,
                                            conf_factory.__switch_ports__[swport_dst], vlanid_dst, addr_dst,
                                            comment)
+
+    print()
 
     return
 
