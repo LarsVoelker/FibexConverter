@@ -252,20 +252,18 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def add_service(self, serviceid, majorver, minorver, service):
         sid = f"{serviceid:04x}-{majorver:02x}-{minorver:08x}"
         if sid in self.__services_long__:
-            print(
-                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, " +
-                f"Minor-Ver: {minorver:d}) already exists! Not overriding it!"
-            )
+            print(f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, " +
+                  f"Minor-Ver: {minorver:d}) already exists! Not overriding it!")
             return False
+
         self.__services_long__[sid] = service
 
         sid = f"{serviceid:04x}-{majorver:02x}"
         if sid in self.__services__:
-            print(
-                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d})" +
-                f"already exists with a different Minor Version (not {minorver:d})! Not overriding it!"
-            )
+            print(f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d})" +
+                  f"already exists with a different Minor Version (not {minorver:d})! Not overriding it!")
             return False
+
         self.__services__[sid] = service
         return True
 
@@ -347,7 +345,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 class Switch(BaseSwitch):
     def str(self, indent, factory, print_ecu_name=False):
         ret = indent * " "
-        tmp = f" of ECU {self.__ecu__.name()}" if print_ecu_name else ""
+        tmp = f" of ECU {self.__ecu__.name()}" if self.__ecu__ is not None and print_ecu_name else ""
         ret += f"Switch {self.__name__}{tmp}\n"
         for port in self.__ports__:
             ret += port.str(indent + 2, factory)
