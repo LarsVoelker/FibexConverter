@@ -208,6 +208,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__multicast_paths__ = dict()
         self.__mcast_entries__ = None
 
+        self.__mcast_senders__ = dict()
+
         # we need these to trace the topology (multicast) -- ONLY EGs are Multicast!!!
         # key is service-id << 16 + service-instance-id
         self.__service_instance_provider_sockets__ = dict()
@@ -265,7 +267,22 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         elif comment is not None and comment != "":
             self.__multicast_paths__[tmp.to_key()].__append_to_comment__(f"; {comment}")
 
+        switchport_vlan = f"{switchport_tx.portid_full(gen_name=g_gen_portid)}.{vlan_tx:#x}"
+        self.add_multicast_sender(mcast_addr, switchport_vlan)
+
         return tmp
+
+    def add_multicast_sender(self, mcast_addr, switchport, verbose=False):
+        if verbose:
+            print(f"DEBUG: adding mcast sender {switchport} for Address {mcast_addr}")
+        senders = self.__mcast_senders__.setdefault(mcast_addr, [])
+        senders.append(switchport)
+
+    def get_multicast_senders(self, mcast_addr, verbose=False):
+        ret = self.__mcast_senders__.get(mcast_addr, [])
+        if verbose:
+            print(f"DEBUG: found mcast senders for {mcast_addr}: {ret}")
+        return ret
 
     def calc_mcast_topology(self):
         if self.__mcast_entries__ is not None:
@@ -796,7 +813,7 @@ class Switch(BaseSwitch):
                                                       sw_port.portid(gen_name=g_gen_portid),
                                                       ecu_name, ctrl_name, {vlan_id: [address]})
 
-                    for i in actes.to_output_set_dict(KEY_DELIM).values():
+                    for i in actes.to_output_set_dict(".").values():
                         (cols, ips) = tmp.setdefault(i[0], (i[1], []))
                         for ip in i[2]:
                             if ip not in ips:
@@ -808,11 +825,19 @@ class Switch(BaseSwitch):
 
             output_line = cols
 
+
             for ip in factory.get_multicast_columns():
                 if ip in ips:
-                    output_line.append(ip)
+                    entry = ip
                 else:
-                    output_line.append("")
+                    entry = ""
+
+                senders = factory.get_multicast_senders(ip)
+                if f"{cols[0]}.{cols[1]}.{cols[2]}.{cols[3]}" in senders:
+                    if entry != "":
+                        entry += ", "
+                    entry += "TX"
+                output_line.append(entry)
 
             ret.append(output_line)
 
