@@ -21,18 +21,20 @@
 
 import argparse
 import csv
+import datetime
 import json
 from graphviz import Graph
 import os.path
 import pprint
-import sys
 import time
+
+from xlsxwriter.workbook import Workbook
 
 from parser_dispatcher import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
 
 DUMMY_SWITCH_NAME = ""
-CSV_DELIM = ","
+KEY_DELIM = ","
 g_gen_portid = False
 
 class TopologyTableEntry:
@@ -133,15 +135,15 @@ class AccessControlTableEntries:
                             key = f"{self.__ecu_from__}{delim}{self.__switch_from__}{delim}{self.__switch_port_from__}" \
                                   f"{delim}0x{vlan:x}"
 
-                            data = (key, [])
-                            tmp = ret.setdefault(key, data)
-                            tmp[1].append(str(addr))
+                            cols = [self.__ecu_from__, self.__switch_from__, self.__switch_port_from__, f"{vlan:#x}"]
+                            tmp = ret.setdefault(key, (key, cols, []))
+                            tmp[2].append(str(addr))
 
         return ret
 
 
 
-    def to_output_set(self, factory, escape_for_excel):
+    def to_output_set(self, factory):
         ret = []
 
         if self.__addrs_per_vlans__ is not None:
@@ -149,10 +151,9 @@ class AccessControlTableEntries:
                 if addrs is not None:
                     for addr in addrs:
                         mask_prefix = factory.get_ipv4_netmask_or_ipv6_prefix_length(addr)
-                        escaped_addr = f"\"=\"\"{addr}\"\"\"" if escape_for_excel else f"{addr}"
                         ret += [(f"{self.__ecu_from__}", f"{self.__switch_from__}", f"{self.__switch_port_from__}",
                                 f"{self.__ecu_to__}", f"{self.__ctrl_to__}",
-                                f"0x{vlan:x}", escaped_addr,
+                                f"0x{vlan:x}", f"{addr}",
                                 mask_prefix,
                                 f"{mcast_addr_to_mac_mcast(addr)}")]
 
@@ -178,21 +179,18 @@ class MulticastPathEntry:
         return ret
 
     def to_csv_line(self):
-        ret = (f"0x{self.__sid_iid__:08x}{CSV_DELIM}"
-               f"{self.__tx_swport__}{CSV_DELIM}"
-               f"{self.__tx_socket__.interface().vlanid()}{CSV_DELIM}"
-               f"{self.__tx_socket__.ip()}{CSV_DELIM}"
-               f"{self.__rx_swport__}{CSV_DELIM}"
-               f"{self.__rx_socket__.interface().vlanid()}{CSV_DELIM}"
-               f"{self.__rx_socket__.ip()}")
+        ret = [f"{self.__sid_iid__:#08x}",
+               self.__tx_swport__, self.__tx_socket__.interface().vlanid(), self.__tx_socket__.ip(),
+               self.__rx_swport__, self.__rx_socket__.interface().vlanid(), self.__rx_socket__.ip()]
+
         return ret
 
     def to_key_string(self):
-        ret = (f"{self.__tx_swport__}{CSV_DELIM}"
-               f"{self.__tx_socket__.interface().vlanid()}{CSV_DELIM}"
-               f"{self.__tx_socket__.ip()}{CSV_DELIM}"
-               f"{self.__rx_swport__}{CSV_DELIM}"
-               f"{self.__rx_socket__.interface().vlanid()}{CSV_DELIM}"
+        ret = (f"{self.__tx_swport__}{KEY_DELIM}"
+               f"{self.__tx_socket__.interface().vlanid()}{KEY_DELIM}"
+               f"{self.__tx_socket__.ip()}{KEY_DELIM}"
+               f"{self.__rx_swport__}{KEY_DELIM}"
+               f"{self.__rx_socket__.interface().vlanid()}{KEY_DELIM}"
                f"{self.__rx_socket__.ip()}")
         return ret
 
@@ -265,7 +263,6 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         if tmp.to_key() not in self.__multicast_paths__.keys():
             self.__multicast_paths__[tmp.to_key()] = tmp
         elif comment is not None and comment != "":
-            # do not use CSV_DELIM here since we want to merge
             self.__multicast_paths__[tmp.to_key()].__append_to_comment__(f"; {comment}")
 
         return tmp
@@ -390,7 +387,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     v = vlans
                 for vlan in v:
                     if vlan_label != "":
-                        vlan_label += f"{CSV_DELIM} "
+                        vlan_label += f"{KEY_DELIM} "
                     vlan_label += f"0x{vlan:x}"
             g.edge(a, b, label=vlan_label)
 
@@ -403,14 +400,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def topology_table(self):
         vlan_cols = self.get_vlan_columns()
 
-        header = f"Type{CSV_DELIM}ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}" \
-                 f"Type{CSV_DELIM}ECU{CSV_DELIM}Switch|Ctrl{CSV_DELIM}SwPort|None"
+        header = ["Type", "ECU", "Switch", "SwPort", "Type", "ECU", "Switch|Ctrl", "SwPort|None"]
+
         for vlan in sorted(vlan_cols):
             if vlan == 0:
-                header += f"{CSV_DELIM}Untagged"
+                header.append("Untagged")
             else:
                 vlanname = self.__vlans__[vlan].name()
-                header += f"{CSV_DELIM}0x{vlan:x} {vlanname}"
+                header.append(f"{vlan:#x} {vlanname}")
 
         ret = [header]
 
@@ -427,53 +424,47 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         for ecuname, ecu in sorted(self.__ecus__.items()):
             ecu.print_fwd_tables(fn_prefix, fn_postfix)
 
-    def access_control_table(self, factory):
-        header = f"ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}ECU{CSV_DELIM}Ctrl{CSV_DELIM}" \
-                 f"VLAN{CSV_DELIM}IP{CSV_DELIM}Netmask/Prefix"
+    def access_control_table(self):
+        header = ["ECU", "Switch", "SwPort", "ECU", "Ctrl", "VLAN", "IP", "Netmask/Prefix"]
         ret = [header]
 
         for ecuname, ecu in sorted(self.__ecus__.items()):
-            ret += ecu.access_control_table(factory)
+            ret += ecu.access_control_table(self)
 
         return ret
 
-    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True, file_format="csv"):
+    def extended_access_control_table(self, skip_multicast=False, file_format="csv"):
         if file_format == "json":
             ret = dict()
             for ecuname, ecu in sorted(self.__ecus__.items()):
                 if ecuname is None or ecuname == "":
                     continue
 
-                ret[ecuname] = ecu.extended_access_control_table(factory,
+                ret[ecuname] = ecu.extended_access_control_table(self,
                                                                  skip_multicast=skip_multicast,
-                                                                 escape_for_excel=escape_for_excel,
                                                                  file_format="json")
 
             return ret
 
         # default = csv
-        header = f"ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}" \
-                 f"ECU{CSV_DELIM}Ctrl{CSV_DELIM}VLAN{CSV_DELIM}" \
-                 f"IP{CSV_DELIM}Netmask/Prefix{CSV_DELIM}MAC{CSV_DELIM}"
+        header = ["ECU", "Switch", "SwPort", "ECU", "Ctrl", "VLAN", "IP", "Netmask/Prefix", "MAC"]
         ret = [header]
 
         for ecuname, ecu in sorted(self.__ecus__.items()):
-            ret += ecu.extended_access_control_table(factory,
-                                                     skip_multicast=skip_multicast,
-                                                     escape_for_excel=escape_for_excel)
+            ret += ecu.extended_access_control_table(self, skip_multicast=skip_multicast)
+
         return ret
 
-    def extended_access_control_matrix(self, factory):
-        multicast_cols = self.get_multicast_columns()
-        header = f"ECU{CSV_DELIM}Switch{CSV_DELIM}SwPort{CSV_DELIM}VLAN"
+    def extended_access_control_matrix(self):
+        header = ["ECU", "Switch", "SwPort", "VLAN"]
 
         for mcast_addr in self.get_multicast_columns():
-            header += f"{CSV_DELIM}{mcast_addr}"
+            header.append(f"{mcast_addr}")
 
         ret = [header]
 
         for ecuname, ecu in sorted(self.__ecus__.items()):
-            ret += ecu.extended_access_control_matrix(factory)
+            ret += ecu.extended_access_control_matrix(self)
 
         return ret
 
@@ -630,6 +621,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         return ret
 
+
 class MulticastPath(BaseMulticastPath):
     def __init__(self, switchport_tx, vlan_tx, source_addr, switchport_rx, vlan_rx, multicast_addr, comment):
         self.__sid_iids__ = []
@@ -646,16 +638,15 @@ class MulticastPath(BaseMulticastPath):
         return "__".join(sorted(self.__sid_iids__))
 
     def to_key(self):
-        ret = f"{self.switchport_tx_name()}{CSV_DELIM}{self.vlanid()}{CSV_DELIM}{self.source_addr()}{CSV_DELIM}" \
-              f"{self.switchport_rx_name()}{CSV_DELIM}{self.vlanid()}{CSV_DELIM}{self.mc_addr()}{CSV_DELIM}"
+        ret = f"{self.switchport_tx_name()}{KEY_DELIM}{self.vlanid()}{KEY_DELIM}{self.source_addr()}{KEY_DELIM}" \
+              f"{self.switchport_rx_name()}{KEY_DELIM}{self.vlanid()}{KEY_DELIM}{self.mc_addr()}{KEY_DELIM}"
         return ret
 
     def to_csv_line(self):
-        ret = f"{self.switchport_tx_name()}{CSV_DELIM}{self.vlanid()}{CSV_DELIM}" \
-              f"\"=\"\"{self.source_addr()}\"\"\"{CSV_DELIM}" \
-              f"{self.switchport_rx_name()}{CSV_DELIM}{self.vlanid()}{CSV_DELIM}" \
-              f"\"=\"\"{self.mc_addr()}\"\"\"{CSV_DELIM}" \
-              f"{self.comment()}{self.sid_iids_to_string()}"
+        ret = [self.switchport_tx_name(), self.vlanid(), self.source_addr(),
+               self.switchport_rx_name(), self.vlanid(), self.mc_addr(),
+               f"{self.comment()}{self.sid_iids_to_string()}"]
+
         return ret
 
 
@@ -805,27 +796,29 @@ class Switch(BaseSwitch):
                                                       sw_port.portid(gen_name=g_gen_portid),
                                                       ecu_name, ctrl_name, {vlan_id: [address]})
 
-                    for i in actes.to_output_set_dict(CSV_DELIM).values():
-                        ips = tmp.setdefault(i[0], [])
-                        for ip in i[1]:
+                    for i in actes.to_output_set_dict(KEY_DELIM).values():
+                        (cols, ips) = tmp.setdefault(i[0], (i[1], []))
+                        for ip in i[2]:
                             if ip not in ips:
                                 ips.append(ip)
 
         ret = []
         for key in sorted(tmp.keys()):
-            output_line = key
+            (cols, ips) = tmp[key]
+
+            output_line = cols
 
             for ip in factory.get_multicast_columns():
-                if ip in tmp[key]:
-                    output_line += f"{CSV_DELIM}{ip}"
+                if ip in ips:
+                    output_line.append(ip)
                 else:
-                    output_line += f"{CSV_DELIM}"
+                    output_line.append("")
 
             ret.append(output_line)
 
         return ret
 
-    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True, file_format="csv"):
+    def extended_access_control_table(self, factory, skip_multicast=False, file_format="csv"):
         if file_format == "json":
             ret = dict()
 
@@ -862,12 +855,12 @@ class Switch(BaseSwitch):
                     tmp = AccessControlTableEntries(self.ecu().name(), self.name(),
                                                     sw_port.portid(gen_name=g_gen_portid),
                                                     ecu_name, ctrl_name, {vlan_id: [address]})
-                    for i in tmp.to_output_set(factory, escape_for_excel):
-                        ret.append(CSV_DELIM.join(i))
+                    for i in tmp.to_output_set(factory):
+                        ret.append(list(i))
 
         return ret
 
-    def access_control_table(self, factory, escape_for_excel=True):
+    def access_control_table(self, factory):
         ret = []
 
         for swport in self.ports():
@@ -900,8 +893,8 @@ class Switch(BaseSwitch):
                 tmp = AccessControlTableEntries(self.ecu().name(), self.name(),
                                                 swport.portid(gen_name=g_gen_portid),
                                                 ctrl.ecu().name(), ctrl.name(), ips_per_vlan)
-                for entry in tmp.to_output_set(factory, escape_for_excel):
-                    ret.append(CSV_DELIM.join(entry))
+                for entry in tmp.to_output_set(factory):
+                    ret.append(entry)
 
         return ret
 
@@ -1008,7 +1001,7 @@ class ECU(BaseECU):
                     tmp = TopologyTableEntry(self.name(), None, switch.name(), swport.portid(gen_name=g_gen_portid),
                                              ctrl.ecu().name(), ctrl.name(), None, None,
                                              swport.vlans())
-                    ret.append(CSV_DELIM.join(tmp.to_output_set(vlan_cols)))
+                    ret.append(tmp.to_output_set(vlan_cols))
                 elif peerport is not None:
                     peerswitch = peerport.switch()
                     if peerswitch is None:
@@ -1026,7 +1019,7 @@ class ECU(BaseECU):
                         tmp2 = tmp.to_output_set(vlan_cols)
 
                         if tmp2 is not None:
-                            ret.append(CSV_DELIM.join(tmp2))
+                            ret.append(tmp2)
 
                         # checking for asymmetry
                         if len(swport.vlans()) != len(peerport.vlans()):
@@ -1047,7 +1040,7 @@ class ECU(BaseECU):
                                              swport.portid(gen_name=g_gen_portid),
                                              "...", None, None, None,
                                              swport.vlans())
-                    ret.append(CSV_DELIM.join(tmp.to_output_set(vlan_cols)))
+                    ret.append(tmp.to_output_set(vlan_cols))
 
         return ret
 
@@ -1059,7 +1052,7 @@ class ECU(BaseECU):
 
         return ret
 
-    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True, file_format="csv"):
+    def extended_access_control_table(self, factory, skip_multicast=False, file_format="csv"):
         if file_format == "json":
             ret = {}
 
@@ -1067,14 +1060,12 @@ class ECU(BaseECU):
             for switch in self.__switches__:
                 switches[switch.name()] = switch.extended_access_control_table(factory,
                                                                                skip_multicast=skip_multicast,
-                                                                               escape_for_excel=escape_for_excel,
                                                                                file_format=file_format)
 
             ctrls = ret.setdefault("controllers", {})
             for ctrl in self.__controllers__:
                 ctrls[ctrl.name()] = ctrl.extended_access_control_table(factory,
                                                                         skip_multicast=skip_multicast,
-                                                                        escape_for_excel=escape_for_excel,
                                                                         file_format=file_format)
 
             return ret
@@ -1083,9 +1074,7 @@ class ECU(BaseECU):
         ret = []
 
         for switch in self.__switches__:
-            ret += switch.extended_access_control_table(factory,
-                                                        skip_multicast=skip_multicast,
-                                                        escape_for_excel=escape_for_excel)
+            ret += switch.extended_access_control_table(factory, skip_multicast=skip_multicast)
 
         return ret
 
@@ -1116,9 +1105,10 @@ class ECU(BaseECU):
                                 str_netmask_prefix))
         return ret
 
+
 class Controller(BaseController):
 
-    def extended_access_control_table(self, factory, skip_multicast=False, escape_for_excel=True, file_format="csv"):
+    def extended_access_control_table(self, factory, skip_multicast=False, file_format="csv"):
         if file_format == "json":
             ret = {}
 
@@ -1218,6 +1208,33 @@ def add_multicast_file(conf_factory, f, verbose=False):
     return
 
 
+def write_to_csv(filename, data):
+    with open(filename, "w", newline='') as f:
+        writer = csv.writer(f, delimiter=',', quotechar='\\', quoting=csv.QUOTE_MINIMAL)
+        for i in data:
+            writer.writerow(i)
+
+def write_to_xslx(filename, data):
+    workbook = Workbook(filename)
+    worksheet = workbook.add_worksheet()
+
+    headerformat = workbook.add_format({'bg_color': '#0B72B5', 'font_color': 'white'})
+
+    for r, row in enumerate(data):
+        for c, col in enumerate(row):
+            if r == 0:
+                worksheet.write(r, c, col, headerformat)
+            else:
+                worksheet.write(r, c, col)
+
+    if len(data) > 0:
+        worksheet.autofilter(0, 0, len(data) - 1, len(data[0]) - 1)
+
+    worksheet.autofit()
+
+    workbook.set_properties({'title': filename, 'created': datetime.date.today()})
+    workbook.close()
+
 def main():
     global g_gen_portid
 
@@ -1241,15 +1258,14 @@ def main():
         gvfile_prefix_details = os.path.join(target_dir_details, "all_files")
         fwdtableprefix = os.path.join(target_dir_details, "all_files" + "_fwd_table_")
         fwdtablepostfix = ".txt"
-        topofile = os.path.join(target_dir, "all_files" + "_topology.csv")
-        aclfile = os.path.join(target_dir, "all_files" + "_switch_port_addresses.csv")
-        aclfile2 = os.path.join(target_dir, "all_files" + "_switch_port_addresses_ext.csv")
-        aclfile2u = os.path.join(target_dir, "all_files" + "_access_control_ext.csv")
-        aclfile2uj = os.path.join(target_dir, "all_files" + "_access_control_ext.json")
-        aclfile3 = os.path.join(target_dir, "all_files" + "_switch_port_mcast_matrix.csv")
-        mcrfile = os.path.join(target_dir, "all_files" + "_multicast_routes.csv")
+        topofile = os.path.join(target_dir, "all_files" + "_topology")
+        swportaddr = os.path.join(target_dir, "all_files" + "_switch_port_addresses")
+        swportaddrext = os.path.join(target_dir, "all_files" + "_switch_port_addresses_ext")
+        aclfile2u = os.path.join(target_dir, "all_files" + "_access_control_ext")
+        matrixfile = os.path.join(target_dir, "all_files" + "_switch_port_mcast_matrix")
+        mcrfile = os.path.join(target_dir, "all_files" + "_multicast_routes")
         mcrfiles = os.path.join(target_dir_details, "all_files" + "_multicast_routes")
-        endpfile = os.path.join(target_dir, "all_files" + "_endpoints.csv")
+        endpfile = os.path.join(target_dir, "all_files" + "_endpoints")
     elif os.path.isfile(args.filename):
         (path, f) = os.path.split(args.filename)
 
@@ -1266,15 +1282,14 @@ def main():
         gvfile_prefix_details = os.path.join(target_dir_details, filenoext)
         fwdtableprefix = os.path.join(target_dir_details, filenoext + "_fwd_table_")
         fwdtablepostfix = ".txt"
-        topofile = os.path.join(target_dir, filenoext + "_topology.csv")
-        aclfile = os.path.join(target_dir, filenoext + "_switch_port_addresses.csv")
-        aclfile2 = os.path.join(target_dir, filenoext + "_switch_port_addresses_ext.csv")
-        aclfile2u = os.path.join(target_dir, filenoext + "_access_control_ext.csv")
-        aclfile2uj = os.path.join(target_dir, filenoext + "_access_control_ext.json")
-        aclfile3 = os.path.join(target_dir, filenoext + "_switch_port_mcast_matrix.csv")
-        mcrfile = os.path.join(target_dir, filenoext + "_multicast_routes.csv")
+        topofile = os.path.join(target_dir, filenoext + "_topology")
+        swportaddr = os.path.join(target_dir, filenoext + "_switch_port_addresses")
+        swportaddrext = os.path.join(target_dir, filenoext + "_switch_port_addresses_ext")
+        aclfile2u = os.path.join(target_dir, filenoext + "_access_control_ext")
+        matrixfile = os.path.join(target_dir, filenoext + "_switch_port_mcast_matrix")
+        mcrfile = os.path.join(target_dir, filenoext + "_multicast_routes")
         mcrfiles = os.path.join(target_dir_details, filenoext + "_multicast_routes")
-        endpfile = os.path.join(target_dir, filenoext + "_endpoints.csv")
+        endpfile = os.path.join(target_dir, filenoext + "_endpoints")
     else:
         return
 
@@ -1299,6 +1314,44 @@ def main():
     conf_factory.print_fwd_tables(fwdtableprefix, fwdtablepostfix)
 
     print("Generating outputs...")
+
+    print(f"Generating tables...")
+    write_to_csv(f"{topofile}.csv", conf_factory.topology_table())
+    write_to_xslx(f"{topofile}.xlsx", conf_factory.topology_table())
+
+    write_to_csv(f"{swportaddr}.csv", conf_factory.access_control_table())
+    write_to_xslx(f"{swportaddr}.xlsx", conf_factory.access_control_table())
+
+    write_to_csv(f"{swportaddrext}.csv", conf_factory.extended_access_control_table())
+    write_to_xslx(f"{swportaddrext}.xlsx", conf_factory.extended_access_control_table())
+    write_to_csv(f"{aclfile2u}.csv", conf_factory.extended_access_control_table(skip_multicast=True))
+    write_to_xslx(f"{aclfile2u}.xlsx", conf_factory.extended_access_control_table(skip_multicast=True))
+    with open(f"{aclfile2u}.json", "w") as f:
+        tmp = conf_factory.extended_access_control_table(skip_multicast=True, file_format="json")
+        json.dump(tmp, f, indent=4)
+
+    write_to_csv(f"{matrixfile}.csv", conf_factory.extended_access_control_matrix())
+    write_to_xslx(f"{matrixfile}.xlsx", conf_factory.extended_access_control_matrix())
+
+    # multicast routes
+    header = ["Source Switch Port", "Source VLAN", "Source IP", "Dest Switch Port", "Dest VLAN", "Dest IP", "Comments"]
+    data = [header]
+    data += conf_factory.create_multicast_csv()
+    write_to_csv(f"{mcrfile}.csv", data)
+    write_to_xslx(f"{mcrfile}.xlsx", data)
+
+    # multicast route files
+    for mc_addr in sorted(conf_factory.all_multicast_addresses(), key=lambda x: addr_to_key(x)):
+        file_name = f"{mcrfiles}_{mc_addr}"
+        data = [header]
+        data += conf_factory.create_multicast_csv(mc_addr=mc_addr)
+        write_to_csv(f"{file_name}.csv", data)
+        write_to_xslx(f"{file_name}.xlsx", data)
+
+    print(f"Exporting endpoints...")
+    write_to_csv(f"{endpfile}.csv", conf_factory.endpoints())
+    write_to_xslx(f"{endpfile}.xlsx", conf_factory.endpoints())
+
     for vlan in sorted(conf_factory.__vlans__):
         print(f"Generating plot for VLAN {vlan}")
         fn_tmp = gvfile_prefix_details + f"__vlan_0x{vlan:x}.gv"
@@ -1313,63 +1366,6 @@ def main():
     if remove_gv:
         os.remove(fn_tmp)
         os.remove(gvfile)
-
-    with open(topofile, "w") as f:
-        tmp = conf_factory.topology_table()
-        for i in tmp:
-            f.write(f"{i}\n")
-
-    with open(aclfile, "w") as f:
-        tmp = conf_factory.access_control_table(conf_factory)
-        for i in tmp:
-            f.write(f"{i}\n")
-
-    with open(aclfile2, "w") as f:
-        tmp = conf_factory.extended_access_control_table(conf_factory)
-        for i in tmp:
-            f.write(f"{i}\n")
-
-    with open(aclfile2u, "w") as f:
-        tmp = conf_factory.extended_access_control_table(conf_factory,
-                                                         skip_multicast=True,
-                                                         escape_for_excel=False)
-        for i in tmp:
-            f.write(f"{i}\n")
-
-    with open(aclfile2uj, "w") as f:
-        tmp = conf_factory.extended_access_control_table(conf_factory,
-                                                         skip_multicast=True,
-                                                         escape_for_excel=False,
-                                                         file_format="json")
-        json.dump(tmp, f, indent=4)
-
-    with open(aclfile3, "w") as f:
-        tmp = conf_factory.extended_access_control_matrix(conf_factory)
-        for i in tmp:
-            f.write(f"{i}\n")
-
-    csv_header = f"Source Switch Port{CSV_DELIM}Source VLAN{CSV_DELIM}Source IP{CSV_DELIM}Dest Switch Port{CSV_DELIM}" \
-                 f"Dest VLAN{CSV_DELIM}Dest IP{CSV_DELIM}Comments\n"
-    with open(mcrfile, "w") as f:
-        tmp = conf_factory.create_multicast_csv()
-        f.write(csv_header)
-        for i in tmp:
-            f.write(f"{i}\n")
-
-    for mc_addr in sorted(conf_factory.all_multicast_addresses(), key=lambda x: addr_to_key(x)):
-        file_name = f"{mcrfiles}_{mc_addr}.csv"
-        with open(file_name, "w") as f:
-            tmp = conf_factory.create_multicast_csv(mc_addr=mc_addr)
-            f.write(csv_header)
-            for i in tmp:
-                f.write(f"{i}\n")
-
-    print(f"Exporting endpoints..")
-    with open(endpfile, "w") as f:
-        endpoints = conf_factory.endpoints()
-
-        for line in endpoints:
-            f.write(CSV_DELIM.join(line) + "\n")
 
     print("Done.")
 
