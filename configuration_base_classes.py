@@ -648,6 +648,7 @@ class BaseController(BaseItem):
     def get_eth_bus(self):
         return self.__eth_bus__
 
+
 class BaseInterface(BaseItem):
     def __init__(self, vlanname, vlanid, ips, sockets, frame_triggerings_in, frame_triggerings_out, fr_channel):
         self.__vlanname__ = vlanname

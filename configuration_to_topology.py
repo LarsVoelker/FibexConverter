@@ -209,6 +209,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__mcast_entries__ = None
 
         self.__mcast_senders__ = dict()
+        self.__all_mcast_sender_swports__ = []
 
         # we need these to trace the topology (multicast) -- ONLY EGs are Multicast!!!
         # key is service-id << 16 + service-instance-id
@@ -278,10 +279,21 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         senders = self.__mcast_senders__.setdefault(mcast_addr, [])
         senders.append(switchport)
 
+        if switchport not in self.__all_mcast_sender_swports__:
+            self.__all_mcast_sender_swports__.append(switchport)
+
     def get_multicast_senders(self, mcast_addr, verbose=False):
         ret = self.__mcast_senders__.get(mcast_addr, [])
         if verbose:
             print(f"DEBUG: found mcast senders for {mcast_addr}: {ret}")
+        return ret
+
+    def get_all_mcast_sender_swports(self, prefix=None):
+        ret = []
+        for swport in self.__all_mcast_sender_swports__:
+            if prefix is None or swport.startswith(prefix):
+                ret.append(swport)
+
         return ret
 
     def calc_mcast_topology(self):
@@ -819,12 +831,14 @@ class Switch(BaseSwitch):
                             if ip not in ips:
                                 ips.append(ip)
 
+        # Make sure sender ports exist
+        for tx_swport in factory.get_all_mcast_sender_swports(prefix=self.key()):
+            tmp.setdefault(tx_swport, (tx_swport.split('.'), []))
+
         ret = []
         for key in sorted(tmp.keys()):
             (cols, ips) = tmp[key]
-
             output_line = cols
-
 
             for ip in factory.get_multicast_columns():
                 if ip in ips:
