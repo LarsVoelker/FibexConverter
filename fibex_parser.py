@@ -1261,7 +1261,7 @@ class FibexParser(AbstractParser):
                     channel_fts = channel.get("frametriggerings", {})
                 else:
                     channel = None
-                    print(f"ERROR in FIBEX: I cannot find channel {channelref}")
+                    print(f"ERROR in FIBEX: I cannot find channel '{channelref}' (ID: {self.get_id(c)})")
                     channel_fts = {}
 
                 input_frame_trigs, output_frame_trigs = self.parse_inputs_outputs(c, channel_fts)
