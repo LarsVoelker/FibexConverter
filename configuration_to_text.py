@@ -364,10 +364,10 @@ class SwitchPort(BaseSwitchPort):
 
     def str(self, indent, factory):
         ret = indent * " "
-        ret += f"SwitchPort {self.__portid__} <-> "
+        ret += f"SwitchPort {self.portid(gen_name=g_gen_portid)} <-> "
         if self.__port__ is not None:
             tmp = f"of {self.__port__.switch().name()}" if self.__port__.switch() is not None else ""
-            ret += f"SwitchPort {self.__port__.portid()} {tmp}\n"
+            ret += f"SwitchPort {self.__port__.portid(gen_name=g_gen_portid)} {tmp}\n"
         elif self.__ctrl__ is not None:
             ret += f"Controller {self.__ctrl__.name()} of {self.__ctrl__.ecu().name()}\n"
         else:
@@ -990,6 +990,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Converting configuration to text.')
     parser.add_argument('type', choices=parser_formats, help='format')
     parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
+    parser.add_argument('--generate-switch-port-names', action='store_true')
     parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
                         default=None)
 
@@ -998,8 +999,12 @@ def parse_arguments():
 
 
 def main():
+    global g_gen_portid
+
     print("Converting configuration to text")
     args = parse_arguments()
+
+    g_gen_portid = args.generate_switch_port_names
 
     conf_factory = SimpleConfigurationFactory()
     output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin)
