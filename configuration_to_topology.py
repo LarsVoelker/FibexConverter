@@ -472,11 +472,11 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         return ret
 
-    def extended_access_control_matrix(self):
+    def extended_access_control_matrix(self, multicast_names):
         header = ["ECU", "Switch", "SwPort", "VLAN"]
 
         for mcast_addr in self.get_multicast_columns():
-            header.append(f"{mcast_addr}")
+            header.append(f"{multicast_names.get(mcast_addr, mcast_addr)}")
 
         ret = [header]
 
@@ -1194,7 +1194,8 @@ def parse_arguments():
     parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
     parser.add_argument('--mcast-list', type=argparse.FileType('r'), default=None,
                         help='Semicolon Separated List of Static Multicast Entries')
-    parser.add_argument('--metadata', type=argparse.FileType('r'), default=None, help='Key/Value pair CSV file')
+    parser.add_argument('--metadata', type=argparse.FileType('r'), default=None, help='Key/Value CSV file')
+    parser.add_argument('--multicast-names', type=argparse.FileType('r'), default=None, help='Address/Name CSV file')
     parser.add_argument('--generate-switch-port-names', action='store_true')
     parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
                         default=None)
@@ -1203,13 +1204,10 @@ def parse_arguments():
     return args
 
 
-def read_metadata_file(conf_factory, f, verbose=False):
-    if verbose:
-        print(f"Reading metadata file...")
-
+def read_csv_to_dict(f, verbose=False):
     ret = {}
 
-    csvreader = csv.reader(f, delimiter=',', quotechar='|')
+    csvreader = csv.reader(f, delimiter=',', quotechar='"')
     skip_first_line = True
     for row in csvreader:
         if skip_first_line:
@@ -1224,15 +1222,10 @@ def read_metadata_file(conf_factory, f, verbose=False):
             print("  " + ', '.join(row))
 
         if len(row) != 2:
-            print(f"Error: Line in Metadata File too short/long: {', '.join(row)}")
+            print(f"Error: Line in file too short/long: {', '.join(row)} ({len(row)})")
             continue
 
         key, value = row[:2]
-
-        if key not in ("title", "subject", "author", "manager", "company", "category", "keywords", "comments", "status"):
-            print(f"Error: key {key} not a valid key! Currently supported: "
-                  f"title, subject, author, manager, company, category, keywords, comments, status")
-            continue
 
         if key in ret.keys():
             print(f"Error: key {key} is present multiple times!")
@@ -1241,6 +1234,29 @@ def read_metadata_file(conf_factory, f, verbose=False):
         ret[key] = value
 
     print()
+
+    return ret
+
+
+def read_multicast_names_file(conf_factory, f, verbose=False):
+    if verbose:
+        print(f"Reading multicast names file...")
+
+    ret = read_csv_to_dict(f, verbose=verbose)
+
+    return ret
+
+def read_metadata_file(conf_factory, f, verbose=False):
+    if verbose:
+        print(f"Reading metadata file...")
+
+    ret = read_csv_to_dict(f, verbose=verbose)
+
+    for key in ret.keys():
+        if key not in ("title", "subject", "author", "manager", "company", "category", "keywords", "comments", "status"):
+            print(f"Error: key {key} not a valid key! Currently supported: "
+                  f"title, subject, author, manager, company, category, keywords, comments, status")
+            ret.pop(key, None)
 
     return ret
 
@@ -1382,6 +1398,10 @@ def main():
     if args.metadata is not None:
         xlsx_metadata = read_metadata_file(conf_factory, args.metadata, verbose=True)
 
+    multicast_names = dict()
+    if args.multicast_names is not None:
+        multicast_names = read_multicast_names_file(conf_factory, args.multicast_names, verbose=True)
+
     # yes, we must call calc_fwd_tables twice or else the result is wrong (mcast with any)
     conf_factory.calc_fwd_tables()
     conf_factory.calc_mcast_topology()
@@ -1405,8 +1425,8 @@ def main():
         tmp = conf_factory.extended_access_control_table(skip_multicast=True, file_format="json")
         json.dump(tmp, f, indent=4)
 
-    write_to_csv(f"{matrixfile}.csv", conf_factory.extended_access_control_matrix())
-    write_to_xslx(f"{matrixfile}.xlsx", conf_factory.extended_access_control_matrix(), xlsx_metadata,
+    write_to_csv(f"{matrixfile}.csv", conf_factory.extended_access_control_matrix(multicast_names))
+    write_to_xslx(f"{matrixfile}.xlsx", conf_factory.extended_access_control_matrix(multicast_names), xlsx_metadata,
                   freeze_row=1, freeze_col=4)
 
     # multicast routes
