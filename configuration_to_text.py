@@ -412,9 +412,6 @@ class Interface(BaseInterface):
         else:
             vlanstr = f" (VLAN-ID: 0x{self.__vlanid__:x})"
         ret += f"Interface/Channel {self.__vlanname__}{vlanstr}\n"
-        for s in self.__sockets__:
-            ret += s.str(indent + 2)
-
         for ip in sorted(self.ips(), key=lambda x: ip_to_key(x)):
             if is_ip(ip) and not is_ip_mcast(ip):
                 ret += (indent + 2) * " "
