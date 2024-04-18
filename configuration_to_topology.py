@@ -391,6 +391,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         ret = Socket(name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
                      eventgroupreceivers)
+
+        if ret.is_multicast() and ip not in self.__mcast_senders__:
+            self.__mcast_senders__[ip] = []
+
         return ret
 
     def graphviz(self, filename, vlans=None, show=True, label_links=False):
@@ -593,6 +597,11 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             mc_addr = item.mc_addr()
             if mc_addr not in ret:
                 ret.append(mc_addr)
+
+        # adding addresses even though we could not construct a path
+        for mcast_addr in self.__mcast_senders__:
+            if mcast_addr not in ret:
+                ret.append(mcast_addr)
 
         return ret
 
