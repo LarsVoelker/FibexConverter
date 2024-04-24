@@ -488,7 +488,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         return ret
 
-    def extended_access_control_matrix(self, multicast_names):
+    def extended_access_control_matrix(self, multicast_names, tx_delimiter=','):
         header = ["ECU", "Switch", "SwPort", "VLAN"]
 
         for mcast_addr in self.get_multicast_columns():
@@ -497,7 +497,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = [header]
 
         for ecuname, ecu in sorted(self.__ecus__.items()):
-            ret += ecu.extended_access_control_matrix(self)
+            ret += ecu.extended_access_control_matrix(self, tx_delimiter=tx_delimiter)
 
         return ret
 
@@ -822,7 +822,7 @@ class Switch(BaseSwitch):
         with open(fn, "w") as f:
             pprint.pprint(self.__fwd_table__, stream=f)
 
-    def extended_access_control_matrix(self, factory):
+    def extended_access_control_matrix(self, factory, tx_delimiter):
         tmp = {}
         for vlan_id, entries in self.__fwd_table__.items():
             for address, entry in entries.items():
@@ -858,7 +858,7 @@ class Switch(BaseSwitch):
                 senders = factory.get_multicast_senders(ip)
                 if f"{cols[0]}.{cols[1]}.{cols[2]}.{cols[3]}" in senders:
                     if entry != "":
-                        entry += ", "
+                        entry += f"{tx_delimiter} "
                     entry += "TX"
                 output_line.append(entry)
 
@@ -1126,11 +1126,11 @@ class ECU(BaseECU):
 
         return ret
 
-    def extended_access_control_matrix(self, factory):
+    def extended_access_control_matrix(self, factory, tx_delimiter):
         ret = []
 
         for switch in self.__switches__:
-            ret += switch.extended_access_control_matrix(factory)
+            ret += switch.extended_access_control_matrix(factory, tx_delimiter=tx_delimiter)
 
         return ret
 
@@ -1183,7 +1183,7 @@ class Socket(BaseSocket):
 
 def write_to_csv(filename, data):
     with open(filename, "w", newline='') as f:
-        writer = csv.writer(f, delimiter=',', quotechar='\\', quoting=csv.QUOTE_MINIMAL)
+        writer = csv.writer(f, delimiter=',', escapechar='\\', quoting=csv.QUOTE_NONE)
         for i in data:
             writer.writerow(i)
 
@@ -1448,7 +1448,7 @@ def main():
         tmp = conf_factory.extended_access_control_table(skip_multicast=True, file_format="json")
         json.dump(tmp, f, indent=4)
 
-    write_to_csv(f"{matrixfile}.csv", conf_factory.extended_access_control_matrix(multicast_names))
+    write_to_csv(f"{matrixfile}.csv", conf_factory.extended_access_control_matrix(multicast_names, tx_delimiter=';'))
     write_to_xslx(f"{matrixfile}.xlsx", conf_factory.extended_access_control_matrix(multicast_names), xlsx_metadata,
                   freeze_row=1, freeze_col=4)
 
