@@ -449,6 +449,25 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         return ret
 
+    def vlan_table(self):
+        header = ["ECU", "Switch|Ctrl", "SwitchPort", "VLAN-ID", "Name", "DefaultPrio"]
+        ret = [header]
+
+        for ecu_name in sorted(self.__ecus__.keys()):
+            ecu = self.__ecus__[ecu_name]
+
+            for ctrl in ecu.controllers():
+                for iface in ctrl.interfaces():
+                    ret += [[ecu_name, ctrl.name(), "", iface.vlanid(), iface.vlanname(), ""]]
+
+            for switch in ecu.switches():
+                for switch_port in switch.ports():
+                    port_id = switch_port.portid_generated()
+                    for vlan in switch_port.vlans_objs():
+                        ret += [ [ecu_name, switch.name(), port_id, vlan.vlanid_str(), vlan.name(), vlan.priority()] ]
+
+        return ret
+
     def calc_fwd_tables(self):
         for ecuname, ecu in sorted(self.__ecus__.items()):
             ecu.calc_fwd_tables()
@@ -1376,6 +1395,7 @@ def main():
         mcrfile = os.path.join(target_dir, "all_files" + "_multicast_routes")
         mcrfiles = os.path.join(target_dir_details, "all_files" + "_multicast_routes")
         endpfile = os.path.join(target_dir, "all_files" + "_endpoints")
+        vlanfile = os.path.join(target_dir, "all_files" + "_vlans")
     elif os.path.isfile(args.filename):
         (path, f) = os.path.split(args.filename)
 
@@ -1400,6 +1420,7 @@ def main():
         mcrfile = os.path.join(target_dir, filenoext + "_multicast_routes")
         mcrfiles = os.path.join(target_dir_details, filenoext + "_multicast_routes")
         endpfile = os.path.join(target_dir, filenoext + "_endpoints")
+        vlanfile = os.path.join(target_dir, filenoext + "_vlans")
     else:
         return
 
@@ -1434,6 +1455,9 @@ def main():
     print("Generating outputs...")
 
     print(f"Generating tables...")
+    write_to_csv(f"{vlanfile}.csv", conf_factory.vlan_table())
+    write_to_xslx(f"{vlanfile}.xlsx", conf_factory.vlan_table(), xlsx_metadata)
+
     write_to_csv(f"{topofile}.csv", conf_factory.topology_table())
     write_to_xslx(f"{topofile}.xlsx", conf_factory.topology_table(), xlsx_metadata)
 
