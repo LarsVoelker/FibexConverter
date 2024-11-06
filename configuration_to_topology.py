@@ -458,7 +458,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
             for ctrl in ecu.controllers():
                 for iface in ctrl.interfaces():
-                    ret += [[ecu_name, ctrl.name(), "", iface.vlanid(), iface.vlanname(), ""]]
+                    ret += [[ecu_name, ctrl.name(), "", f"0x{int(iface.vlanid()):x}", iface.vlanname(), ""]]
 
             for switch in ecu.switches():
                 for switch_port in switch.ports():
