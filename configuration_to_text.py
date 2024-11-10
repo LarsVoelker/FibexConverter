@@ -847,6 +847,7 @@ class PDU(BasePDU):
 
         return ret
 
+
 class MultiplexPDU(BaseMultiplexPDU):
     def str(self, indent, indent_first_line=True):
         if indent_first_line:
@@ -886,6 +887,7 @@ class MultiplexPDU(BaseMultiplexPDU):
 
         return ret
 
+
 class MultiplexPDUSwitch(BaseMultiplexPDUSwitch):
     def str(self, indent, indent_first_line=True):
         if indent_first_line:
@@ -898,6 +900,7 @@ class MultiplexPDUSwitch(BaseMultiplexPDUSwitch):
         ret += f"[Bit pos.: {self.__bit_position__}..{end_bit}] Switch {self.__short_name__} {self.__bit_length__} bits ({high_low})  \n"
 
         return ret
+
 
 class MultiplexPDUSegmentPosition(BaseMultiplexPDUSegmentPosition):
     def str(self, indent, indent_first_line=True, prefix=""):
@@ -913,6 +916,7 @@ class MultiplexPDUSegmentPosition(BaseMultiplexPDUSegmentPosition):
 
         return ret
 
+
 class EthernetPDUInstance(BaseEthernetPDUInstance):
     def str(self, indent, show_signals=False):
         ret = indent * " "
@@ -923,6 +927,7 @@ class EthernetPDUInstance(BaseEthernetPDUInstance):
             ret += self.__pdu__.str(indent + 2, indent_first_line=False, show_signals=show_signals)
 
         return ret
+
 
 class PDUInstance(BasePDUInstance):
     def str(self, indent):

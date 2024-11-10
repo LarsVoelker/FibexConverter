@@ -554,18 +554,31 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         for ecuname in self.__ecus__:
             for controller in self.__ecus__[ecuname].controllers():
-                for interface in controller.interfaces():
 
+                if len(self.__ecus__[ecuname].controllers()) > 1:
+                    if controller.name().startswith(ecuname):
+                        ecuctrlname = controller.name()
+                    else:
+                        ecuctrlname = f"{ecuname}_{controller.name()}"
+
+                    if "Controller" in ecuctrlname:
+                        ecuctrlname = ecuctrlname.replace("Controller", "")
+                    if "controller" in ecuctrlname:
+                        ecuctrlname = ecuctrlname.replace("controller", "")
+                else:
+                    ecuctrlname = ecuname
+
+                for interface in controller.interfaces():
                     for socket in interface.sockets():
                         if not is_ip_mcast(socket.ip()):
                             tmp = ips.setdefault(socket.ip(), {})
-                            tmp[ecuname] = ecuname
+                            tmp[ecuctrlname] = ecuctrlname
 
                     # let us also include IPs without sockets
                     for ip in interface.ips():
                         if is_ip(ip) and not is_ip_mcast(ip):
                             tmp = ips.setdefault(ip, {})
-                            tmp[ecuname] = ecuname
+                            tmp[ecuctrlname] = ecuctrlname
 
         for ip in sorted(ips.keys(), key=lambda x: ip_to_key(x)):
             ecu_names = "__".join(ips[ip])
