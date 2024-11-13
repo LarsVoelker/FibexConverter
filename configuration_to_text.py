@@ -384,10 +384,10 @@ class ECU(BaseECU):
         ret = indent * " "
         ret += f"ECU {self.__name__}\n"
 
-        for c in self.__controllers__:
+        for c in sorted(self.__controllers__, key=lambda x: x.name()):
             ret += c.str(indent + 2, factory)
 
-        for s in self.__switches__:
+        for s in sorted(self.__switches__, key=lambda x: x.name()):
             ret += s.str(indent + 2, factory)
 
         return ret
@@ -992,6 +992,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Converting configuration to text.')
     parser.add_argument('type', choices=parser_formats, help='format')
     parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
+    parser.add_argument('--ecu-name-mapping', type=argparse.FileType('r'), default=None, help='Key/Value CSV file')
     parser.add_argument('--generate-switch-port-names', action='store_true')
     parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
                         default=None)
@@ -1008,8 +1009,13 @@ def main():
 
     g_gen_portid = args.generate_switch_port_names
 
+    ecu_name_mapping = {}
+    if args.ecu_name_mapping is not None:
+        ecu_name_mapping = read_csv_to_dict(args.ecu_name_mapping)
+
     conf_factory = SimpleConfigurationFactory()
-    output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin)
+    output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin,
+                                   ecu_name_replacement=ecu_name_mapping)
 
     print("Generating output directories:")
 

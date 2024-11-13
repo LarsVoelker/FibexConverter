@@ -20,7 +20,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import argparse
-import csv
 import datetime
 import json
 from graphviz import Graph
@@ -1234,6 +1233,7 @@ def parse_arguments():
     parser = argparse.ArgumentParser(description='Converting configuration to topology.')
     parser.add_argument('type', choices=parser_formats, help='format')
     parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
+    parser.add_argument('--ecu-name-mapping', type=argparse.FileType('r'), default=None, help='Key/Value CSV file')
     parser.add_argument('--mcast-list', type=argparse.FileType('r'), default=None,
                         help='Semicolon Separated List of Static Multicast Entries')
     parser.add_argument('--metadata', type=argparse.FileType('r'), default=None, help='Key/Value CSV file')
@@ -1246,40 +1246,6 @@ def parse_arguments():
     return args
 
 
-def read_csv_to_dict(f, verbose=False):
-    ret = {}
-
-    csvreader = csv.reader(f, delimiter=',', quotechar='"')
-    skip_first_line = True
-    for row in csvreader:
-        if skip_first_line:
-            skip_first_line = False
-            continue
-
-        # skip empty lines
-        if len(row) == 0 or row[0] == "" or row[0] == "":
-            continue
-
-        if verbose:
-            print("  " + ', '.join(row))
-
-        if len(row) != 2:
-            print(f"Error: Line in file too short/long: {', '.join(row)} ({len(row)})")
-            continue
-
-        key, value = row[:2]
-
-        if key in ret.keys():
-            print(f"Error: key {key} is present multiple times!")
-            continue
-
-        ret[key] = value
-
-    print()
-
-    return ret
-
-
 def read_multicast_names_file(conf_factory, f, verbose=False):
     if verbose:
         print(f"Reading multicast names file...")
@@ -1287,6 +1253,7 @@ def read_multicast_names_file(conf_factory, f, verbose=False):
     ret = read_csv_to_dict(f, verbose=verbose)
 
     return ret
+
 
 def read_metadata_file(conf_factory, f, verbose=False):
     if verbose:
@@ -1374,8 +1341,13 @@ def main():
 
     g_gen_portid = args.generate_switch_port_names
 
+    ecu_name_mapping = {}
+    if args.ecu_name_mapping is not None:
+        ecu_name_mapping = read_csv_to_dict(args.ecu_name_mapping)
+
     conf_factory = SimpleConfigurationFactory()
-    output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin)
+    output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin,
+                                   ecu_name_replacement=ecu_name_mapping)
 
     print("Making sure output directory exists...")
     if os.path.isdir(args.filename):

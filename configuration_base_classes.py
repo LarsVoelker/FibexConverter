@@ -21,6 +21,7 @@
 
 import ipaddress
 import macaddress
+import csv
 
 
 def bits_to_bytes(bits):
@@ -133,6 +134,40 @@ def mcast_addr_to_mac_mcast(addr):
         return f"01:00:5e:{(tmp.packed[1] & 127):02x}:{tmp.packed[2]:02x}:{tmp.packed[3]:02x}"
 
     return ""
+
+
+def read_csv_to_dict(f, verbose=False):
+    ret = {}
+
+    csvreader = csv.reader(f, delimiter=',', quotechar='"')
+    skip_first_line = True
+    for row in csvreader:
+        if skip_first_line:
+            skip_first_line = False
+            continue
+
+        # skip empty lines
+        if len(row) == 0 or row[0] == "" or row[0] == "":
+            continue
+
+        if verbose:
+            print("  " + ', '.join(row))
+
+        if len(row) != 2:
+            print(f"Error: Line in file too short/long: {', '.join(row)} ({len(row)})")
+            continue
+
+        key, value = row[:2]
+
+        if key in ret.keys():
+            print(f"Error: key {key} is present multiple times!")
+            continue
+
+        ret[key] = value
+
+    print()
+
+    return ret
 
 
 class BaseConfigurationFactory(object):

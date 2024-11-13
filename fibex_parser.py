@@ -26,7 +26,7 @@ import sys
 import os
 
 class FibexParser(AbstractParser):
-    def __init__(self, plugin_file):
+    def __init__(self, plugin_file, ecu_name_replacement):
         super().__init__()
         self.__conf_factory__ = None
 
@@ -44,8 +44,13 @@ class FibexParser(AbstractParser):
         self.__datatypes__ = dict()
         self.__channels__ = dict()
         self.__controllers__ = dict()
-        self.__ecus__ = dict()
         self.__coupling_ports__ = dict()
+
+        self.__ecu_name_replacement__ = ecu_name_replacement
+        self.__ecu_data__ = dict()
+        self.__ecus__ = dict()
+        self.__ecu_id_to_ecu_name_mapping__ = dict()
+        self.__ecus_ready__ = False
 
         self.__frames__ = dict()
         self.__frame_triggerings__ = dict()
@@ -82,6 +87,57 @@ class FibexParser(AbstractParser):
             spec.loader.exec_module(module)
 
             self.__plugin__ = module
+
+    def create_ecu(self, ecu_id, ecu_name, ctrllist):
+        ret = None
+
+        if ecu_name in self.__ecu_data__:
+            print(f"ERROR: Duplicate ecu_id: {ecu_name} during create_ecu")
+
+        self.__ecu_data__[ecu_name] = (ecu_id, ctrllist)
+        #ret = self.__conf_factory__.create_ecu(ecu_name, ctrllist)
+        #self.__ecus__[ecu_id] = ret
+
+    def finalize_ecus(self):
+
+        # name -> ([ecu_id], [ctrl])
+        tmp_data = dict()
+
+        for ecu_name, data in self.__ecu_data__.items():
+            # replace ecu_name, if in replacement data
+            if self.__ecu_name_replacement__ is not None and ecu_name in self.__ecu_name_replacement__.keys():
+                ecu_name = self.__ecu_name_replacement__[ecu_name]
+
+            ecu_id, ctrllist = data
+
+            ecu_data = tmp_data.get(ecu_name, ([],[]))
+
+            if ecu_id not in ecu_data[0]:
+                ecu_data[0].append(ecu_id)
+
+            # controllers should be unique but just in case
+            tmp_ctrllist = list(set(ctrllist + ecu_data[1]))
+
+            if len(tmp_ctrllist) != len(ctrllist) + len(ecu_data[1]):
+                print(f"INTERNAL ERROR: Merging Controller lists reveals duplicates during finalize_ecus!")
+
+            tmp_data[ecu_name] =  (ecu_data[0], tmp_ctrllist)
+
+        for ecu_name, ecu_data in tmp_data.items():
+            self.__ecus__[ecu_name] = self.__conf_factory__.create_ecu(ecu_name, ecu_data[1])
+
+            for ecu_id in ecu_data[0]:
+                self.__ecu_id_to_ecu_name_mapping__[ecu_id] = ecu_name
+
+        self.__ecus_ready__ = True
+        pass
+
+    def get_ecu(self, ecu_ref):
+
+        if not self.__ecus_ready__:
+            print(f"INTERNAL ERROR: get_ecu is called before ECUs are finalized!")
+
+        return self.__ecus__.get(self.__ecu_id_to_ecu_name_mapping__.get(ecu_ref, None), None)
 
     def get_signal(self, signal_ref):
         for _, value in self.__signals__.items():
@@ -1356,7 +1412,8 @@ class FibexParser(AbstractParser):
                 assert (tmp not in self.__controllers__)
                 self.__controllers__[key] = tmp
 
-            self.__ecus__[ecu_id] = self.__conf_factory__.create_ecu(ecu_name, ctrllist)
+            self.create_ecu(ecu_id, ecu_name, ctrllist)
+        self.finalize_ecus()
 
     def parse_topology(self, root, verbose=False):
         for e in root.findall('.//fx:COUPLING-ELEMENTS/fx:COUPLING-ELEMENT', self.__ns__):
@@ -1365,7 +1422,7 @@ class FibexParser(AbstractParser):
             ecu_ref = self.get_child_attribute(e, "fx:ECU-REF", "ID-REF")
             coupling_element_type = self.get_child_text(e, "ethernet:COUPLING-ELEMENT-TYPE")
 
-            ecu = self.__ecus__.get(ecu_ref, None)
+            ecu = self.get_ecu(ecu_ref)
 
             if verbose:
                 print(f"{switch_name} cluster_ref:{cluster_ref} ecu_ref:{ecu_ref} "

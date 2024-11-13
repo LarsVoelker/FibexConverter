@@ -39,7 +39,8 @@ def is_file_valid(parser, arg):
     else:
         return arg
 
-def parse_input_files(filename, t, conf_factory, plugin_file=None, print_filename=True, file_filter="", verbose=False):
+def parse_input_files(filename, t, conf_factory, plugin_file=None, ecu_name_replacement=None, print_filename=True,
+                      file_filter="", verbose=False):
     if file_filter == "":
         if t.upper() == "FIBEX":
             file_filter = "/**/FBX*.xml"
@@ -58,7 +59,7 @@ def parse_input_files(filename, t, conf_factory, plugin_file=None, print_filenam
         return None
 
     if t.upper() == "FIBEX":
-        parser = FibexParser(plugin_file)
+        parser = FibexParser(plugin_file, ecu_name_replacement)
         for f in files:
             if print_filename:
                 print(f"\nFile: {f}")
