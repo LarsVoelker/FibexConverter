@@ -130,7 +130,7 @@ class AccessControlTableEntries:
             for vlan, addrs in self.__addrs_per_vlans__.items():
                 if addrs is not None:
                     for addr in addrs:
-                        if is_ip_mcast(addr) or is_mac_mcast(addr):
+                        if is_mcast(addr):
                             key = f"{self.__ecu_from__}{delim}{self.__switch_from__}{delim}{self.__switch_port_from__}" \
                                   f"{delim}0x{vlan:x}"
 
@@ -890,7 +890,7 @@ class Switch(BaseSwitch):
 
             for vlan_id in sorted(self.__fwd_table__.keys()):
                 for address in sorted(self.__fwd_table__[vlan_id].keys(), key=lambda x: addr_to_key(x)):
-                    if skip_multicast and is_ip_mcast(address):
+                    if skip_multicast and is_mcast(address):
                         continue
 
                     entry = self.__fwd_table__[vlan_id][address]
@@ -909,7 +909,7 @@ class Switch(BaseSwitch):
         for vlan_id in sorted(self.__fwd_table__.keys()):
             for address in sorted(self.__fwd_table__[vlan_id].keys(), key=lambda x: addr_to_key(x)):
 
-                if skip_multicast and is_ip_mcast(address):
+                if skip_multicast and is_mcast(address):
                     continue
 
                 entry = self.__fwd_table__[vlan_id][address]
@@ -1181,7 +1181,7 @@ class Controller(BaseController):
             for iface in self.interfaces():
                 addresses = ret.setdefault(hex(iface.vlanid()), [])
                 for address in sorted(iface.ips(), key=lambda x: addr_to_key(x)):
-                    if skip_multicast and is_ip_mcast(address):
+                    if skip_multicast and is_mcast(address):
                         continue
 
                     addresses.append(address)

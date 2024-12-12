@@ -67,6 +67,9 @@ def is_mac(mac):
 
 
 def is_mac_mcast(mac):
+    if mac is None:
+        return False
+
     try:
         tmp = macaddress.EUI48(mac)
     except ValueError:
@@ -131,7 +134,10 @@ def mcast_addr_to_mac_mcast(addr):
 
     if is_ip_mcast(addr):
         tmp = ipaddress.ip_address(addr)
-        return f"01:00:5e:{(tmp.packed[1] & 127):02x}:{tmp.packed[2]:02x}:{tmp.packed[3]:02x}"
+        ret =  f"01-00-5e-{(tmp.packed[1] & 127):02x}-{tmp.packed[2]:02x}-{tmp.packed[3]:02x}"
+        return ret.upper()
+
+    # TODO IPv6
 
     return ""
 
