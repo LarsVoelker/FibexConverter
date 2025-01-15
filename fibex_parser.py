@@ -962,11 +962,18 @@ class FibexParser(AbstractParser):
                 print(f"ERROR: Unknown Signal: {s}")
                 return None
 
+        array_declaration = self.parse_array(element)
+
         utils = self.parse_utilization(element)
         serialization_attributes = self.parse_serialization_attributes(element)
 
         params = []
         child = self.interpret_datatype(datatype, utils, serialization_attributes)
+
+        if array_declaration is not None:
+            child = self.build_array(f"{name}_array", serialization_attributes["ArrayLengthSize"],
+                                     array_declaration, child)
+
         params += [self.__conf_factory__.create_someip_parameter(0, 'fieldparam', '', True, child, signal)]
 
         getter_debouncereq = -1
