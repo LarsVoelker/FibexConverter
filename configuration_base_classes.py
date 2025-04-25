@@ -133,11 +133,16 @@ def mcast_addr_to_mac_mcast(addr):
         return addr
 
     if is_ip_mcast(addr):
+        ret = ""
         tmp = ipaddress.ip_address(addr)
-        ret =  f"01-00-5e-{(tmp.packed[1] & 127):02x}-{tmp.packed[2]:02x}-{tmp.packed[3]:02x}"
-        return ret.upper()
+        if tmp.version == 4:
+            ret =  f"01-00-5e-{(tmp.packed[1] & 127):02x}-{tmp.packed[2]:02x}-{tmp.packed[3]:02x}"
+        elif tmp.version == 6:
+            ret = f"33-33-{(tmp.packed[12]):02x}-{(tmp.packed[13]):02x}-{(tmp.packed[14]):02x}-{(tmp.packed[15]):02x}"
+        else:
+            print("ERROR: IP Address has to be IPv4 or IPv6 to convert it to Ethernet Multicast!")
 
-    # TODO IPv6
+        return ret.upper()
 
     return ""
 
