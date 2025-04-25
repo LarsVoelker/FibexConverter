@@ -122,7 +122,6 @@ class AccessControlTableEntries:
         self.__ctrl_to__ = ctrl_to
         self.__addrs_per_vlans__ = ips_per_vlans
 
-
     def to_output_set_dict(self, delim):
         ret = {}
 
@@ -132,15 +131,13 @@ class AccessControlTableEntries:
                     for addr in addrs:
                         if is_mcast(addr):
                             key = f"{self.__ecu_from__}{delim}{self.__switch_from__}{delim}{self.__switch_port_from__}" \
-                                  f"{delim}0x{vlan:x}"
+                                  f"{delim}{vlan:#x}"
 
                             cols = [self.__ecu_from__, self.__switch_from__, self.__switch_port_from__, f"{vlan:#x}"]
                             tmp = ret.setdefault(key, (key, cols, []))
                             tmp[2].append(str(addr))
 
         return ret
-
-
 
     def to_output_set(self, factory):
         ret = []
@@ -152,7 +149,7 @@ class AccessControlTableEntries:
                         mask_prefix = factory.get_ipv4_netmask_or_ipv6_prefix_length(addr)
                         ret += [(f"{self.__ecu_from__}", f"{self.__switch_from__}", f"{self.__switch_port_from__}",
                                 f"{self.__ecu_to__}", f"{self.__ctrl_to__}",
-                                f"0x{vlan:x}", f"{addr}",
+                                f"{vlan:#x}", f"{addr}",
                                 mask_prefix,
                                 f"{mcast_addr_to_mac_mcast(addr)}")]
 
@@ -252,6 +249,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def get_vlan_columns(self):
         return sorted(self.__vlans__.keys())
+
+    def get_vlan_mapping(self):
+        ret = {}
+
+        for ecu in self.__ecus__:
+            for controller in self.__ecus__[ecu].controllers():
+                for interface in controller.interfaces():
+                    ret[interface.vlanid()] = interface.vlanname()
+
+        return ret
 
     def get_multicast_columns(self, sort_columns=True):
         if sort_columns:
@@ -506,8 +513,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         return ret
 
-    def extended_access_control_matrix(self, multicast_names, tx_delimiter=','):
+    def extended_access_control_matrix(self, multicast_names, tx_delimiter=',', vlan_mapping=None):
         header = ["ECU", "Switch", "SwPort", "VLAN"]
+        vlan_pos = header.index("VLAN")
+
+        if vlan_mapping is not None:
+            header.append("VLAN Name")
+            vlan_name_pos = header.index("VLAN Name")
+        else:
+            vlan_mapping = {}
+            vlan_name_pos = -1
 
         for mcast_addr in self.get_multicast_columns():
             header.append(f"{multicast_names.get(mcast_addr, mcast_addr)}")
@@ -515,7 +530,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = [header]
 
         for ecuname, ecu in sorted(self.__ecus__.items()):
-            ret += ecu.extended_access_control_matrix(self, tx_delimiter=tx_delimiter)
+            tmp = ecu.extended_access_control_matrix(self, tx_delimiter=tx_delimiter)
+
+            for line in tmp:
+                # adding VLAN name
+                if 0 <= vlan_name_pos < len(line):
+                    key = line[vlan_pos]
+                    vlan_name = vlan_mapping.get(key, f"{key} ({int(key, 16)})")
+                    line = line[:vlan_name_pos] + [vlan_name] + line[vlan_name_pos:]
+
+                ret += [line]
 
         return ret
 
@@ -1239,6 +1263,7 @@ def parse_arguments():
     parser.add_argument('--metadata', type=argparse.FileType('r'), default=None, help='Key/Value CSV file')
     parser.add_argument('--multicast-names', type=argparse.FileType('r'), default=None, help='Address/Name CSV file')
     parser.add_argument('--generate-switch-port-names', action='store_true')
+    parser.add_argument('--generate-vlan-names', action='store_true')
     parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
                         default=None)
 
@@ -1349,6 +1374,14 @@ def main():
     output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin,
                                    ecu_name_replacement=ecu_name_mapping)
 
+    vlan_name_mapping = None
+    if args.generate_vlan_names:
+        vlan_name_mapping = {}
+        vlans = conf_factory.get_vlan_mapping()
+        for vlan_id, vlan_name in vlans.items():
+            key=f"{vlan_id:#x}"
+            vlan_name_mapping[key] = f"{vlan_name} ({vlan_id})"
+
     print("Making sure output directory exists...")
     if os.path.isdir(args.filename):
         target_dir = os.path.join(output_dir, "topology")
@@ -1444,9 +1477,14 @@ def main():
         tmp = conf_factory.extended_access_control_table(skip_multicast=True, file_format="json")
         json.dump(tmp, f, indent=4)
 
-    write_to_csv(f"{matrixfile}.csv", conf_factory.extended_access_control_matrix(multicast_names, tx_delimiter=';'))
-    write_to_xslx(f"{matrixfile}.xlsx", conf_factory.extended_access_control_matrix(multicast_names), xlsx_metadata,
-                  freeze_row=1, freeze_col=4)
+    matrix_data = conf_factory.extended_access_control_matrix(multicast_names,
+                                                              tx_delimiter=';',
+                                                              vlan_mapping=vlan_name_mapping)
+    write_to_csv(f"{matrixfile}.csv", matrix_data)
+
+    matrix_data = conf_factory.extended_access_control_matrix(multicast_names, vlan_mapping=vlan_name_mapping)
+    freeze_col = 4 if vlan_name_mapping is None else 5
+    write_to_xslx(f"{matrixfile}.xlsx", matrix_data, xlsx_metadata, freeze_row=1, freeze_col=freeze_col)
 
     # multicast routes
     header = ["Source Switch Port", "Source VLAN", "Source IP", "Dest Switch Port", "Dest VLAN", "Dest IP", "Comments"]
