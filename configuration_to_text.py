@@ -182,6 +182,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterUnionMember(index, name, mandatory, child)
         return ret
 
+    def create_someip_parameter_bitfield(self, name, items, child):
+        ret = SOMEIPParameterBitfield(name, items, child)
+        return ret
+
+    def create_someip_parameter_bitfield_item(self, bit_number, name):
+        ret = SOMEIPParameterBitfieldItem(bit_number, name)
+        return ret
+
     def create_signal(self, id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen):
         ret = Signal(id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen)
         return ret
@@ -758,14 +766,14 @@ class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
         ret += f"Enumeration {self.__name__}\n"
         ret += self.__child__.str(indent + 2)
         for i in self.__items__:
-            i.str(indent + 2)
+            ret += i.str(indent + 2)
         return ret
 
 
 class SOMEIPParameterEnumerationItem(SOMEIPBaseParameterEnumerationItem):
     def str(self, indent):
         ret = indent * " "
-        ret += f"{self.__value__}: {self.__name__}"
+        ret += f"{self.__value__}: {self.__name__}\n"
         return ret
 
 
@@ -793,6 +801,23 @@ class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
         if self.__child__ is not None:
             ret += self.__child__.str(indent + 2)
 
+        return ret
+
+
+class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Bitfield {self.__name__}\n"
+        ret += self.__child__.str(indent + 2)
+        for i in self.__items__:
+            ret += i.str(indent + 2)
+        return ret
+
+
+class SOMEIPParameterBitfieldItem(SOMEIPBaseParameterBitfieldItem):
+    def str(self, indent):
+        ret = indent * " "
+        ret += f"Bit {self.__bit_number__}: {self.__name__}\n"
         return ret
 
 

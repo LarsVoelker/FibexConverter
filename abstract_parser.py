@@ -99,3 +99,16 @@ class AbstractParser(object):
         if s is None:
             return -1
         return (isodate.parse_duration(s)).total_seconds()
+
+    @staticmethod
+    def value_to_bit(i):
+        if i.bit_count() != 1:
+            return None
+
+        bitnumber = 0
+        tmp = i
+        while tmp & 1 != 1:
+            tmp = tmp >> 1
+            bitnumber += 1
+
+        return bitnumber

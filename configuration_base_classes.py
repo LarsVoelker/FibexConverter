@@ -289,6 +289,12 @@ class BaseConfigurationFactory(object):
     def create_someip_parameter_union_member(self, index, name, mandatory, child):
         return SOMEIPBaseParameterUnionMember(index, name, mandatory, child)
 
+    def create_someip_parameter_bitfield(self, name, items, child):
+        return SOMEIPBaseParameterBitfield(name, items, child)
+
+    def create_someip_parameter_bitfield_item(self, bit_number, name):
+        return SOMEIPBaseParameterBitfieldItem(bit_number, name)
+
     def create_signal(self, id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen):
         return BaseSignal(id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen)
 
@@ -1918,6 +1924,59 @@ class SOMEIPBaseParameterUnionMember(BaseItem):
                 self.index() == other.index() and
                 self.mandatory() == other.mandatory() and
                 self.child() == other.child()
+        )
+
+
+class SOMEIPBaseParameterBitfield(BaseItem):
+    def __init__(self, name, items, child):
+        self.__name__ = name
+        self.__items__ = items
+        self.__child__ = child
+
+    def name(self):
+        return self.__name__
+
+    def items(self):
+        return self.__items__
+
+    def child(self):
+        return self.__child__
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        return (
+                self.name() == other.name() and
+                self.items() == other.items() and
+                self.child() == other.child()
+        )
+
+    def size_min_bits(self):
+        return self.__child__.size_min_bits()
+
+    def size_max_bits(self):
+        return self.__child__.size_max_bits()
+
+
+class SOMEIPBaseParameterBitfieldItem(BaseItem):
+    def __init__(self, bit_number, name):
+        self.__name__ = name
+        self.__bit_number__ = int(bit_number)
+
+    def name(self):
+        return self.__name__
+
+    def bit_number(self):
+        return self.__bit_number__
+
+    def __eq__(self, other):
+        if not isinstance(other, self.__class__):
+            return False
+
+        return (
+                self.name() == other.name() and
+                self.bit_number() == other.bit_number()
         )
 
 

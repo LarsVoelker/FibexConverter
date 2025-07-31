@@ -227,6 +227,7 @@ class FibexParser(AbstractParser):
         name = self.get_child_text(element, './ho:SHORT-NAME')
 
         coded_basetype = None
+        coded_basetype2 = None
         coded_category = None
         coded_encoding = None
         coded_termination = None
@@ -252,6 +253,10 @@ class FibexParser(AbstractParser):
             if bl is not None and bl.text is not None:
                 coded_max_length = int(bl.text)
 
+        pt = element.find('./ho:PHYSICAL-TYPE', self.__ns__)
+        if pt is not None:
+            coded_basetype2 = self.get_attribute(pt, 'ho:BASE-DATA-TYPE')
+
         cs = element.find('./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:COMPU-INTERNAL-TO-PHYS/ho:COMPU-SCALES/ho:COMPU-SCALE/'
                           'ho:COMPU-RATIONAL-COEFFS', self.__ns__)
         if cs is not None:
@@ -265,6 +270,11 @@ class FibexParser(AbstractParser):
                 compu_scale.append(float(num.text))
             else:
                 compu_scale.append(None)
+
+        cm_cat = element.find('./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:CATEGORY', self.__ns__)
+
+        if cm_cat is not None:
+            cm_cat = cm_cat.text
 
         compu_consts = []
         for cs in element.findall('./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:COMPU-INTERNAL-TO-PHYS/ho:COMPU-SCALES/',
@@ -285,6 +295,7 @@ class FibexParser(AbstractParser):
              'OID': oid,
              'Name': name,
              'Basetype': coded_basetype,
+             'Basetype2': coded_basetype2,
              'Category': coded_category,
              'Encoding': coded_encoding,
              'Termination': coded_termination,
@@ -292,7 +303,8 @@ class FibexParser(AbstractParser):
              'MinLength': coded_min_length,
              'MaxLength': coded_max_length,
              'CompuScale': compu_scale,
-             'CompuConsts': compu_consts}
+             'CompuConsts': compu_consts,
+             'CompuMethod_Category': cm_cat}
         return d
 
     def parse_codings(self, root):
@@ -546,9 +558,14 @@ class FibexParser(AbstractParser):
         basetype = self.get_from_dict(coding_dict, "Basetype", "--INVALID--")
         return basetype in ['A_ASCIISTRING', 'A_UNICODE2STRING']
 
+    def basetype_is_bitfield(self, coding_dict):
+        basetype = self.get_from_dict(coding_dict, "Basetype", "--INVALID--")
+        basetype2 = self.get_from_dict(coding_dict, "Basetype2", "--INVALID--")
+        return basetype in ['A_BITFIELD'] or basetype2 in ['A_BITFIELD']
+
     def basetype_is_other(self, coding_dict):
         basetype = self.get_from_dict(coding_dict, "Basetype", "--INVALID--")
-        return basetype in ['A_BYTEFIELD', 'A_BITFIELD', 'OTHER']
+        return basetype in ['A_BYTEFIELD', 'OTHER']
 
     def interpret_datatype(self, element, utils, serialization_attributes):
         ret = None
@@ -563,14 +580,53 @@ class FibexParser(AbstractParser):
             print("ERROR: Datatype should have ID and Type!!!")
             return None
 
-        # coding1 = self.get_from_dict_or_none(utils, "Coding")
+        coding1 = self.get_from_dict_or_none(utils, "Coding")
         coding2 = None
         coding_ref = element.find('fx:CODING-REF', self.__ns__)
         if coding_ref is not None:
             coding2 = self.__codings__[self.get_attribute(coding_ref, 'ID-REF')]
 
         if p["Type"] == "fx:COMMON-DATATYPE-TYPE" or p["Type"] == "fx:ENUM-DATATYPE-TYPE":
-            if self.basetype_is_int(coding2) or self. basetype_is_float(coding2):
+            if self.basetype_is_bitfield(coding1):
+                bitlenbase = self.get_from_dict(coding2, "BitLength", -1)
+                bitlenenct = self.get_from_dict(utils, "BitLength", -1)
+                if bitlenenct == -1:
+                    bitlenenct = bitlenbase
+
+                # basically a fallback to encode as regular UINT
+                child = self.__conf_factory__.create_someip_parameter_basetype(
+                    self.get_from_dict_or_none(p, "Name"),
+                    self.get_from_dict_or_none(coding2, "Basetype"),
+                    self.get_from_dict_or_none(utils, "HighLowByteOrder"),
+                    bitlenbase,
+                    bitlenenct
+                )
+
+                items = {}
+
+                for (name, value_min, value_max) in coding1["CompuConsts"]:
+                    if not value_min.isdigit() or not value_max.isdigit():
+                        continue
+
+                    vmin = int(value_min)
+                    vmax = int(value_max)
+
+                    if vmin != vmax:
+                        print(f"ERROR: Bitfield ID {coding1["ID"]} has for name {name}: min {vmin} != max {vmax}!")
+                    elif vmin == 0 and coding1['CompuMethod_Category'] != 'BITFIELD-TEXTTABLE':
+                        print(f"ERROR: Bitfield ID {coding1["ID"]} has for name {name}: value {vmin} is 0!")
+                    elif vmin.bit_count() == 1:
+                        bit_number = self.value_to_bit(vmin)
+                        if bit_number is not None:
+                            items[vmin] = self.__conf_factory__.create_someip_parameter_bitfield_item(bit_number, name)
+
+                ret = self.__conf_factory__.create_someip_parameter_bitfield(
+                    self.get_from_dict_or_none(p, "Name"),
+                    self.dict_to_sorted_set(items),
+                    child
+                )
+
+            elif self.basetype_is_int(coding2) or self. basetype_is_float(coding2):
                 bitlenbase = self.get_from_dict(coding2, "BitLength", -1)
                 bitlenenct = self.get_from_dict(utils, "BitLength", -1)
                 if bitlenenct == -1:
@@ -651,7 +707,7 @@ class FibexParser(AbstractParser):
                 items = {}
 
                 for i in element.findall('./fx:ENUMERATION-ELEMENTS/fx:ENUM-ELEMENT', self.__ns__):
-                    value = self.get_child_text(i, "fx:VALUE")
+                    value = int(self.get_child_text(i, "fx:VALUE"))
                     name = self.get_child_text(i, "fx:SYNONYM")
                     desc = self.get_child_text(i, "ho:DESC")
                     items[value] = self.__conf_factory__.create_someip_parameter_enumeration_item(value, name, desc)

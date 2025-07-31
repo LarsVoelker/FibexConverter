@@ -81,6 +81,10 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterUnion(name, length_of_length, length_of_type, pad_to, members)
         return ret
 
+    def create_someip_parameter_bitfield(self, name, items, child):
+        ret = SOMEIPParameterBitfield(name, items, child)
+        return ret
+
     def add_service(self, serviceid, majorver, minorver, service):
         sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
         if sid in self.__services_long__:
@@ -561,21 +565,40 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
         f.write("%s</Choice>\n" % identtabs)
 
 
+class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
+    def peachout(self, f, indent, paramname, minnum, maxnum):
+        if self.__child__ is not None:
+            self.__child__.peachout(f, indent, paramname, minnum, maxnum)
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Converting configuration to peach xml.')
     parser.add_argument('type', choices=parser_formats, help='format')
     parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
+    parser.add_argument('--ecu-name-mapping', type=argparse.FileType('r'), default=None, help='Key/Value CSV file')
+    parser.add_argument('--generate-switch-port-names', action='store_true')
+    parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
+                        default=None)
 
     args = parser.parse_args()
     return args
 
 
 def main():
+    global g_gen_portid
+
     print("Converting configuration to peach xml\n")
     args = parse_arguments()
 
+    g_gen_portid = args.generate_switch_port_names
+
+    ecu_name_mapping = {}
+    if args.ecu_name_mapping is not None:
+        ecu_name_mapping = read_csv_to_dict(args.ecu_name_mapping)
+
     conf_factory = PeachConfigurationFactory()
-    output_dir = parse_input_files(args.filename, args.type, conf_factory)
+    output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin,
+                                   ecu_name_replacement=ecu_name_mapping)
 
     target_dir = os.path.join(output_dir, "peach")
 

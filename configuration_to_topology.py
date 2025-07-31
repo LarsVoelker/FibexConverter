@@ -151,7 +151,7 @@ class AccessControlTableEntries:
                                 f"{self.__ecu_to__}", f"{self.__ctrl_to__}",
                                 f"{vlan:#x}", f"{addr}",
                                 mask_prefix,
-                                f"{mcast_addr_to_mac_mcast(addr)}")]
+                                    f"{mcast_addr_to_mac_mcast(addr)}")]
 
         return ret
 
