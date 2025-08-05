@@ -612,9 +612,9 @@ class FibexParser(AbstractParser):
                     vmax = int(value_max)
 
                     if vmin != vmax:
-                        print(f"ERROR: Bitfield ID {coding1["ID"]} has for name {name}: min {vmin} != max {vmax}!")
+                        print(f"ERROR: Bitfield ID {coding1['ID']} has for name {name}: min {vmin} != max {vmax}!")
                     elif vmin == 0 and coding1['CompuMethod_Category'] != 'BITFIELD-TEXTTABLE':
-                        print(f"ERROR: Bitfield ID {coding1["ID"]} has for name {name}: value {vmin} is 0!")
+                        print(f"ERROR: Bitfield ID {coding1['ID']} has for name {name}: value {vmin} is 0!")
                     elif vmin.bit_count() == 1:
                         bit_number = self.value_to_bit(vmin)
                         if bit_number is not None:
