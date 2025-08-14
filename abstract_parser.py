@@ -1,9 +1,9 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2024  Dr. Lars Voelker
+# Copyright (C) 2015-2025  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
-# Copyright (C) 2020-2024  Dr. Lars Voelker, Technica Engineering GmbH
+# Copyright (C) 2020-2025  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
