@@ -1708,6 +1708,9 @@ class SOMEIPBaseParameterStructMember(BaseItem):
     def position(self):
         return self.__position__
 
+    def update_position(self, p):
+        self.__position__ = p
+
     def mandatory(self):
         return self.__mandatory__
 

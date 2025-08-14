@@ -1400,15 +1400,38 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
 
         number_of_entries = len(self.members())
 
-        # first pass: check that all positions are below numbers_of_entries
-        for key in self.members():
+        # first pass: check numbering and that all positions are below numbers_of_entries
+        error_found = False
+        last_pos = -1
+        for key in sorted(self.members().keys()):
             m = self.members()[key]
-            m_pos = m.position()
-            if m_pos >= number_of_entries:
-                print(f"Position of SOME/IP Struct Member > len(members)! Adjusting ({m_pos+1})")
-                number_of_entries = m_pos + 1
 
-        for key in self.members():
+            #check position
+            if last_pos != -1 and m.position() - last_pos > 1:
+                error_found = True
+                print(f"\nERROR: Position skipped by SOME/IP Struct Member {m.name()} {last_pos} -> {m.position()}")
+                print("  Current members:")
+                for k2, m2 in self.members().items():
+                    print(f"    {m2.position()}: {m2.name()}")
+
+                print("\n  Adjusting positioning!")
+                m.update_position(last_pos + 1)
+            last_pos = m.position()
+
+            if m.position() >= number_of_entries:
+                print(f"\n  ERROR: Position of SOME/IP Struct Member {m.name()} {m.position()} > number_of_entries {number_of_entries}!\n"
+                      f"  Adjusting number_of_entries to {m.position() + 1} [{self.name()}]")
+                number_of_entries = m.position() + 1
+                error_found = True
+
+        if error_found:
+            print("  Resulting members:")
+            for key in self.members():
+                m = self.members()[key]
+                print(f"    {m.position()}: {m.name()}")
+            print("\n")
+
+        for key in sorted(self.members().keys()):
             m = self.members()[key]
             ret += "\"%08x\",\"%s\",\"%d\",\"%d\"" % (self.globalid(version),
                                                       self.name(),
