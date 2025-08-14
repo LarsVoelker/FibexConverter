@@ -1644,7 +1644,7 @@ class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
                                                                                self.name(),
                                                                                self.child().bitlength_basetype(),
                                                                                len(self.items()),
-                                                                               i.bitnumber(),
+                                                                               i.bit_number(),
                                                                                i.name(),
                                                                                f"{self.name()}.{i.name()}")
         return ret
@@ -1769,7 +1769,7 @@ def main():
     print(f"  --> {fn}")
     conf_factory.write_parameter_enums(os.path.join(target_dir, fn))
     conf_factory.write_parameter_enums(os.path.join(target_dir2, fn), 2)
-    conf_factory.write_parameter_enums(os.path.join(target_dir2, fn), 3)
+    conf_factory.write_parameter_enums(os.path.join(target_dir3, fn), 3)
 
     fn = "SOMEIP_parameter_strings"
     print(f"  --> {fn}")
