@@ -1177,9 +1177,9 @@ class ECU(BaseECU):
         return ret
 
     def export_endpoints(self, factory, ret):
-        for controller in self.__controllers__:
-            for interface in controller.interfaces():
-                for ip in interface.ips():
+        for controller in sorted(self.__controllers__, key=lambda x:x.name()):
+            for interface in sorted(controller.interfaces(),  key=lambda x:x.vlanid()):
+                for ip in sorted(interface.ips()) :
                     if ip is not None:
                         str_ip = str(ip)
                         str_netmask_prefix = factory.get_ipv4_netmask_or_ipv6_prefix_length(ip)
