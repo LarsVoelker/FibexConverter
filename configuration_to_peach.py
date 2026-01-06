@@ -20,6 +20,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import argparse
+import logging
 import os.path
 import time
 
@@ -40,6 +41,8 @@ from configuration_base_classes import (
 )
 from parser_dispatcher import is_file_or_dir_valid, is_file_valid, parse_input_files, parser_formats
 
+logger = logging.getLogger(__name__)
+
 
 class PeachConfigurationFactory(BaseConfigurationFactory):
     def __init__(self):
@@ -55,8 +58,7 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
 
     def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
         ret = SOMEIPBaseService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
-        print("Adding Service(ID: 0x%04x Ver: %d.%d)" % (serviceid, majorver, minorver))
-        #        assert(self.add_service(serviceid, majorver, minorver, ret))
+        logger.debug("Adding Service(Name: %s ID: 0x%04x Ver: %d.%d)", name, serviceid, majorver, minorver)
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 
