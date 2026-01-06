@@ -42,8 +42,7 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
 
     def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
         ret = SOMEIPBaseService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
-        print("Adding Service(ID: 0x%04x Ver: %d.%d)" % (serviceid, majorver, minorver))
-        #        assert(self.add_service(serviceid, majorver, minorver, ret))
+        logger.debug("Adding Service(Name: %s ID: 0x%04x Ver: %d.%d)", name, serviceid, majorver, minorver)
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2025  Dr. Lars Voelker
+# Copyright (C) 2015-2026  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
 # Copyright (C) 2020-2025  Dr. Lars Voelker, Technica Engineering GmbH
 
@@ -19,31 +19,32 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import sys
-import time
-import os.path
 import argparse
+import ipaddress
+import os.path
+from typing import Any, Dict, List, Optional, Tuple
 
-from parser_dispatcher import *  # @UnusedWildImport
 from configuration_base_classes import *  # @UnusedWildImport
+from parser_dispatcher import *  # @UnusedWildImport
 
 
 class SimpleConfigurationFactory(BaseConfigurationFactory):
+    """Factory for creating configuration objects with text output formatting."""
 
-    def __init__(self):
-        self.__services__ = dict()
-        self.__services_long__ = dict()
-        self.__switches__ = dict()
-        self.__ecus__ = dict()
+    def __init__(self) -> None:
+        self.__services__: Dict[str, Any] = {}
+        self.__services_long__: Dict[str, Any] = {}
+        self.__switches__: Dict[str, Any] = {}
+        self.__ecus__: Dict[str, Any] = {}
 
-        self.__codings__ = dict()
-        self.__frame_triggerings__ = dict()
-        self.__frames__ = dict()
-        self.__pdus__ = dict()
-        self.__channels__ = dict()
+        self.__codings__: Dict[str, Any] = {}
+        self.__frame_triggerings__: Dict[str, Any] = {}
+        self.__frames__: Dict[str, Any] = {}
+        self.__pdus__: Dict[str, Any] = {}
+        self.__channels__: Dict[str, Dict[str, Any]] = {}
 
-        self.__ipv4_netmasks__ = {}
-        self.__ipv6_prefix_lengths__ = {}
+        self.__ipv4_netmasks__: Dict[str, str] = {}
+        self.__ipv6_prefix_lengths__: Dict[str, int] = {}
 
     def create_switch(self, name, ecu, ports):
         ret = Switch(name, ecu, ports)
@@ -69,10 +70,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         channel = self.__channels__.setdefault(name, {})
         frame_triggerings = channel.setdefault("frametriggerings", {})
 
-        for key, value in input_frame_trigs.items():
-            frame_triggerings[key] = value
-        for key, value in output_frame_trigs.items():
-            frame_triggerings[key] = value
+        frame_triggerings.update(input_frame_trigs)
+        frame_triggerings.update(output_frame_trigs)
 
         return ret
 
@@ -100,7 +99,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
         ret = SOMEIPService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
-        print(f"Adding Service(Name: {name} ID: 0x{serviceid:04x} Ver: {majorver:d}.{minorver:d})")
+        logger.debug("Adding Service(Name: %s ID: 0x%04x Ver: %d.%d)", name, serviceid, majorver, minorver)
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 
@@ -202,7 +201,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = PDU(id, short_name, byte_length, pdu_type, signal_instances)
 
         if id in self.__pdus__:
-            print(f"WARNING: Creating PDU with existing ID {id}!")
+            logger.warning("Creating PDU with existing ID %s!", id)
 
         self.__pdus__[id] = ret
         return ret
@@ -213,7 +212,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                            static_segs, static_pdu)
 
         if id in self.__pdus__:
-            print(f"WARNING: Creating Multiplex PDU with existing ID {id}!")
+            logger.warning("Creating Multiplex PDU with existing ID %s!", id)
         self.__pdus__[id] = ret
         return ret
 
@@ -233,9 +232,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def create_frame(self, id, short_name, byte_length, frame_type, pdu_instances):
         if short_name in self.__frames__:
             i = 1
-            while i == 1 or tmp_name in self.__frames__:
-                tmp_name = f"{short_name}__duplicate{i}"
+            tmp_name = f"{short_name}__duplicate{i}"
+            while tmp_name in self.__frames__:
                 i += 1
+                tmp_name = f"{short_name}__duplicate{i}"
 
             short_name = tmp_name
 
@@ -260,16 +260,21 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def add_service(self, serviceid, majorver, minorver, service):
         sid = f"{serviceid:04x}-{majorver:02x}-{minorver:08x}"
         if sid in self.__services_long__:
-            print(f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, " +
-                  f"Minor-Ver: {minorver:d}) already exists! Not overriding it!")
+            logger.error(
+                "Service (SID: 0x%04x, Major-Ver: %d, Minor-Ver: %d) already exists! Not overriding it!",
+                serviceid, majorver, minorver
+            )
             return False
 
         self.__services_long__[sid] = service
 
         sid = f"{serviceid:04x}-{majorver:02x}"
         if sid in self.__services__:
-            print(f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d})" +
-                  f"already exists with a different Minor Version (not {minorver:d})! Not overriding it!")
+            logger.error(
+                "Service (SID: 0x%04x, Major-Ver: %d) already exists with a different Minor Version (not %d)! "
+                "Not overriding it!",
+                serviceid, majorver, minorver
+            )
             return False
 
         self.__services__[sid] = service
@@ -278,25 +283,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def get_service(self, serviceid, majorver, minorver=None):
         if minorver is None:
             sid = f"{serviceid:04x}-{majorver:02x}"
-            if sid in self.__services__:
-                return self.__services__[sid]
-            else:
-                return None
+            return self.__services__.get(sid)
         else:
             sid = f"{serviceid:04x}-{majorver:02x}-{minorver:08x}"
-            if sid in self.__services_long__:
-                return self.__services_long__[sid]
-            else:
-                return None
+            return self.__services_long__.get(sid)
 
     def add_ipv4_address_config(self, ip, netmask):
         self.__ipv4_netmasks__[ip] = netmask
 
     def get_ipv4_netmask(self, ip):
-        try:
-            return self.__ipv4_netmasks__.get(ip)
-        except ValueError:
-            return None
+        return self.__ipv4_netmasks__.get(ip)
 
     def add_ipv6_address_config(self, ip, prefixlen):
         tmp = ipaddress.ip_address(ip).exploded
@@ -306,7 +302,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         try:
             tmp = ipaddress.ip_address(ip).exploded
             return self.__ipv6_prefix_lengths__.get(tmp)
-        except ValueError:
+        except (ValueError, ipaddress.AddressValueError):
             return None
 
     def get_ipv4_netmask_or_ipv6_prefix_length(self, ip):
@@ -318,40 +314,44 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         return ""
 
-    def __str__(self):
-        ret = "Services: \n"
+    def __str__(self) -> str:
+        parts: List[str] = []
+
+        parts.append("Services: \n")
         for serviceid in sorted(self.__services__):
-            ret += self.__services__[serviceid].str(2)
+            parts.append(self.__services__[serviceid].str(2))
 
-        ret += "\nFrames: \n"
+        parts.append("\nFrames: \n")
         for name in sorted(self.__frames__):
-            ret += self.__frames__[name].str(2)
+            parts.append(self.__frames__[name].str(2))
 
-        ret += "\nPDUs: \n"
+        parts.append("\nPDUs: \n")
         for name in sorted(self.__pdus__):
-            ret += self.__pdus__[name].str(2)
+            parts.append(self.__pdus__[name].str(2))
 
-        ret += "\nECUs: \n"
+        parts.append("\nECUs: \n")
         for name in sorted(self.__ecus__):
-            ret += self.__ecus__[name].str(2, self)
+            parts.append(self.__ecus__[name].str(2, self))
 
-        ret += "\nChannels/Busses/VLANs: \n"
+        parts.append("\nChannels/Busses/VLANs: \n")
         for name in sorted(self.__channels__):
-            ret += f"  Channel {name}:\n"
+            parts.append(f"  Channel {name}:\n")
             fts = self.__channels__[name]["frametriggerings"]
             for key in sorted(fts):
-                ret += fts[key].str(4)
-            ret += "\n"
+                parts.append(fts[key].str(4))
+            parts.append("\n")
 
-        ret += "\nEthernet Topology: \n"
+        parts.append("\nEthernet Topology: \n")
         for name in sorted(self.__switches__):
-            ret += self.__switches__[name].str(2, self, print_ecu_name=True)
+            parts.append(self.__switches__[name].str(2, self, print_ecu_name=True))
 
-        return ret
+        return "".join(parts)
 
 
 class Switch(BaseSwitch):
-    def str(self, indent, factory, print_ecu_name=False):
+    """Switch representation with text formatting."""
+
+    def str(self, indent: int, factory: Any, print_ecu_name: bool = False) -> str:
         ret = indent * " "
         tmp = f" of ECU {self.__ecu__.name()}" if self.__ecu__ is not None and print_ecu_name else ""
         ret += f"Switch {self.__name__}{tmp}\n"
@@ -361,16 +361,16 @@ class Switch(BaseSwitch):
 
 
 class SwitchPort(BaseSwitchPort):
-    def str_vlans(self, indent):
-        ret = ""
+    """Switch port representation with text formatting."""
 
+    def str_vlans(self, indent: int) -> str:
+        parts: List[str] = []
         for vlan in self.vlans_objs():
-            ret += indent * " "
-            ret += f"VLAN (ID: {vlan.vlanid_str()}, Prio: {vlan.priority()})\n"
+            parts.append(indent * " ")
+            parts.append(f"VLAN (ID: {vlan.vlanid_str()}, Prio: {vlan.priority()})\n")
+        return "".join(parts)
 
-        return ret
-
-    def str(self, indent, factory):
+    def str(self, indent: int, factory: Any) -> str:
         ret = indent * " "
         ret += f"SwitchPort {self.portid(gen_name=g_gen_portid)} <-> "
         if self.__port__ is not None:
@@ -382,13 +382,15 @@ class SwitchPort(BaseSwitchPort):
             ret += "\n"
 
         ret += (indent + 2) * " "
-        ret += f"VLANs:\n"
+        ret += "VLANs:\n"
         ret += self.str_vlans(indent + 4)
         return ret
 
 
 class ECU(BaseECU):
-    def str(self, indent, factory):
+    """ECU representation with text formatting."""
+
+    def str(self, indent: int, factory: Any) -> str:
         ret = indent * " "
         ret += f"ECU {self.__name__}\n"
 
@@ -402,7 +404,9 @@ class ECU(BaseECU):
 
 
 class Controller(BaseController):
-    def str(self, indent, factory):
+    """Controller representation with text formatting."""
+
+    def str(self, indent: int, factory: Any) -> str:
         ret = indent * " "
         ret += f"CTRL {self.__name__}\n"
         for i in self.__interfaces__:
@@ -412,7 +416,9 @@ class Controller(BaseController):
 
 
 class Interface(BaseInterface):
-    def str(self, indent, factory):
+    """Interface representation with text formatting."""
+
+    def str(self, indent: int, factory: Any) -> str:
         ret = indent * " "
 
         if self.__vlanid__ == 0:
@@ -428,13 +434,13 @@ class Interface(BaseInterface):
         for s in self.__sockets__:
             ret += s.str(indent + 2)
 
-        if self.__frame_triggerings_in__ is not None and len(self.__frame_triggerings_in__.keys()) > 0:
+        if self.__frame_triggerings_in__ is not None and len(self.__frame_triggerings_in__) > 0:
             ret += (indent + 2) * " "
             ret += "Input Frames:\n"
             for key in sorted(self.__frame_triggerings_in__.keys()):
                 ret += self.__frame_triggerings_in__[key].str(indent + 4)
 
-        if self.__frame_triggerings_out__ is not None and len(self.__frame_triggerings_out__.keys()) > 0:
+        if self.__frame_triggerings_out__ is not None and len(self.__frame_triggerings_out__) > 0:
             ret += (indent + 2) * " "
             ret += "Output Frames:\n"
             for key in sorted(self.__frame_triggerings_out__.keys()):
@@ -444,7 +450,9 @@ class Interface(BaseInterface):
 
 
 class Socket(BaseSocket):
-    def str(self, indent):
+    """Socket representation with text formatting."""
+
+    def str(self, indent: int) -> str:
         ret = indent * " "
         ret += f"Socket {self.__name__} {self.__ip__}:{self.__portnumber__}/{self.__proto__}\n"
         for i in self.__instances__:
@@ -508,7 +516,9 @@ class SOMEIPServiceEventgroupReceiver(SOMEIPBaseServiceEventgroupReceiver):
 
 
 class SOMEIPService(SOMEIPBaseService):
-    def str(self, indent):
+    """SOME/IP service representation with text formatting."""
+
+    def str(self, indent: int) -> str:
         ret = indent * " "
         ret += f"Service {self.__name__} (id: 0x{self.__serviceid__:04x} ver: {self.__major__:d}.{self.__minor__:d})\n"
 
@@ -630,33 +640,21 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
 
 
 class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
-    def str(self, indent):
+    """SOME/IP service eventgroup representation with text formatting."""
+
+    def str(self, indent: int) -> str:
         ret = indent * " "
         ret += f"Eventgroup {self.__name__} (id: 0x{self.__id__:04x})\n"
 
         if len(self.__eventids__) > 0:
             ret += (2 + indent) * " "
-            ret += "Events: "
-            first = True
-            for eid in self.__eventids__:
-                if not first:
-                    ret += ", "
-                else:
-                    first = False
-                ret += f"0x{eid:04x}"
-            ret += "\n"
+            event_strs = [f"0x{eid:04x}" for eid in self.__eventids__]
+            ret += f"Events: {', '.join(event_strs)}\n"
 
         if len(self.__fieldids__) > 0:
             ret += (2 + indent) * " "
-            ret += "Notifiers: "
-            first = True
-            for fid in self.__fieldids__:
-                if not first:
-                    ret += ", "
-                else:
-                    first = False
-                ret += f"0x{fid:04x}"
-            ret += "\n"
+            field_strs = [f"0x{fid:04x}" for fid in self.__fieldids__]
+            ret += f"Notifiers: {', '.join(field_strs)}\n"
 
         return ret
 
@@ -733,7 +731,7 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
                 if member is not None:
                     ret += member.str(indent + 2)
                 else:
-                    print("ERROR: struct member == None!")
+                    logger.error("Struct member is None at position %s", m)
 
         return ret
 
@@ -787,7 +785,7 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
                 if member is not None:
                     ret += member.str(indent + 2)
                 else:
-                    print("ERROR: union member == None!")
+                    logger.error("Union member is None at index %s", m)
 
         return ret
 
@@ -822,7 +820,9 @@ class SOMEIPParameterBitfieldItem(SOMEIPBaseParameterBitfieldItem):
 
 
 class Signal(BaseSignal):
-    def str(self, indent, indent_first_line=True, show_basetype=False):
+    """Signal representation with text formatting."""
+
+    def str(self, indent: int, indent_first_line: bool = True, show_basetype: bool = False) -> str:
         if indent_first_line:
             ret = indent * " "
         else:
@@ -834,20 +834,15 @@ class Signal(BaseSignal):
         if self.__compu_scale__ is not None and len(self.__compu_scale__) == 3:
             ret += f", f(x) = {self.__compu_scale__[1]}/{self.__compu_scale__[2]} * x + {self.__compu_scale__[0]}"
         if self.__compu_consts__ is not None and len(self.__compu_consts__) > 0:
-            ret += f", Consts: "
-            first = True
-            for name, start, end in self.__compu_consts__:
-                if first:
-                    first = False
-                else:
-                    ret += ", "
-                ret += f"{name} ({start}-{end})"
-            ret += f" "
+            const_strs = [f"{name} ({start}-{end})" for name, start, end in self.__compu_consts__]
+            ret += f", Consts: {', '.join(const_strs)} "
         return ret + "\n"
 
 
 class Frame(BaseFrame):
-    def str(self, indent):
+    """Frame representation with text formatting."""
+
+    def str(self, indent: int) -> str:
         ret = indent * " "
         ret += f"Frame {self.__short_name__}\n"
 
@@ -858,7 +853,9 @@ class Frame(BaseFrame):
 
 
 class PDU(BasePDU):
-    def str(self, indent, indent_first_line=True, start_offset=0, show_signals=True):
+    """PDU representation with text formatting."""
+
+    def str(self, indent: int, indent_first_line: bool = True, start_offset: int = 0, show_signals: bool = True) -> str:
         if indent_first_line:
             ret = indent * " "
         else:
@@ -1013,7 +1010,8 @@ class FrameTriggeringFlexRay(BaseFrameTriggeringFlexRay):
         return ret
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
+    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description='Converting configuration to text.')
     parser.add_argument('type', choices=parser_formats, help='format')
     parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
@@ -1022,8 +1020,7 @@ def parse_arguments():
     parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
                         default=None)
 
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def main():
@@ -1042,11 +1039,11 @@ def main():
     output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin,
                                    ecu_name_replacement=ecu_name_mapping)
 
-    print("Generating output directories:")
+    print("Generating output directories")
 
     if os.path.isdir(args.filename):
         target_dir = os.path.join(output_dir, "text")
-        textfile = os.path.join(target_dir, "all_files" + ".txt")
+        textfile = os.path.join(target_dir, "all_files.txt")
     elif os.path.isfile(args.filename):
         (path, f) = os.path.split(args.filename)
         filenoext = '.'.join(f.split('.')[:-1])
@@ -1055,10 +1052,10 @@ def main():
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
-        time.sleep(0.5)
 
+    #with open(textfile, "w", encoding="utf-8") as f:
     with open(textfile, "w") as f:
-        f.write("%s" % conf_factory)
+        f.write(str(conf_factory))
 
     print("Done.")
 

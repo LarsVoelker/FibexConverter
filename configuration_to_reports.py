@@ -73,8 +73,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
         ret = SOMEIPService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
-        print("Adding Service(ID: 0x%04x Ver: %d.%d)" % (serviceid, majorver, minorver))
-        #        assert(self.add_service(serviceid, majorver, minorver, ret))
+        logger.debug("Adding Service(Name: %s ID: 0x%04x Ver: %d.%d)", name, serviceid, majorver, minorver)
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 
@@ -167,15 +166,15 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def add_service(self, serviceid, majorver, minorver, service):
         sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
         if sid in self.__services_long__:
-            print("ERROR: Service (SID: 0x%04x, Major-Ver: %d, Minor-Ver: %d) already exists! Not overriding it!" %
-                  (serviceid, majorver, minorver))
+            logger.error("Service (SID: 0x%04x, Major-Ver: %d, Minor-Ver: %d) already exists! Not overriding it!",
+                          serviceid, majorver, minorver)
             return False
         self.__services_long__[sid] = service
 
         sid = "%04x-%02x" % (serviceid, majorver)
         if sid in self.__services__:
-            print(f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver}) " +
-                  "already exists with a different Minor Version (not {minorver})! Not overriding it!")
+            logger.error("Service (SID: 0x%04x, Major-Ver: %d) already exists with a different Minor Version (not %d)! Not overwriting it!",
+                          serviceid, majorver, minorver)
             return False
         self.__services__[sid] = service
         return True
@@ -212,13 +211,13 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         return self.__ecus__.keys()
 
     def get_service_instance_client_relations(self):
-        print("Looking at Service Instances...")
+        logger.debug("Looking at Service Instances...")
         ret = dict()
 
         for e in self.__ecus__.items():
             ecu = e[1]
             ecu_key = ecu.name()
-            print(f"Looking at ECU: {ecu_key}")
+            logger.debug("Looking at ECU: %s", ecu_key)
 
             if ecu_key not in ret:
                 ret[ecu_key] = dict()
@@ -228,15 +227,15 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     for s in i.sockets():
                         for si in s.instances():
                             si_key = si.key()
-                            print(f"  SI key -> {si_key}")
+                            logger.debug(f"  SI key -> {si_key}")
                             if si_key not in ret[ecu_key]:
                                 ret[ecu_key][si_key] = []
 
                             for sic in si.serviceinstanceclients():
                                 if sic is None:
-                                    print("Error: SIC = None!")
+                                    logger.error("SIC = None!")
                                 elif sic.socket() is None:
-                                    print("Error: Socket in SIC (%s) = None!" % (str(sic)))
+                                    logger.error("Socket in SIC (%s) = None!", str(sic))
                                 else:
                                     client_ecu_name = sic.socket().interface().controller().ecu().name()
                                     ret[ecu_key][si_key].append(client_ecu_name)
@@ -531,7 +530,7 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
                 if member is not None:
                     ret += member.str(indent + 2)
                 else:
-                    print("ERROR: struct member == None!")
+                    logger.error("struct member == None!")
 
         return ret
 
@@ -583,7 +582,7 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
                 if member is not None:
                     ret += member.str(indent + 2)
                 else:
-                    print("ERROR: union member == None!")
+                    logger.error("union member == None!")
 
         return ret
 
@@ -638,7 +637,7 @@ def read_hex_integer_file(f):
                     i = int(line.rstrip(), 16)
                     ret.append(i)
                 except ValueError:
-                    print("can't parse line: ", line)
+                    logger.error("can't parse line: ", line)
 
     return ret
 
@@ -1005,27 +1004,26 @@ def main():
     matrix = calc_matrix(ignored_ecus, ignore_services, ecunames, data)
 
     # generate the outputs
-    print("")
-    print("Generating overlapping EG file")
+    print("-> Generating overlapping EG file")
     service_with_overlapping_events = generate_event_multiple_eg(target_dir, filenoext,
                                                                  "__events_fields_in_multiple_EGs.csv", conf_factory)
 
-    print("Generating Eventgroup statistics")
+    print("-> Generating Eventgroup statistics")
     generate_count_file(target_dir, filenoext, "__eventgroup_stats.csv", conf_factory)
 
-    print("Generating sizes file")
+    print("-> Generating sizes file")
     generate_size_file(target_dir, filenoext, "__sizes.csv", conf_factory)
 
-    print("Generating instance matrices")
+    print("-> Generating instance matrices")
     generate_service_instance_matrix_file(target_dir, filenoext, "__si_matrix_filtered.csv", ecunames, ignore_services,
                                           data, service_with_overlapping_events)
     generate_service_instance_matrix_file(target_dir, filenoext, "__si_matrix_full.csv", ecunamesall, [], data,
                                           service_with_overlapping_events)
 
-    print("Generating service instance usage list")
+    print("-> Generating service instance usage list")
     generate_service_list(target_dir, filenoext, "__service_instance_usage_list.csv", ignored_ecus, matrix)
 
-    print("Generating service instance usage matrix")
+    print("-> Generating service instance usage matrix")
     generate_service_matrix(target_dir, filenoext, "__service_instance_usage_matrix.csv", ecunames, ignored_ecus,
                             matrix)
 
