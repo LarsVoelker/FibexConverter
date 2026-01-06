@@ -1475,7 +1475,7 @@ def main():
     write_to_xslx(f"{aclfile2u}.xlsx", conf_factory.extended_access_control_table(skip_multicast=True), xlsx_metadata)
     with open(f"{aclfile2u}.json", "w") as f:
         tmp = conf_factory.extended_access_control_table(skip_multicast=True, file_format="json")
-        json.dump(tmp, f, indent=4)
+        json.dump(tmp, f, indent=4, sort_keys=True)
 
     matrix_data = conf_factory.extended_access_control_matrix(multicast_names,
                                                               tx_delimiter=';',
