@@ -462,8 +462,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         for ecu_name in sorted(self.__ecus__.keys()):
             ecu = self.__ecus__[ecu_name]
 
-            for ctrl in ecu.controllers():
-                for iface in ctrl.interfaces():
+            for ctrl in sorted(ecu.controllers(), key=lambda x:x.name()):
+                for iface in sorted(ctrl.interfaces(),  key=lambda x:x.vlanid()):
                     ret += [[ecu_name, ctrl.name(), "", f"0x{int(iface.vlanid()):x}", iface.vlanname(), ""]]
 
             for switch in ecu.switches():
