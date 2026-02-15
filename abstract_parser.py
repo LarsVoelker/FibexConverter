@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2025  Dr. Lars Voelker
+# Copyright (C) 2015-2026  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
 # Copyright (C) 2020-2025  Dr. Lars Voelker, Technica Engineering GmbH
 
@@ -19,96 +19,142 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import logging
+from typing import Any, Dict, Hashable, Optional, Tuple
+from xml.etree.ElementTree import Element
+
 import isodate
 
+logger = logging.getLogger(__name__)
 
-class AbstractParser(object):
-    def __init__(self):
-        self.__conf_factory__ = None
-        self.__ns__ = {}
 
-    def get_child_text(self, element, childtag):
+class AbstractParser:
+    """Common helper functions for XML-based configuration parsers."""
+
+    def __init__(self) -> None:
+        self.__conf_factory: Optional[Any] = None
+        # Namespace map used when querying XML elements
+        self._ns: Dict[str, str] = {}
+
+    def get_child_text(self, element: Optional[Element], child_tag: str) -> Optional[str]:
+        """Return the text of the first matching child or ``None`` if not found."""
         if element is None:
             return None
 
-        c = element.find(childtag, self.__ns__)
-        if c is None:
+        child = element.find(child_tag, self._ns)
+        if child is None:
             return None
 
-        return c.text
+        return child.text
 
-    def get_attribute(self, element, attribkey):
-        if self.__ns__ is not None and len(attribkey.split(':')) > 1:
-            prefix, elem = attribkey.split(':')
-            if prefix in self.__ns__:
-                attribkey = '{' + self.__ns__[prefix] + '}' + elem
+    def get_attribute(self, element: Element, attribute_key: str) -> Optional[str]:
+        """
+        Return the attribute value from *element* or ``None``.
+
+        Namespaced attributes can be requested with the ``prefix:name`` notation.
+        """
+        if element is None or attribute_key is None:
+            return None
+
+        if self._ns is not None and ":" in attribute_key:
+            prefix, elem = attribute_key.split(":", 1)
+            if prefix in self._ns:
+                attribute_key = "{" + self._ns[prefix] + "}" + elem
             else:
-                print(f"Cannot lookup namespace: {attribkey}")
+                logger.warning("Cannot lookup namespace for attribute %s", attribute_key)
 
-        if attribkey in element.attrib:
-            return element.attrib[attribkey]
-        return None
+        return element.attrib.get(attribute_key)
 
-    def get_child_attribute(self, element, childtag, attribkey):
-        if childtag is None or attribkey is None:
+    def get_child_attribute(
+        self,
+        element: Optional[Element],
+        child_tag: Optional[str],
+        attribute_key: Optional[str],
+    ) -> Optional[str]:
+        """Return an attribute of a child element or ``None`` if child/attribute is missing."""
+        if element is None or child_tag is None or attribute_key is None:
             return None
 
-        c = element.find(childtag, self.__ns__)
-        if c is None:
+        child = element.find(child_tag, self._ns)
+        if child is None:
             # xml.etree.ElementTree.dump(element)
             return None
-        if attribkey in c.attrib:
-            return c.attrib[attribkey]
-        return None
+
+        return child.attrib.get(attribute_key)
 
     @staticmethod
-    def element_text_to_int(element, default):
+    def element_text_to_int(element: Optional[Element], default: int) -> int:
+        """Convert an element's text to ``int`` or return *default* on failure."""
         try:
+            if element is None or element.text is None:
+                return default
             return int(element.text)
-        except AttributeError:
+        except (AttributeError, TypeError, ValueError):
             return default
 
     @staticmethod
-    def element_text(element):
+    def element_text(element: Optional[Element]) -> Optional[str]:
+        """Return ``element.text`` or ``None`` when *element* is ``None``."""
         if element is None:
             return None
         return element.text
 
     @staticmethod
-    def get_from_dict(d, key, default):
+    def get_from_dict(d: Optional[Dict[Hashable, Any]], key: Any, default: Any) -> Any:
+        """Safe dictionary lookup that tolerates ``None`` for *d* or *key*."""
         if d is None or key is None or key not in d:
             return default
         return d[key]
 
-    def get_from_dict_or_none(self, d, key):
+    def get_from_dict_or_none(
+        self,
+        d: Optional[Dict[Hashable, Any]],
+        key: Any,
+    ) -> Any:
+        """Convenience wrapper to get a value from a dict or ``None``."""
+
         if d is None:
             return None
         return self.get_from_dict(d, key, None)
 
     @staticmethod
-    def dict_to_sorted_set(d):
-        ret = ()
+    def dict_to_sorted_set(d: Dict[str, Any]) -> Tuple[Any, ...]:
+        """
+        Return tuple of dictionary values ordered by sorted keys.
 
-        for k in sorted(d.keys()):
-            ret = ret + (d[k],)
+        Keeping the return type as a tuple maintains the original API behavior.
+        """
+        if not d:
+            return tuple()
 
-        return ret
+        return tuple(d[k] for k in sorted(d.keys()))
 
-    def get_child_iso_duration(self, element, childtag):
-        s = self.get_child_text(element, childtag)
-        if s is None:
+    def get_child_iso_duration(self, element: Optional[Element], child_tag: str) -> float:
+        """
+        Parse an ISO-8601 duration from a child element and return its length in seconds.
+
+        Returns ``-1`` when the child or its text is missing to preserve legacy semantics.
+        """
+        duration_str = self.get_child_text(element, child_tag)
+        if duration_str is None:
             return -1
-        return (isodate.parse_duration(s)).total_seconds()
+
+        return (isodate.parse_duration(duration_str)).total_seconds()
 
     @staticmethod
-    def value_to_bit(i):
-        if i.bit_count() != 1:
+    def value_to_bit(i: int) -> Optional[int]:
+        """
+        Return the bit index of a power-of-two integer or ``None`` otherwise.
+
+        ``i`` must be a strictly positive power of two (e.g. 1, 2, 4, 8, ...).
+        """
+        if i <= 0 or i.bit_count() != 1:
             return None
 
-        bitnumber = 0
+        bit_number = 0
         tmp = i
         while tmp & 1 != 1:
             tmp = tmp >> 1
-            bitnumber += 1
+            bit_number += 1
 
-        return bitnumber
+        return bit_number

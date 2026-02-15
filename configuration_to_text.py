@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2025  Dr. Lars Voelker
+# Copyright (C) 2015-2026  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
 # Copyright (C) 2020-2025  Dr. Lars Voelker, Technica Engineering GmbH
 
@@ -19,130 +19,181 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import sys
-import time
-import os.path
 import argparse
+import ipaddress
+import os.path
+import time
 
-from parser_dispatcher import *  # @UnusedWildImport
-from configuration_base_classes import *  # @UnusedWildImport
+from configuration_base_classes import (
+    BaseConfigurationFactory,
+    BaseController,
+    BaseECU,
+    BaseEthernetPDUInstance,
+    BaseFrame,
+    BaseFrameTriggeringCAN,
+    BaseFrameTriggeringFlexRay,
+    BaseInterface,
+    BaseMultiplexPDU,
+    BaseMultiplexPDUSegmentPosition,
+    BaseMultiplexPDUSwitch,
+    BasePDU,
+    BasePDUInstance,
+    BaseSignal,
+    BaseSignalInstance,
+    BaseSocket,
+    BaseSwitch,
+    BaseSwitchPort,
+    SOMEIPBaseParameter,
+    SOMEIPBaseParameterArray,
+    SOMEIPBaseParameterArrayDimension,
+    SOMEIPBaseParameterBasetype,
+    SOMEIPBaseParameterBitfield,
+    SOMEIPBaseParameterBitfieldItem,
+    SOMEIPBaseParameterEnumeration,
+    SOMEIPBaseParameterEnumerationItem,
+    SOMEIPBaseParameterString,
+    SOMEIPBaseParameterStruct,
+    SOMEIPBaseParameterStructMember,
+    SOMEIPBaseParameterTypedef,
+    SOMEIPBaseParameterUnion,
+    SOMEIPBaseParameterUnionMember,
+    SOMEIPBaseService,
+    SOMEIPBaseServiceEvent,
+    SOMEIPBaseServiceEventgroup,
+    SOMEIPBaseServiceEventgroupReceiver,
+    SOMEIPBaseServiceEventgroupSender,
+    SOMEIPBaseServiceField,
+    SOMEIPBaseServiceInstance,
+    SOMEIPBaseServiceInstanceClient,
+    SOMEIPBaseServiceMethod,
+    ip_to_key,
+    is_ip,
+    is_ip_mcast,
+    read_csv_to_dict,
+)
+from parser_dispatcher import (
+    is_file_or_dir_valid,
+    is_file_valid,
+    parse_input_files,
+    parser_formats,
+)
 
 
-class SimpleConfigurationFactory(BaseConfigurationFactory):
+class TextConfigurationFactory(BaseConfigurationFactory):
 
     def __init__(self):
-        self.__services__ = dict()
-        self.__services_long__ = dict()
-        self.__switches__ = dict()
-        self.__ecus__ = dict()
+        self.__services = dict()
+        self.__services_long = dict()
+        self.__switches = dict()
+        self.__ecus = dict()
 
-        self.__codings__ = dict()
-        self.__frame_triggerings__ = dict()
-        self.__frames__ = dict()
-        self.__pdus__ = dict()
-        self.__channels__ = dict()
+        self.__codings = dict()
+        self.__frame_triggerings = dict()
+        self.__frames = dict()
+        self.__pdus = dict()
+        self.__channels = dict()
 
-        self.__ipv4_netmasks__ = {}
-        self.__ipv6_prefix_lengths__ = {}
+        self.__ipv4_netmasks = {}
+        self.__ipv6_prefix_lengths = {}
 
     def create_switch(self, name, ecu, ports):
         ret = Switch(name, ecu, ports)
-        assert (name not in self.__switches__)
-        self.__switches__[name] = ret
+        assert (name not in self.__switches)
+        self.__switches[name] = ret
         return ret
 
-    def create_switch_port(self, portid, ctrl, port, default_vlan, vlans):
-        return SwitchPort(portid, ctrl, port, default_vlan, vlans)
+    def create_switch_port(self, port_id, ctrl, port, default_vlan, vlans):
+        return SwitchPort(port_id, ctrl, port, default_vlan, vlans)
 
     def create_ecu(self, name, controllers):
         ret = ECU(name, controllers)
-        assert (name not in self.__ecus__)
-        self.__ecus__[name] = ret
+        assert (name not in self.__ecus)
+        self.__ecus[name] = ret
         return ret
 
     def create_controller(self, name, interfaces):
         ret = Controller(name, interfaces)
         return ret
 
-    def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
-        ret = Interface(name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel)
-        channel = self.__channels__.setdefault(name, {})
+    def create_interface(self, name, vlan_id, ips, sockets, input_frame_triggerings, output_frame_triggerings, fr_channel):
+        ret = Interface(name, vlan_id, ips, sockets, input_frame_triggerings, output_frame_triggerings, fr_channel)
+        channel = self.__channels.setdefault(name, {})
         frame_triggerings = channel.setdefault("frametriggerings", {})
 
-        for key, value in input_frame_trigs.items():
+        for key, value in input_frame_triggerings.items():
             frame_triggerings[key] = value
-        for key, value in output_frame_trigs.items():
+        for key, value in output_frame_triggerings.items():
             frame_triggerings[key] = value
 
         return ret
 
-    def create_socket(self, name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
-                      eventgroupreceivers):
-        ret = Socket(name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
-                     eventgroupreceivers)
+    def create_socket(self, name, ip, proto, port_number, service_instances, service_instance_clients, event_handlers,
+                      event_group_receivers):
+        ret = Socket(name, ip, proto, port_number, service_instances, service_instance_clients, event_handlers,
+                     event_group_receivers)
         return ret
 
-    def create_someip_service_instance(self, service, instanceid, protover):
-        ret = SOMEIPServiceInstance(service, instanceid, protover)
+    def create_someip_service_instance(self, service, instance_id, protocol_version):
+        ret = SOMEIPServiceInstance(service, instance_id, protocol_version)
         return ret
 
-    def create_someip_service_instance_client(self, service, instanceid, protover, server):
-        ret = SOMEIPServiceInstanceClient(service, instanceid, protover, server)
+    def create_someip_service_instance_client(self, service, instance_id, protocol_version, server):
+        ret = SOMEIPServiceInstanceClient(service, instance_id, protocol_version, server)
         return ret
 
-    def create_someip_service_eventgroup_sender(self, serviceinstance, eventgroupid):
-        ret = SOMEIPServiceEventgroupSender(serviceinstance, eventgroupid)
+    def create_someip_service_eventgroup_sender(self, service_instance, eventgroup_id):
+        ret = SOMEIPServiceEventgroupSender(service_instance, eventgroup_id)
         return ret
 
-    def create_someip_service_eventgroup_receiver(self, serviceinstance, eventgroupid, sender):
-        ret = SOMEIPServiceEventgroupReceiver(serviceinstance, eventgroupid, sender)
+    def create_someip_service_eventgroup_receiver(self, service_instance, eventgroup_id, sender):
+        ret = SOMEIPServiceEventgroupReceiver(service_instance, eventgroup_id, sender)
         return ret
 
-    def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
-        ret = SOMEIPService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
-        print(f"Adding Service(Name: {name} ID: 0x{serviceid:04x} Ver: {majorver:d}.{minorver:d})")
-        self.add_service(serviceid, majorver, minorver, ret)
+    def create_someip_service(self, name, service_id, major_version, minor_version, methods, events, fields, eventgroups):
+        ret = SOMEIPService(name, service_id, major_version, minor_version, methods, events, fields, eventgroups)
+        print(f"Adding Service(Name: {name} ID: 0x{service_id:04x} Ver: {major_version:d}.{minor_version:d})")
+        self.add_service(service_id, major_version, minor_version, ret)
         return ret
 
-    def create_someip_service_method(self, name, methodid, calltype, relia, inparams, outparams,
-                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1, tlv=False):
-        ret = SOMEIPServiceMethod(name, methodid, calltype, relia, inparams, outparams,
-                                  reqdebounce, reqmaxretention, resmaxretention, tlv)
+    def create_someip_service_method(self, name, method_id, call_type, reliable, in_parameters, out_parameters,
+                                     request_debounce=-1, request_max_retention=-1, response_max_retention=-1, tlv=False):
+        ret = SOMEIPServiceMethod(name, method_id, call_type, reliable, in_parameters, out_parameters,
+                                  request_debounce, request_max_retention, response_max_retention, tlv)
         return ret
 
-    def create_someip_service_event(self, name, methodid, relia, params,
-                                    debounce=-1, maxretention=-1, tlv=False):
-        ret = SOMEIPServiceEvent(name, methodid, relia, params,
-                                 debounce, maxretention, tlv)
+    def create_someip_service_event(self, name, method_id, reliable, params,
+                                    debounce=-1, max_retention=-1, tlv=False):
+        ret = SOMEIPServiceEvent(name, method_id, reliable, params,
+                                 debounce, max_retention, tlv)
         return ret
 
-    def create_someip_service_field(self, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
+    def create_someip_service_field(self, name, getter_id, setter_id, notifier_id, getter_reliable, setter_reliable, notifier_reliable,
                                     params,
-                                    getter_debouncereq, getter_retentionreq, getter_retentionres,
-                                    setter_debouncereq, setter_retentionreq, setter_retentionres,
+                                    getter_debounce_request, getter_retention_request, getter_retention_response,
+                                    setter_debounce_request, setter_retention_request, setter_retention_response,
                                     notifier_debounce, notifier_retention, tlv=False):
-        ret = SOMEIPServiceField(self, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
+        ret = SOMEIPServiceField(self, name, getter_id, setter_id, notifier_id, getter_reliable, setter_reliable, notifier_reliable,
                                  params,
-                                 getter_debouncereq, getter_retentionreq, getter_retentionres,
-                                 setter_debouncereq, setter_retentionreq, setter_retentionres,
+                                 getter_debounce_request, getter_retention_request, getter_retention_response,
+                                 setter_debounce_request, setter_retention_request, setter_retention_response,
                                  notifier_debounce, notifier_retention, tlv)
         return ret
 
-    def create_someip_service_eventgroup(self, name, eid, eventids, fieldids):
-        ret = SOMEIPServiceEventgroup(name, eid, eventids, fieldids)
+    def create_someip_service_eventgroup(self, name, eid, event_ids, field_ids):
+        ret = SOMEIPServiceEventgroup(name, eid, event_ids, field_ids)
         return ret
 
-    def create_someip_parameter(self, position, name, desc, mandatory, datatype, signal):
-        ret = SOMEIPParameter(position, name, desc, mandatory, datatype, signal)
+    def create_someip_parameter(self, position, name, desc, mandatory, data_type, signal):
+        ret = SOMEIPParameter(position, name, desc, mandatory, data_type, signal)
         return ret
 
-    def create_someip_parameter_basetype(self, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
-        ret = SOMEIPParameterBasetype(name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type)
+    def create_someip_parameter_basetype(self, name, data_type, bigendian, bitlength_basetype, bitlength_encoded_type):
+        ret = SOMEIPParameterBasetype(name, data_type, bigendian, bitlength_basetype, bitlength_encoded_type)
         return ret
 
-    def create_someip_parameter_string(self, name, chartype, bigendian, lowerlimit, upperlimit, termination,
+    def create_someip_parameter_string(self, name, char_type, big_endian, lower_limit, upper_limit, termination,
                                        length_of_length, pad_to):
-        ret = SOMEIPParameterString(name, chartype, bigendian, lowerlimit, upperlimit, termination, length_of_length,
+        ret = SOMEIPParameterString(name, char_type, big_endian, lower_limit, upper_limit, termination, length_of_length,
                                     pad_to)
         return ret
 
@@ -150,8 +201,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterArray(name, dims, child)
         return ret
 
-    def create_someip_parameter_array_dim(self, dim, lowerlimit, upperlimit, length_of_length, pad_to):
-        ret = SOMEIPParameterArrayDim(dim, lowerlimit, upperlimit, length_of_length, pad_to)
+    def create_someip_parameter_array_dim(self, dim, lower_limit, upper_limit, length_of_length, pad_to):
+        ret = SOMEIPParameterArrayDim(dim, lower_limit, upper_limit, length_of_length, pad_to)
         return ret
 
     def create_someip_parameter_struct(self, name, length_of_length, pad_to, members, tlv=False):
@@ -190,35 +241,35 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterBitfieldItem(bit_number, name)
         return ret
 
-    def create_signal(self, id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen):
-        ret = Signal(id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen)
+    def create_signal(self, signal_id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen):
+        ret = Signal(signal_id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen)
         return ret
 
-    def create_signal_instance(self, id, signal_ref, bit_position, is_high_low_byte_order):
-        ret = SignalInstance(id, signal_ref, bit_position, is_high_low_byte_order)
+    def create_signal_instance(self, signal_instance_id, signal_ref, bit_position, is_high_low_byte_order):
+        ret = SignalInstance(signal_instance_id, signal_ref, bit_position, is_high_low_byte_order)
         return ret
 
-    def create_pdu(self, id, short_name, byte_length, pdu_type, signal_instances):
-        ret = PDU(id, short_name, byte_length, pdu_type, signal_instances)
+    def create_pdu(self, pdu_id, short_name, byte_length, pdu_type, signal_instances):
+        ret = PDU(pdu_id, short_name, byte_length, pdu_type, signal_instances)
 
-        if id in self.__pdus__:
-            print(f"WARNING: Creating PDU with existing ID {id}!")
+        if pdu_id in self.__pdus:
+            print(f"WARNING: Creating PDU with existing ID {pdu_id}!")
 
-        self.__pdus__[id] = ret
+        self.__pdus[pdu_id] = ret
         return ret
 
-    def create_multiplex_pdu(self, id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
-                            static_segs, static_pdu):
-        ret = MultiplexPDU(id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
-                           static_segs, static_pdu)
+    def create_multiplex_pdu(self, multiplexer_pdu_id, short_name, byte_length, pdu_type, switch, segment_position, pdu_instances,
+                             static_segments, static_pdu):
+        ret = MultiplexPDU(multiplexer_pdu_id, short_name, byte_length, pdu_type, switch, segment_position, pdu_instances,
+                           static_segments, static_pdu)
 
-        if id in self.__pdus__:
-            print(f"WARNING: Creating Multiplex PDU with existing ID {id}!")
-        self.__pdus__[id] = ret
+        if multiplexer_pdu_id in self.__pdus:
+            print(f"WARNING: Creating Multiplex PDU with existing ID {multiplexer_pdu_id}!")
+        self.__pdus[multiplexer_pdu_id] = ret
         return ret
 
-    def create_multiplex_switch(self, id, short_name, bit_position, is_high_low_byte_order, bit_length):
-        return MultiplexPDUSwitch(id, short_name, bit_position, is_high_low_byte_order, bit_length)
+    def create_multiplex_switch(self, multiplex_switch_id, short_name, bit_position, is_high_low_byte_order, bit_length):
+        return MultiplexPDUSwitch(multiplex_switch_id, short_name, bit_position, is_high_low_byte_order, bit_length)
 
     def create_multiplex_segment_position(self, bit_position, is_high_low_byte_order, bit_length):
         return MultiplexPDUSegmentPosition(bit_position, is_high_low_byte_order, bit_length)
@@ -226,86 +277,86 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def create_ethernet_pdu_instance(self, pdu_ref, header_id):
         return EthernetPDUInstance(pdu_ref, header_id)
 
-    def create_pdu_instance(self, id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position):
-        ret = PDUInstance(id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position)
+    def create_pdu_instance(self, pdu_instance_id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position):
+        ret = PDUInstance(pdu_instance_id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position)
         return ret
 
-    def create_frame(self, id, short_name, byte_length, frame_type, pdu_instances):
-        if short_name in self.__frames__:
+    def create_frame(self, frame_id, short_name, byte_length, frame_type, pdu_instances):
+        if short_name in self.__frames:
             i = 1
-            while i == 1 or tmp_name in self.__frames__:
-                tmp_name = f"{short_name}__duplicate{i}"
+
+            while f"{short_name}__duplicate{i}" in self.__frames:
                 i += 1
 
-            short_name = tmp_name
+            short_name = f"{short_name}__duplicate{i}"
 
-        assert (short_name not in self.__frames__)
+        assert (short_name not in self.__frames)
 
-        ret = Frame(id, short_name, byte_length, frame_type, pdu_instances)
-        self.__frames__[short_name] = ret
+        ret = Frame(frame_id, short_name, byte_length, frame_type, pdu_instances)
+        self.__frames[short_name] = ret
         return ret
 
-    def create_frame_triggering_can(self, id, frame_ref, can_id):
-        ret = FrameTriggeringCAN(id, frame_ref, can_id)
+    def create_frame_triggering_can(self, frame_trigger_id, frame_ref, can_id):
+        ret = FrameTriggeringCAN(frame_trigger_id, frame_ref, can_id)
 
-        self.__frame_triggerings__[id] = ret
+        self.__frame_triggerings[frame_trigger_id] = ret
         return ret
 
-    def create_frame_triggering_flexray(self, id, frame_ref, slot_id, cycle_counter, base_cycle, cycle_repetition):
-        ret = FrameTriggeringFlexRay(id, frame_ref, slot_id, cycle_counter, base_cycle, cycle_repetition)
+    def create_frame_triggering_flexray(self, frame_trigger_id, frame_ref, slot_id, cycle_counter, base_cycle, cycle_repetition):
+        ret = FrameTriggeringFlexRay(frame_trigger_id, frame_ref, slot_id, cycle_counter, base_cycle, cycle_repetition)
 
-        self.__frame_triggerings__[id] = ret
+        self.__frame_triggerings[frame_trigger_id] = ret
         return ret
 
     def add_service(self, serviceid, majorver, minorver, service):
         sid = f"{serviceid:04x}-{majorver:02x}-{minorver:08x}"
-        if sid in self.__services_long__:
+        if sid in self.__services_long:
             print(f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, " +
                   f"Minor-Ver: {minorver:d}) already exists! Not overriding it!")
             return False
 
-        self.__services_long__[sid] = service
+        self.__services_long[sid] = service
 
         sid = f"{serviceid:04x}-{majorver:02x}"
-        if sid in self.__services__:
+        if sid in self.__services:
             print(f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d})" +
                   f"already exists with a different Minor Version (not {minorver:d})! Not overriding it!")
             return False
 
-        self.__services__[sid] = service
+        self.__services[sid] = service
         return True
 
     def get_service(self, serviceid, majorver, minorver=None):
         if minorver is None:
             sid = f"{serviceid:04x}-{majorver:02x}"
-            if sid in self.__services__:
-                return self.__services__[sid]
+            if sid in self.__services:
+                return self.__services[sid]
             else:
                 return None
         else:
             sid = f"{serviceid:04x}-{majorver:02x}-{minorver:08x}"
-            if sid in self.__services_long__:
-                return self.__services_long__[sid]
+            if sid in self.__services_long:
+                return self.__services_long[sid]
             else:
                 return None
 
     def add_ipv4_address_config(self, ip, netmask):
-        self.__ipv4_netmasks__[ip] = netmask
+        self.__ipv4_netmasks[ip] = netmask
 
     def get_ipv4_netmask(self, ip):
         try:
-            return self.__ipv4_netmasks__.get(ip)
+            return self.__ipv4_netmasks.get(ip)
         except ValueError:
             return None
 
-    def add_ipv6_address_config(self, ip, prefixlen):
+    def add_ipv6_address_config(self, ip, prefix_len):
         tmp = ipaddress.ip_address(ip).exploded
-        self.__ipv6_prefix_lengths__[tmp] = prefixlen
+        self.__ipv6_prefix_lengths[tmp] = prefix_len
 
     def get_ipv6_prefix_length(self, ip):
         try:
             tmp = ipaddress.ip_address(ip).exploded
-            return self.__ipv6_prefix_lengths__.get(tmp)
+            return self.__ipv6_prefix_lengths.get(tmp)
         except ValueError:
             return None
 
@@ -320,32 +371,32 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def __str__(self):
         ret = "Services: \n"
-        for serviceid in sorted(self.__services__):
-            ret += self.__services__[serviceid].str(2)
+        for serviceid in sorted(self.__services):
+            ret += self.__services[serviceid].str(2)
 
         ret += "\nFrames: \n"
-        for name in sorted(self.__frames__):
-            ret += self.__frames__[name].str(2)
+        for name in sorted(self.__frames):
+            ret += self.__frames[name].str(2)
 
         ret += "\nPDUs: \n"
-        for name in sorted(self.__pdus__):
-            ret += self.__pdus__[name].str(2)
+        for name in sorted(self.__pdus):
+            ret += self.__pdus[name].str(2)
 
         ret += "\nECUs: \n"
-        for name in sorted(self.__ecus__):
-            ret += self.__ecus__[name].str(2, self)
+        for name in sorted(self.__ecus):
+            ret += self.__ecus[name].str(2, self)
 
         ret += "\nChannels/Busses/VLANs: \n"
-        for name in sorted(self.__channels__):
+        for name in sorted(self.__channels):
             ret += f"  Channel {name}:\n"
-            fts = self.__channels__[name]["frametriggerings"]
+            fts = self.__channels[name]["frametriggerings"]
             for key in sorted(fts):
                 ret += fts[key].str(4)
             ret += "\n"
 
         ret += "\nEthernet Topology: \n"
-        for name in sorted(self.__switches__):
-            ret += self.__switches__[name].str(2, self, print_ecu_name=True)
+        for name in sorted(self.__switches):
+            ret += self.__switches[name].str(2, self, print_ecu_name=True)
 
         return ret
 
@@ -353,9 +404,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 class Switch(BaseSwitch):
     def str(self, indent, factory, print_ecu_name=False):
         ret = indent * " "
-        tmp = f" of ECU {self.__ecu__.name()}" if self.__ecu__ is not None and print_ecu_name else ""
-        ret += f"Switch {self.__name__}{tmp}\n"
-        for port in self.__ports__:
+        tmp = f" of ECU {self.ecu().name()}" if self.ecu() is not None and print_ecu_name else ""
+        ret += f"Switch {self.name()}{tmp}\n"
+        for port in self.ports():
             ret += port.str(indent + 2, factory)
         return ret
 
@@ -366,23 +417,23 @@ class SwitchPort(BaseSwitchPort):
 
         for vlan in self.vlans_objs():
             ret += indent * " "
-            ret += f"VLAN (ID: {vlan.vlanid_str()}, Prio: {vlan.priority()})\n"
+            ret += f"VLAN (ID: {vlan.vlan_id_str()}, Prio: {vlan.priority()})\n"
 
         return ret
 
     def str(self, indent, factory):
         ret = indent * " "
         ret += f"SwitchPort {self.portid(gen_name=g_gen_portid)} <-> "
-        if self.__port__ is not None:
-            tmp = f"of {self.__port__.switch().name()}" if self.__port__.switch() is not None else ""
-            ret += f"SwitchPort {self.__port__.portid(gen_name=g_gen_portid)} {tmp}\n"
-        elif self.__ctrl__ is not None:
-            ret += f"Controller {self.__ctrl__.name()} of {self.__ctrl__.ecu().name()}\n"
+        if self.port() is not None:
+            tmp = f"of {self.port().switch().name()}" if self.port().switch() is not None else ""
+            ret += f"SwitchPort {self.port().portid(gen_name=g_gen_portid)} {tmp}\n"
+        elif self.controller() is not None:
+            ret += f"Controller {self.controller().name()} of {self.controller().ecu().name()}\n"
         else:
             ret += "\n"
 
         ret += (indent + 2) * " "
-        ret += f"VLANs:\n"
+        ret += "VLANs:\n"
         ret += self.str_vlans(indent + 4)
         return ret
 
@@ -390,12 +441,12 @@ class SwitchPort(BaseSwitchPort):
 class ECU(BaseECU):
     def str(self, indent, factory):
         ret = indent * " "
-        ret += f"ECU {self.__name__}\n"
+        ret += f"ECU {self.name()}\n"
 
-        for c in sorted(self.__controllers__, key=lambda x: x.name()):
+        for c in sorted(self.controllers(), key=lambda x: x.name()):
             ret += c.str(indent + 2, factory)
 
-        for s in sorted(self.__switches__, key=lambda x: x.name()):
+        for s in sorted(self.switches(), key=lambda x: x.name()):
             ret += s.str(indent + 2, factory)
 
         return ret
@@ -404,8 +455,8 @@ class ECU(BaseECU):
 class Controller(BaseController):
     def str(self, indent, factory):
         ret = indent * " "
-        ret += f"CTRL {self.__name__}\n"
-        for i in self.__interfaces__:
+        ret += f"CTRL {self.name()}\n"
+        for i in self.interfaces():
             ret += i.str(indent + 2, factory)
 
         return ret
@@ -415,30 +466,30 @@ class Interface(BaseInterface):
     def str(self, indent, factory):
         ret = indent * " "
 
-        if self.__vlanid__ == 0:
-            vlanstr = ""
+        if self.vlan_id() == 0:
+            vlan_str = ""
         else:
-            vlanstr = f" (VLAN-ID: 0x{self.__vlanid__:x})"
-        ret += f"Interface/Channel {self.__vlanname__}{vlanstr}\n"
+            vlan_str = f" (VLAN-ID: 0x{self.vlan_id():x})"
+        ret += f"Interface/Channel {self.vlan_name()}{vlan_str}\n"
         for ip in sorted(self.ips(), key=lambda x: ip_to_key(x)):
             if is_ip(ip) and not is_ip_mcast(ip):
                 ret += (indent + 2) * " "
                 ret += f"IP: {ip}{factory.get_ipv4_netmask_or_ipv6_prefix_length(ip)}\n"
 
-        for s in self.__sockets__:
+        for s in self.sockets():
             ret += s.str(indent + 2)
 
-        if self.__frame_triggerings_in__ is not None and len(self.__frame_triggerings_in__.keys()) > 0:
+        if self.frame_triggerings_in() is not None and len(self.frame_triggerings_in().keys()) > 0:
             ret += (indent + 2) * " "
             ret += "Input Frames:\n"
-            for key in sorted(self.__frame_triggerings_in__.keys()):
-                ret += self.__frame_triggerings_in__[key].str(indent + 4)
+            for key in sorted(self.frame_triggerings_in().keys()):
+                ret += self.frame_triggerings_in()[key].str(indent + 4)
 
-        if self.__frame_triggerings_out__ is not None and len(self.__frame_triggerings_out__.keys()) > 0:
+        if self.frame_triggerings_out() is not None and len(self.frame_triggerings_out().keys()) > 0:
             ret += (indent + 2) * " "
             ret += "Output Frames:\n"
-            for key in sorted(self.__frame_triggerings_out__.keys()):
-                ret += self.__frame_triggerings_out__[key].str(indent + 4)
+            for key in sorted(self.frame_triggerings_out().keys()):
+                ret += self.frame_triggerings_out()[key].str(indent + 4)
 
         return ret
 
@@ -446,24 +497,24 @@ class Interface(BaseInterface):
 class Socket(BaseSocket):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Socket {self.__name__} {self.__ip__}:{self.__portnumber__}/{self.__proto__}\n"
-        for i in self.__instances__:
+        ret += f"Socket {self.name()} {self.ip()}:{self.port_number()}/{self.protocol()}\n"
+        for i in self.instances():
             ret += i.str(indent + 2)
-        for i in self.__instanceclients__:
+        for i in self.service_instance_clients():
             ret += i.str(indent + 2)
-        for c in self.__ehs__:
+        for c in self.event_handlers():
             ret += c.str(indent + 2)
-        for c in self.__cegs__:
+        for c in self.event_group_receivers():
             ret += c.str(indent + 2)
 
-        if len(self.__pdus_in__) > 0:
+        if len(self.incoming_pdus()) > 0:
             ret += (indent + 2) * " " + "PDUs in:\n"
-            for p in sorted(self.__pdus_in__, key=lambda x: x.header_id()):
+            for p in sorted(self.incoming_pdus(), key=lambda x: x.header_id()):
                 ret += p.str(indent + 4, show_signals=False)
 
-        if len(self.__pdus_out__) > 0:
+        if len(self.outgoing_pdus()) > 0:
             ret += (indent + 2) * " " + "PDUs out:\n"
-            for p in sorted(self.__pdus_out__, key=lambda x: x.header_id()):
+            for p in sorted(self.outgoing_pdus(), key=lambda x: x.header_id()):
                 ret += p.str(indent + 4, show_signals=False)
 
         return ret
@@ -472,57 +523,57 @@ class Socket(BaseSocket):
 class SOMEIPServiceInstance(SOMEIPBaseServiceInstance):
     def str(self, indent):
         ret = indent * " "
-        ret += f"ServiceInstance Service-ID: 0x{self.__service__.serviceid():04x} "
-        ret += f"Version: {self.__service__.versionstring()} "
-        ret += f"Instance-ID: 0x{self.__instanceid__:04x} "
-        ret += f"Protover: {self.__protover__:d}\n"
+        ret += f"ServiceInstance Service-ID: 0x{self.service().service_id():04x} "
+        ret += f"Version: {self.service().version_string()} "
+        ret += f"Instance-ID: 0x{self.instance_id():04x} "
+        ret += f"Protover: {self.protocol_version():d}\n"
         return ret
 
 
 class SOMEIPServiceInstanceClient(SOMEIPBaseServiceInstanceClient):
     def str(self, indent):
         ret = indent * " "
-        ret += f"ServiceInstanceClient Service-ID: 0x{self.__service__.serviceid():04x} "
-        ret += f"Version: {self.__service__.versionstring()} "
-        ret += f"Instance-ID: 0x{self.__instanceid__:04x} "
-        ret += f"Protover: {self.__protover__:d}\n"
+        ret += f"ServiceInstanceClient Service-ID: 0x{self.service().service_id():04x} "
+        ret += f"Version: {self.service().version_string()} "
+        ret += f"Instance-ID: 0x{self.instance_id():04x} "
+        ret += f"Protover: {self.protocol_version():d}\n"
         return ret
 
 
 class SOMEIPServiceEventgroupSender(SOMEIPBaseServiceEventgroupSender):
     def str(self, indent):
         ret = indent * " "
-        ret += f"EventgroupSender: Service-ID: 0x{self.__si__.service().serviceid():04x} "
-        ret += f"Instance-ID: 0x{self.__si__.instanceid():04x} "
-        ret += f"Eventgroup-ID: 0x{self.__eventgroupid__:04x}\n"
+        ret += f"EventgroupSender: Service-ID: 0x{self.service_instance().service().service_id():04x} "
+        ret += f"Instance-ID: 0x{self.service_instance().instance_id():04x} "
+        ret += f"Eventgroup-ID: 0x{self.eventgroup_id():04x}\n"
         return ret
 
 
 class SOMEIPServiceEventgroupReceiver(SOMEIPBaseServiceEventgroupReceiver):
     def str(self, indent):
         ret = indent * " "
-        ret += f"EventgroupReceiver: Service-ID: 0x{self.__si__.service().serviceid():04x} "
-        ret += f"Instance-ID: 0x{self.__si__.instanceid():04x} "
-        ret += f"Eventgroup-ID: 0x{self.__eventgroupid__:04x}\n"
+        ret += f"EventgroupReceiver: Service-ID: 0x{self.service_instance().service().service_id():04x} "
+        ret += f"Instance-ID: 0x{self.service_instance().instance_id():04x} "
+        ret += f"Eventgroup-ID: 0x{self.eventgroup_id():04x}\n"
         return ret
 
 
 class SOMEIPService(SOMEIPBaseService):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Service {self.__name__} (id: 0x{self.__serviceid__:04x} ver: {self.__major__:d}.{self.__minor__:d})\n"
+        ret += f"Service {self.name()} (id: 0x{self.service_id():04x} ver: {self.major_version():d}.{self.minor_version():d})\n"
 
-        for methodid in sorted(self.__methods__):
-            ret += self.__methods__[methodid].str(indent + 2)
+        for method_id in sorted(self.methods().keys()):
+            ret += self.method(method_id).str(indent + 2)
 
-        for eventsid in sorted(self.__events__):
-            ret += self.__events__[eventsid].str(indent + 2)
+        for event_id in sorted(self.events().keys()):
+            ret += self.event(event_id).str(indent + 2)
 
-        for fieldid in sorted(self.__fields__, key=lambda x: (x is None, x)):
-            ret += self.__fields__[fieldid].str(indent + 2)
+        for field_id in sorted(self.fields().keys(), key=lambda x: (x is None, x)):
+            ret += self.field(field_id).str(indent + 2)
 
-        for egid in sorted(self.__eventgroups__):
-            ret += self.__eventgroups__[egid].str(indent + 2)
+        for eg_id in sorted(self.eventgroups().keys()):
+            ret += self.eventgroup(eg_id).str(indent + 2)
 
         return ret
 
@@ -530,26 +581,26 @@ class SOMEIPService(SOMEIPBaseService):
 class SOMEIPServiceMethod(SOMEIPBaseServiceMethod):
     def str(self, indent):
         extra = ""
-        if self.__reqdebouncetime__ >= 0:
-            extra += f" debounce:{str(self.__reqdebouncetime__)}s"
-        if self.__reqretentiontime___ >= 0:
-            extra += f" max_request_retention:{str(self.__reqretentiontime___)}s"
-        if self.__resretentiontime___ >= 0:
-            extra += f" max_response_retention:{str(self.__resretentiontime___)}s"
+        if self.debounce_time_req() >= 0:
+            extra += f" debounce:{str(self.debounce_time_req())}s"
+        if self.max_buffer_retention_time_req() >= 0:
+            extra += f" max_request_retention:{str(self.max_buffer_retention_time_req())}s"
+        if self.max_buffer_retention_time_res() >= 0:
+            extra += f" max_response_retention:{str(self.max_buffer_retention_time_res())}s"
 
-        extra += ' TLV' if self.__tlv__ else ''
+        extra += ' TLV' if self.tlv() else ''
         ret = indent * " "
-        ret += f"Method {self.__name__} (id:0x{self.__methodid__:04x} type:{self.__calltype__} " + \
-               f"reli:{self.__reliable__}{extra})\n"
+        ret += f"Method {self.name()} (id:0x{self.method_id():04x} type:{self.call_type()} " + \
+               f"reli:{self.reliable()}{extra})\n"
 
         ret += (indent + 2) * " "
         ret += "In Parameters: \n"
-        for param in self.__inparams__:
+        for param in self.in_parameters():
             ret += param.str(indent + 4)
 
         ret += (indent + 2) * " "
         ret += "Out Parameters: \n"
-        for param in self.__outparams__:
+        for param in self.out_parameters():
             ret += param.str(indent + 4)
 
         return ret
@@ -558,19 +609,19 @@ class SOMEIPServiceMethod(SOMEIPBaseServiceMethod):
 class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
     def str(self, indent):
         extra = ""
-        if self.__debouncetime__ >= 0:
-            extra += f" debounce:{str(self.__debouncetime__)}s"
-        if self.__retentiontime___ >= 0:
-            extra += f" max_retention:{str(self.__retentiontime___)}s"
+        if self.debounce_time() >= 0:
+            extra += f" debounce:{str(self.debounce_time())}s"
+        if self.max_buffer_retention_time() >= 0:
+            extra += f" max_retention:{str(self.max_buffer_retention_time())}s"
 
         ret = indent * " "
-        extra += ', TLV:True' if self.__tlv__ else ''
+        extra += ', TLV:True' if self.tlv() else ''
         if self.legacy():
-            ret += f"Event {self.__name__} (id:0x{self.__methodid__:04x} reli:{self.__reliable__}{extra}, Legacy PDU)\n"
+            ret += f"Event {self.name()} (id:0x{self.method_id():04x} reli:{self.reliable()}{extra}, Legacy PDU)\n"
         else:
-            ret += f"Event {self.__name__} (id:0x{self.__methodid__:04x} reli:{self.__reliable__}{extra})\n"
+            ret += f"Event {self.name()} (id:0x{self.method_id():04x} reli:{self.reliable()}{extra})\n"
 
-        for param in self.__params__:
+        for param in self.params():
             ret += param.str(indent + 2)
 
         return ret
@@ -583,46 +634,49 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
             legacy = ", Legacy PDU"
 
         ret = indent * " "
-        ret += f"Field {self.__name__}{' TLV' if self.__tlv__ else ''}\n"
+        ret += f"Field {self.name()}{' TLV' if self.tlv() else ''}\n"
 
         indent += 2
-        if self.__getter__ is not None:
+        if self.getter() is not None:
+            getter = self.getter()
             extra = ""
-            if self.__getter__.debounce_time_req() >= 0:
-                extra += f" debounce:{str(self.__getter__.debounce_time_req())}s"
-            if self.__getter__.max_buffer_retention_time_req() >= 0:
-                extra += f" max_request_retention:{str(self.__getter__.max_buffer_retention_time_req())}s"
-            if self.__getter__.max_buffer_retention_time_res() >= 0:
-                extra += f" max_response_retention:{str(self.__getter__.max_buffer_retention_time_res())}s"
+            if getter.debounce_time_req() >= 0:
+                extra += f" debounce:{str(getter.debounce_time_req())}s"
+            if getter.max_buffer_retention_time_req() >= 0:
+                extra += f" max_request_retention:{str(getter.max_buffer_retention_time_req())}s"
+            if getter.max_buffer_retention_time_res() >= 0:
+                extra += f" max_response_retention:{str(getter.max_buffer_retention_time_res())}s"
 
             ret += indent * " "
-            ret += f"Getter(id:0x{self.__getter__.methodid():04x} reli:{self.__getter__.reliable()}{extra}{legacy})\n"
+            ret += f"Getter(id:0x{getter.method_id():04x} reli:{getter.reliable()}{extra}{legacy})\n"
 
-        if self.__setter__ is not None:
+        if self.setter() is not None:
+            setter = self.setter()
             extra = ""
-            if self.__setter__.debounce_time_req() >= 0:
-                extra += f" debounce:{str(self.__setter__.debounce_time_req())}s"
-            if self.__setter__.max_buffer_retention_time_req() >= 0:
-                extra += f" max_request_retention:{str(self.__setter__.max_buffer_retention_time_req())}s"
-            if self.__setter__.max_buffer_retention_time_res() >= 0:
-                extra += f" max_response_retention:{str(self.__setter__.max_buffer_retention_time_res())}s"
+            if setter.debounce_time_req() >= 0:
+                extra += f" debounce:{str(setter.debounce_time_req())}s"
+            if setter.max_buffer_retention_time_req() >= 0:
+                extra += f" max_request_retention:{str(setter.max_buffer_retention_time_req())}s"
+            if setter.max_buffer_retention_time_res() >= 0:
+                extra += f" max_response_retention:{str(setter.max_buffer_retention_time_res())}s"
 
             ret += indent * " "
-            ret += f"Setter(id:0x{self.__setter__.methodid():04x} reli:{self.__setter__.reliable()}{extra}{legacy})\n"
+            ret += f"Setter(id:0x{setter.method_id():04x} reli:{setter.reliable()}{extra}{legacy})\n"
 
-        if self.__notifier__ is not None:
+        if self.notifier() is not None:
+            notifier = self.notifier()
             extra = ""
-            if self.__notifier__.__debouncetime__ >= 0:
-                extra += f" debounce:{str(self.__notifier__.debounce_time())}s"
-            if self.__notifier__.__retentiontime___ >= 0:
-                extra += f" max_retention:{str(self.__notifier__.max_buffer_retention_time())}s"
+            if notifier.debounce_time() >= 0:
+                extra += f" debounce:{str(notifier.debounce_time())}s"
+            if notifier.max_buffer_retention_time() >= 0:
+                extra += f" max_retention:{str(notifier.max_buffer_retention_time())}s"
             ret += indent * " "
-            ret += f"Notifier(id:0x{self.__notifier__.methodid():04x} reli:{self.__notifier__.reliable()}{extra}" \
+            ret += f"Notifier(id:0x{notifier.method_id():04x} reli:{notifier.reliable()}{extra}" \
                    f"{legacy})\n"
 
         ret += indent * " "
         ret += "Parameters:\n"
-        for param in self.__params__:
+        for param in self.params():
             if param is not None:
                 ret += param.str(indent + 2)
 
@@ -632,13 +686,13 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
 class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Eventgroup {self.__name__} (id: 0x{self.__id__:04x})\n"
+        ret += f"Eventgroup {self.name()} (id: 0x{self.eventgroup_id():04x})\n"
 
-        if len(self.__eventids__) > 0:
+        if len(self.event_ids()) > 0:
             ret += (2 + indent) * " "
             ret += "Events: "
             first = True
-            for eid in self.__eventids__:
+            for eid in self.event_ids():
                 if not first:
                     ret += ", "
                 else:
@@ -646,11 +700,11 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
                 ret += f"0x{eid:04x}"
             ret += "\n"
 
-        if len(self.__fieldids__) > 0:
+        if len(self.field_ids()) > 0:
             ret += (2 + indent) * " "
             ret += "Notifiers: "
             first = True
-            for fid in self.__fieldids__:
+            for fid in self.field_ids():
                 if not first:
                     ret += ", "
                 else:
@@ -664,72 +718,72 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
 class SOMEIPParameter(SOMEIPBaseParameter):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Parameter {self.__position__:d} {self.__name__} (mandatory: {self.__mandatory__})\n"
-        if self.__datatype__ is None:
+        ret += f"Parameter {self.position():d} {self.name()} (mandatory: {self.mandatory()})\n"
+        if self.data_type() is None:
             ret += f"{(indent + 2) * ' '}None\n"
         else:
-            ret += self.__datatype__.str(indent + 2)
-        if self.__signal__ is not None:
-            ret += self.__signal__.str(indent + 2)
+            ret += self.data_type().str(indent + 2)
+        if self.signal() is not None:
+            ret += self.signal().str(indent + 2)
         return ret
 
 
 class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
     def str(self, indent):
         endian = "BE"
-        if not self.__bigendian__:
+        if not self.big_endian():
             endian = "LE"
 
         ret = indent * " "
-        ret += f"{self.__name__} {self.__datatype__} {endian} ({self.__bitlength_basetype__:d};" + \
-               f"{self.__bitlength_encoded_type__:d})\n"
+        ret += f"{self.name()} {self.data_type()} {endian} ({self.bit_length_base_type():d};" + \
+               f"{self.bit_length_encoded_type():d})\n"
         return ret
 
 
 class SOMEIPParameterString(SOMEIPBaseParameterString):
     def str(self, indent):
         endian = "BE"
-        if not self.__bigendian__:
+        if not self.big_endian():
             endian = "LE"
 
         ret = indent * " "
-        ret += f"String {self.__name__} {self.__chartype__} {endian} ({self.__lowerlimit__:d};" + \
-               f"{self.__upperlimit__:d}) term: {self.__termination__} " + \
-               f"len: {self.__lengthOfLength__:d} pad: {self.__padTo__:d}\n"
+        ret += f"String {self.name()} {self.char_type()} {endian} ({self.lower_limit():d};" + \
+               f"{self.upper_limit():d}) term: {self.termination} " + \
+               f"len: {self.length_of_length():d} pad: {self.pad_to():d}\n"
         return ret
 
 
 class SOMEIPParameterArray(SOMEIPBaseParameterArray):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Array {self.__name__}:\n"
-        for dim in self.__dims__:
-            ret += self.__dims__[dim].str(indent + 2)
-        if self.__child__ is None:
+        ret += f"Array {self.name()}:\n"
+        for dim in self.dimensions():
+            ret += self.dimensions()[dim].str(indent + 2)
+        if self.child() is None:
             ret += f"{(indent + 2) * ' '}None\n"
         else:
-            ret += self.__child__.str(indent + 2)
+            ret += self.child().str(indent + 2)
 
         return ret
 
 
-class SOMEIPParameterArrayDim(SOMEIPBaseParameterArrayDim):
+class SOMEIPParameterArrayDim(SOMEIPBaseParameterArrayDimension):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Dimension {self.__dim__:d} [{self.__lowerlimit__:d}-{self.__upperlimit__:d}] " + \
-               f"lengthOfLength: {self.__lengthOfLength__:d} padding: {self.__padTo__:d}\n"
+        ret += f"Dimension {self.dimension():d} [{self.lower_limit():d}-{self.upper_limit():d}] " + \
+               f"lengthOfLength: {self.length_of_length():d} padding: {self.pad_to():d}\n"
         return ret
 
 
 class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
     def str(self, indent):
         ret = indent * " "
-        tlv = ' (TLV: True)' if self.__tlv__ else ''
+        tlv = ' (TLV: True)' if self.tlv() else ''
 
-        ret += f"Struct {self.__name__}{tlv}:\n"
-        if self.__members__ is not None:
-            for m in sorted(self.__members__.keys()):
-                member = self.__members__[m]
+        ret += f"Struct {self.name()}{tlv}:\n"
+        if self.members() is not None:
+            for m in sorted(self.members().keys()):
+                member = self.members()[m]
                 if member is not None:
                     ret += member.str(indent + 2)
                 else:
@@ -741,12 +795,12 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
 class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
     def str(self, indent):
         ret = indent * " "
-        ret += f"{self.__position__:d} {self.__name__} (mandatory: {self.__mandatory__})\n"
+        ret += f"{self.position():d} {self.name()} (mandatory: {self.mandatory()})\n"
 
-        if self.__child__ is not None:
-            ret += self.__child__.str(indent + 2)
-        if self.__signal__ is not None:
-            ret += self.__signal__.str(indent + 2)
+        if self.child() is not None:
+            ret += self.child().str(indent + 2)
+        if self.signal() is not None:
+            ret += self.signal().str(indent + 2)
 
         return ret
 
@@ -754,18 +808,18 @@ class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
 class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Typedef: {self.__name__} {self.__name2__}\n"
-        if self.__child__ is not None:
-            ret += self.__child__.str(indent + 2)
+        ret += f"Typedef: {self.name()} {self.name2()}\n"
+        if self.child() is not None:
+            ret += self.child().str(indent + 2)
         return ret
 
 
 class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Enumeration {self.__name__}\n"
-        ret += self.__child__.str(indent + 2)
-        for i in self.__items__:
+        ret += f"Enumeration {self.name()}\n"
+        ret += self.child().str(indent + 2)
+        for i in self.items():
             ret += i.str(indent + 2)
         return ret
 
@@ -773,17 +827,17 @@ class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
 class SOMEIPParameterEnumerationItem(SOMEIPBaseParameterEnumerationItem):
     def str(self, indent):
         ret = indent * " "
-        ret += f"{self.__value__}: {self.__name__}\n"
+        ret += f"{self.value()}: {self.name()}\n"
         return ret
 
 
 class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Union {self.__name__}:\n"
-        if self.__members__ is not None:
-            for m in sorted(self.__members__.keys()):
-                member = self.__members__[m]
+        ret += f"Union {self.name()}:\n"
+        if self.members() is not None:
+            for m in sorted(self.members().keys()):
+                member = self.members()[m]
                 if member is not None:
                     ret += member.str(indent + 2)
                 else:
@@ -796,10 +850,10 @@ class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
     def str(self, indent):
         ret = indent * " "
 
-        ret += f"{self.__index__:d} {self.__name__} (mandatory: {self.__mandatory__})\n"
+        ret += f"{self.index():d} {self.name()} (mandatory: {self.mandatory()})\n"
 
-        if self.__child__ is not None:
-            ret += self.__child__.str(indent + 2)
+        if self.child() is not None:
+            ret += self.child().str(indent + 2)
 
         return ret
 
@@ -807,9 +861,9 @@ class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
 class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Bitfield {self.__name__}\n"
-        ret += self.__child__.str(indent + 2)
-        for i in self.__items__:
+        ret += f"Bitfield {self.name()}\n"
+        ret += self.child().str(indent + 2)
+        for i in self.items():
             ret += i.str(indent + 2)
         return ret
 
@@ -817,7 +871,7 @@ class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
 class SOMEIPParameterBitfieldItem(SOMEIPBaseParameterBitfieldItem):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Bit {self.__bit_number__}: {self.__name__}\n"
+        ret += f"Bit {self.bit_number()}: {self.name()}\n"
         return ret
 
 
@@ -828,31 +882,31 @@ class Signal(BaseSignal):
         else:
             ret = ""
 
-        ret += f"Signal {self.__name__}"
+        ret += f"Signal {self.name()}"
         if show_basetype:
-            ret += f" [{self.__basetype__}]"
-        if self.__compu_scale__ is not None and len(self.__compu_scale__) == 3:
-            ret += f", f(x) = {self.__compu_scale__[1]}/{self.__compu_scale__[2]} * x + {self.__compu_scale__[0]}"
-        if self.__compu_consts__ is not None and len(self.__compu_consts__) > 0:
-            ret += f", Consts: "
+            ret += f" [{self.base_type()}]"
+        if self.compu_scale() is not None and len(self.compu_scale()) == 3:
+            ret += f", f(x) = {self.compu_scale()[1]}/{self.compu_scale()[2]} * x + {self.compu_scale()[0]}"
+        if self.compu_consts() is not None and len(self.compu_consts()) > 0:
+            ret += ", Consts: "
             first = True
-            for name, start, end in self.__compu_consts__:
+            for name, start, end in self.compu_consts():
                 if first:
                     first = False
                 else:
                     ret += ", "
                 ret += f"{name} ({start}-{end})"
-            ret += f" "
+            ret += " "
         return ret + "\n"
 
 
 class Frame(BaseFrame):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Frame {self.__short_name__}\n"
+        ret += f"Frame {self.short_name()}\n"
 
-        for p in self.__pdu_instances__.keys():
-            ret += self.__pdu_instances__[p].str(indent + 2)
+        for p in self.pdu_instances().keys():
+            ret += self.pdu_instances()[p].str(indent + 2)
 
         return ret
 
@@ -864,7 +918,7 @@ class PDU(BasePDU):
         else:
             ret = ""
 
-        ret += f"PDU {self.__short_name__} ({self.__pdu_type__})\n"
+        ret += f"PDU {self.short_name()} ({self.pdu_type()})\n"
 
         if show_signals:
             for sig_inst in self.signal_instances_sorted_by_bit_position():
@@ -880,16 +934,16 @@ class MultiplexPDU(BaseMultiplexPDU):
         else:
             ret = ""
 
-        ret += f"MUX-PDU {self.__short_name__} ({self.__pdu_type__})\n"
-        ret += self.__switch__.str(indent + 2)
+        ret += f"MUX-PDU {self.short_name()} ({self.pdu_type()})\n"
+        ret += self.switch().str(indent + 2)
 
         dyn_seg_start = 0
-        for seg in self.__segment_positions__:
+        for seg in self.segment_positions():
             ret += seg.str(indent + 2, prefix="Dynamic")
             dyn_seg_start = seg.bit_position()
 
-        for switch_code in sorted(self.__pdu_instances__):
-            pdu = self.__pdu_instances__[switch_code]
+        for switch_code in sorted(self.pdu_instances()):
+            pdu = self.pdu_instances()[switch_code]
             pdu_str = pdu.str(indent + 4, indent_first_line=False, start_offset=dyn_seg_start) \
                       if pdu is not None else "PDU NOT FOUND!\n"
 
@@ -897,14 +951,14 @@ class MultiplexPDU(BaseMultiplexPDU):
             ret += f"[Switch Code: {switch_code}]: {pdu_str}"
 
         static_seg_start = 0
-        if self.__static_segments__ is not None:
-            for seg in self.__static_segments__:
+        if self.static_segments() is not None:
+            for seg in self.static_segments():
                 ret += seg.str(indent + 2, prefix="Static")
                 static_seg_start = seg.bit_position()
 
-        if self.__static_pdu__ is not None:
-            pdu_str = self.__static_pdu__.str(indent + 4, indent_first_line=False, start_offset=static_seg_start)\
-                      if self.__static_pdu__ is not None else "PDU NOT FOUND!\n"
+        if self.static_pdu() is not None:
+            pdu_str = self.static_pdu().str(indent + 4, indent_first_line=False, start_offset=static_seg_start)\
+                      if self.static_pdu() is not None else "PDU NOT FOUND!\n"
 
             ret += (indent + 4) * " "
             ret += f"[Static PDU] {pdu_str}"
@@ -920,9 +974,10 @@ class MultiplexPDUSwitch(BaseMultiplexPDUSwitch):
         else:
             ret = ""
 
-        end_bit = self.__bit_position__ + self.__bit_length__ - 1
-        high_low = "high low byte order" if self.__is_high_low_byte_order__ else "low high byte order"
-        ret += f"[Bit pos.: {self.__bit_position__}..{end_bit}] Switch {self.__short_name__} {self.__bit_length__} bits ({high_low})  \n"
+        end_bit = self.bit_position() + self.bit_length() - 1
+        high_low = "high low byte order" if self.is_high_low_byte_order() else "low high byte order"
+        ret += (f"[Bit pos.: {self.bit_position()}..{end_bit}] "
+                f"Switch {self.short_name()} {self.bit_length()} bits ({high_low})  \n")
 
         return ret
 
@@ -934,10 +989,10 @@ class MultiplexPDUSegmentPosition(BaseMultiplexPDUSegmentPosition):
         else:
             ret = ""
 
-        end_bit = self.__bit_position__ + self.__bit_length__ - 1
-        high_low = "high low byte order" if self.__is_high_low_byte_order__ else "low high byte order"
-        ret += f"[Bit pos.: {self.__bit_position__}..{end_bit}] " \
-               f"{prefix} Segment {self.__bit_length__} bits ({high_low})  \n"
+        end_bit = self.bit_position() + self.bit_length() - 1
+        high_low = "high low byte order" if self.is_high_low_byte_order() else "low high byte order"
+        ret += f"[Bit pos.: {self.bit_position()}..{end_bit}] " \
+               f"{prefix} Segment {self.bit_length()} bits ({high_low})  \n"
 
         return ret
 
@@ -945,11 +1000,11 @@ class MultiplexPDUSegmentPosition(BaseMultiplexPDUSegmentPosition):
 class EthernetPDUInstance(BaseEthernetPDUInstance):
     def str(self, indent, show_signals=False):
         ret = indent * " "
-        ret += f"{hex(self.__header_id__)}: "
-        if self.__pdu__ is None:
+        ret += f"{hex(self.header_id())}: "
+        if self.pdu() is None:
             ret += "\n"
         else:
-            ret += self.__pdu__.str(indent + 2, indent_first_line=False, show_signals=show_signals)
+            ret += self.pdu().str(indent + 2, indent_first_line=False, show_signals=show_signals)
 
         return ret
 
@@ -957,30 +1012,30 @@ class EthernetPDUInstance(BaseEthernetPDUInstance):
 class PDUInstance(BasePDUInstance):
     def str(self, indent):
         ret = indent * " "
-        end_bit = self.__bit_position__ + 8 * self.__pdu__.byte_length() - 1
-        ret += f"[Bit pos.: {self.__bit_position__}..{end_bit}] "
+        end_bit = self.bit_position() + 8 * self.pdu().byte_length() - 1
+        ret += f"[Bit pos.: {self.bit_position()}..{end_bit}] "
 
-        if self.__pdu__ is not None:
-            ret += self.__pdu__.str(indent + 2, indent_first_line=False)
+        if self.pdu() is not None:
+            ret += self.pdu().str(indent + 2, indent_first_line=False)
         else:
-            ret += f" *** missing PDU ***\n"
+            ret += " *** missing PDU ***\n"
 
         return ret
 
 
 class SignalInstance(BaseSignalInstance):
     def str(self, indent, start_offset=0):
-        bit_length = self.__signal__.bit_length()
+        bit_length = self.signal().bit_length()
         ret = indent * " "
 
-        bit_start = int(self.__bit_position__) + start_offset
+        bit_start = int(self.bit_position()) + start_offset
 
         if bit_length == -1:
             ret += f"[Bit pos.: {bit_start}] "
         else:
             bit_end = bit_start + bit_length - 1
             ret += f"[Bit pos.: {bit_start}..{bit_end}] "
-        ret += self.__signal__.str(indent + 2, indent_first_line=False, show_basetype=True)
+        ret += self.signal().str(indent + 2, indent_first_line=False, show_basetype=True)
         return ret
 
 
@@ -988,10 +1043,9 @@ class FrameTriggeringCAN(BaseFrameTriggeringCAN):
     def str(self, indent):
         ret = indent * " "
 
-        frame = self.__frame__.name() if self.__frame__ is not None else "undefined"
-        frame_id = self.__frame__.id() if self.__frame__ is not None else "undefined"
+        frame = self.frame().name() if self.frame() is not None else "undefined"
 
-        ret += f"FrameTriggeringCAN (CAN-ID: {self.__can_id__}) for Frame {frame}\n"
+        ret += f"FrameTriggeringCAN (CAN-ID: {self.can_id()}) for Frame {frame}\n"
         return ret
 
 
@@ -999,17 +1053,16 @@ class FrameTriggeringFlexRay(BaseFrameTriggeringFlexRay):
     def str(self, indent):
         ret = indent * " "
 
-        if self.__cycle_counter__ is not None:
-            timing = f"Cycle Counter: {self.__cycle_counter__}"
-        elif self.__base_cycle__ is not None and self.__cycle_repetition__ is not None:
-            timing = f"Base Cycle: {self.__base_cycle__}, Cycle Rep: {self.__cycle_repetition__}"
+        if self.cycle_counter() is not None:
+            timing = f"Cycle Counter: {self.cycle_counter()}"
+        elif self.base_cycle() is not None and self.cycle_repetition() is not None:
+            timing = f"Base Cycle: {self.base_cycle()}, Cycle Rep: {self.cycle_repetition()}"
         else:
-            timing = f"Undefined Timing"
+            timing = "Undefined Timing"
 
-        frame = self.__frame__.name() if self.__frame__ is not None else "undefined"
-        frame_id = self.__frame__.id() if self.__frame__ is not None else "undefined"
+        frame = self.frame().name() if self.frame() is not None else "undefined"
 
-        ret += f"FrameTriggeringFlexRay (Slot ID: {self.__slot_id__}, {timing}) for Frame {frame}\n"
+        ret += f"FrameTriggeringFlexRay (Slot ID: {self.slot_id()}, {timing}) for Frame {frame}\n"
         return ret
 
 
@@ -1038,7 +1091,7 @@ def main():
     if args.ecu_name_mapping is not None:
         ecu_name_mapping = read_csv_to_dict(args.ecu_name_mapping)
 
-    conf_factory = SimpleConfigurationFactory()
+    conf_factory = TextConfigurationFactory()
     output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin,
                                    ecu_name_replacement=ecu_name_mapping)
 

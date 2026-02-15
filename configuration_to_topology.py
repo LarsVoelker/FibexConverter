@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2025  Dr. Lars Voelker
+# Copyright (C) 2015-2026  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
 # Copyright (C) 2020-2025  Dr. Lars Voelker, Technica Engineering GmbH
 
@@ -20,17 +20,41 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import argparse
-import datetime
+import csv
+import ipaddress
 import json
-from graphviz import Graph
 import os.path
 import pprint
 import time
 
+from graphviz import Graph
 from xlsxwriter.workbook import Workbook
 
-from parser_dispatcher import *  # @UnusedWildImport
-from configuration_base_classes import *  # @UnusedWildImport
+from configuration_base_classes import (
+    BaseConfigurationFactory,
+    BaseController,
+    BaseECU,
+    BaseEthernetBus,
+    BaseInterface,
+    BaseMulticastPath,
+    BaseSocket,
+    BaseSwitch,
+    BaseSwitchPort,
+    BaseVLAN,
+    addr_to_key,
+    is_ip,
+    is_ip_mcast,
+    is_mac,
+    is_mcast,
+    mcast_addr_to_mac_mcast,
+    read_csv_to_dict,
+)
+from parser_dispatcher import (
+    is_file_or_dir_valid,
+    is_file_valid,
+    parse_input_files,
+    parser_formats,
+)
 
 DUMMY_SWITCH_NAME = ""
 KEY_DELIM = ","
@@ -67,14 +91,14 @@ class TopologyTableEntry:
 
     def ecu_from(self):
         if not self.__init_finished__:
-            print(f"ERROR: ecu_from: Calling uninitialized TopologyTableEntry. Input file not ok!")
+            print("ERROR: ecu_from: Calling uninitialized TopologyTableEntry. Input file not ok!")
             return None
 
         return self.__ecu_from__
 
     def ecu_to(self):
         if not self.__init_finished__:
-            print(f"ERROR: ecu_to: Calling uninitialized TopologyTableEntry. Input file not ok!")
+            print("ERROR: ecu_to: Calling uninitialized TopologyTableEntry. Input file not ok!")
             return None
 
         return self.__ecu_to__
@@ -91,7 +115,7 @@ class TopologyTableEntry:
 
     def to_output_set(self, vlan_columns):
         if not self.__init_finished__:
-            print(f"ERROR: to_output_set: Calling uninitialized TopologyTableEntry. Input file not ok!")
+            print("ERROR: to_output_set: Calling uninitialized TopologyTableEntry. Input file not ok!")
             return None
 
         ret = self.__to_half_output_set__(self.__ecu_from__, self.__ctrl_from__,
@@ -158,7 +182,7 @@ class AccessControlTableEntries:
 
 class MulticastPathEntry:
     def __init__(self, sid_iid, tx_swport, tx_socket, rx_swport, rx_socket):
-        if tx_socket.interface().vlanid() != rx_socket.interface().vlanid():
+        if tx_socket.interface().vlan_id() != rx_socket.interface().vlan_id():
             print(f"WARNING: RX and TX vlan differ for Service-ID/Instance-ID 0x{sid_iid:08x}! Not supported!")
             return
 
@@ -170,23 +194,23 @@ class MulticastPathEntry:
 
     def to_output_set(self):
         ret = (f"0x{self.__sid_iid__:08x}",
-               f"{self.__tx_swport__}", f"{self.__tx_socket__.interface().vlanid()}", f"{self.__tx_socket__.ip()}",
-               f"{self.__rx_swport__}", f"{self.__rx_socket__.interface().vlanid()}", f"{self.__rx_socket__.ip()}")
+               f"{self.__tx_swport__}", f"{self.__tx_socket__.interface().vlan_id()}", f"{self.__tx_socket__.ip()}",
+               f"{self.__rx_swport__}", f"{self.__rx_socket__.interface().vlan_id()}", f"{self.__rx_socket__.ip()}")
         return ret
 
     def to_csv_line(self):
         ret = [f"{self.__sid_iid__:#08x}",
-               self.__tx_swport__, self.__tx_socket__.interface().vlanid(), self.__tx_socket__.ip(),
-               self.__rx_swport__, self.__rx_socket__.interface().vlanid(), self.__rx_socket__.ip()]
+               self.__tx_swport__, self.__tx_socket__.interface().vlan_id(), self.__tx_socket__.ip(),
+               self.__rx_swport__, self.__rx_socket__.interface().vlan_id(), self.__rx_socket__.ip()]
 
         return ret
 
     def to_key_string(self):
         ret = (f"{self.__tx_swport__}{KEY_DELIM}"
-               f"{self.__tx_socket__.interface().vlanid()}{KEY_DELIM}"
+               f"{self.__tx_socket__.interface().vlan_id()}{KEY_DELIM}"
                f"{self.__tx_socket__.ip()}{KEY_DELIM}"
                f"{self.__rx_swport__}{KEY_DELIM}"
-               f"{self.__rx_socket__.interface().vlanid()}{KEY_DELIM}"
+               f"{self.__rx_socket__.interface().vlan_id()}{KEY_DELIM}"
                f"{self.__rx_socket__.ip()}")
         return ret
 
@@ -194,71 +218,74 @@ class MulticastPathEntry:
         return self.__sid_iid__
 
 
-class SimpleConfigurationFactory(BaseConfigurationFactory):
+class TopologyConfigurationFactory(BaseConfigurationFactory):
     def __init__(self):
-        self.__switch_ports__ = dict()
-        self.__switches__ = dict()
-        self.__ethernet_busses__ = dict()
-        self.__ecus__ = dict()
-        self.__vlans__ = dict()
-        self.__multicast_paths__ = dict()
-        self.__mcast_entries__ = None
+        self.__switch_ports = dict()
+        self.__switches = dict()
+        self.__ethernet_busses = dict()
+        self.__ecus = dict()
+        self.__vlans = dict()
+        self.__multicast_paths = dict()
+        self.__mcast_entries = None
 
-        self.__mcast_senders__ = dict()
-        self.__all_mcast_sender_swports__ = []
+        self.__mcast_senders = dict()
+        self.__all_mcast_sender_switch_ports = []
 
         # we need these to trace the topology (multicast) -- ONLY EGs are Multicast!!!
         # key is service-id << 16 + service-instance-id
-        self.__service_instance_provider_sockets__ = dict()
-        self.__service_instance_consumer_sockets__ = dict()
-        self.__eg_senders__ = []
+        self.__service_instance_provider_sockets = dict()
+        self.__service_instance_consumer_sockets = dict()
+        self.__eg_senders = []
 
-        #self.__pdu_relations__ = dict()
+        #self.__pdu_relations = dict()
 
         # create dummy ECU for unconnected switches
-        self.__dummy_ecu__ = self.create_ecu(DUMMY_SWITCH_NAME, ())
+        self.__dummy_ecu = self.create_ecu(DUMMY_SWITCH_NAME, ())
 
-        self.__ipv4_netmasks__ = {}
-        self.__ipv6_prefix_lengths__ = {}
+        self.__ipv4_net_masks = {}
+        self.__ipv6_prefix_lengths = {}
 
-    def __add_service_instance_provider_socket__(self, serviceid, instanceid, swport, socket):
-        key = (serviceid << 16) + instanceid
-        if key not in self.__service_instance_provider_sockets__.keys():
-            self.__service_instance_provider_sockets__[key] = []
+    def __add_service_instance_provider_socket__(self, service_id, instance_id, sw_port, socket):
+        key = (service_id << 16) + instance_id
+        if key not in self.__service_instance_provider_sockets.keys():
+            self.__service_instance_provider_sockets[key] = []
 
-        self.__service_instance_provider_sockets__[key].append((swport, socket))
+        self.__service_instance_provider_sockets[key].append((sw_port, socket))
 
-    def __add_service_instance_consumer_socket__(self, serviceid, instanceid, swport, socket):
-        key = (serviceid << 16) + instanceid
-        if key not in self.__service_instance_consumer_sockets__.keys():
-            self.__service_instance_consumer_sockets__[key] = []
+    def __add_service_instance_consumer_socket__(self, service_id, instance_id, sw_port, socket):
+        key = (service_id << 16) + instance_id
+        if key not in self.__service_instance_consumer_sockets.keys():
+            self.__service_instance_consumer_sockets[key] = []
 
-        self.__service_instance_consumer_sockets__[key].append((swport, socket))
+        self.__service_instance_consumer_sockets[key].append((sw_port, socket))
 
-    def create_vlan(self, name, vlanid, prio):
-        vlan = BaseVLAN(name, vlanid, prio)
-        if vlanid is None:
-            vlanid = 0
+    def create_vlan(self, name, vlan_id, prio):
+        vlan = BaseVLAN(name, vlan_id, prio)
+        if vlan_id is None:
+            vlan_id = 0
         # we are just overwritting
-        if int(vlanid) in self.__vlans__.keys() and self.__vlans__[int(vlanid)].name() != vlan.name():
-            print(f"ERROR: Name collision on VLAN ID:{vlanid} "
-                  f"Name:{self.__vlans__[int(vlanid)].name()} vs Name:{vlan.name()}")
+        if int(vlan_id) in self.__vlans.keys() and self.__vlans[int(vlan_id)].name() != vlan.name():
+            print(f"ERROR: Name collision on VLAN ID:{vlan_id} "
+                  f"Name:{self.__vlans[int(vlan_id)].name()} vs Name:{vlan.name()}")
 
-        self.__vlans__[int(vlanid)] = vlan
+        self.__vlans[int(vlan_id)] = vlan
         return vlan
 
     def get_vlan_columns(self):
-        return sorted(self.__vlans__.keys())
+        return sorted(self.__vlans.keys())
 
     def get_vlan_mapping(self):
         ret = {}
 
-        for ecu in self.__ecus__:
-            for controller in self.__ecus__[ecu].controllers():
+        for ecu in self.__ecus:
+            for controller in self.__ecus[ecu].controllers():
                 for interface in controller.interfaces():
-                    ret[interface.vlanid()] = interface.vlanname()
+                    ret[interface.vlan_id()] = interface.vlan_name()
 
         return ret
+
+    def vlans(self):
+        return self.__vlans
 
     def get_multicast_columns(self, sort_columns=True):
         if sort_columns:
@@ -269,10 +296,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def create_multicast_path(self, switchport_tx, vlan_tx, src_addr, switchport_rx, vlan_rx, mcast_addr, comment):
         tmp = MulticastPath(switchport_tx, vlan_tx, src_addr, switchport_rx, vlan_rx, mcast_addr, comment)
 
-        if tmp.to_key() not in self.__multicast_paths__.keys():
-            self.__multicast_paths__[tmp.to_key()] = tmp
+        if tmp.to_key() not in self.__multicast_paths.keys():
+            self.__multicast_paths[tmp.to_key()] = tmp
         elif comment is not None and comment != "":
-            self.__multicast_paths__[tmp.to_key()].__append_to_comment__(f"; {comment}")
+            self.__multicast_paths[tmp.to_key()].__append_to_comment__(f"; {comment}")
 
         switchport_vlan = f"{switchport_tx.portid_full(gen_name=g_gen_portid)}.{vlan_tx:#x}"
         self.add_multicast_sender(mcast_addr, switchport_vlan)
@@ -282,28 +309,28 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def add_multicast_sender(self, mcast_addr, switchport, verbose=False):
         if verbose:
             print(f"DEBUG: adding mcast sender {switchport} for Address {mcast_addr}")
-        senders = self.__mcast_senders__.setdefault(mcast_addr, [])
+        senders = self.__mcast_senders.setdefault(mcast_addr, [])
         senders.append(switchport)
 
-        if switchport not in self.__all_mcast_sender_swports__:
-            self.__all_mcast_sender_swports__.append(switchport)
+        if switchport not in self.__all_mcast_sender_switch_ports:
+            self.__all_mcast_sender_switch_ports.append(switchport)
 
     def get_multicast_senders(self, mcast_addr, verbose=False):
-        ret = self.__mcast_senders__.get(mcast_addr, [])
+        ret = self.__mcast_senders.get(mcast_addr, [])
         if verbose:
             print(f"DEBUG: found mcast senders for {mcast_addr}: {ret}")
         return ret
 
     def get_all_mcast_sender_swports(self, prefix=None):
         ret = []
-        for swport in self.__all_mcast_sender_swports__:
+        for swport in self.__all_mcast_sender_switch_ports:
             if prefix is None or swport.startswith(prefix):
                 ret.append(swport)
 
         return ret
 
     def calc_mcast_topology(self):
-        if self.__mcast_entries__ is not None:
+        if self.__mcast_entries is not None:
             # we need to stop or the results are wrong (wrong entries in mcast matrix)
             return
 
@@ -312,8 +339,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         # TODO: Support MAC Addresses too
 
         # let us make sure to reduce the duplicates...
-        for k, p in self.__multicast_paths__.items():
-            vlan_id = p.vlanid()
+        for k, p in self.__multicast_paths.items():
+            vlan_id = p.vlan_id()
             mc_ip = p.mc_addr()
             sw_port_tx = p.switchport_tx()
             sw_port_rx = p.switchport_rx()
@@ -348,58 +375,58 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             for tx_port in mcast_entries[key]["sw_ports_tx"]:
                 tx_port.calc_mcast_topology(vlan_id, mc_ip)
 
-        self.__mcast_entries__ = mcast_entries
+        self.__mcast_entries = mcast_entries
 
     def ecu_switch_key(self, switch):
         if switch is None:
-            print(f"Warning: ecu_switch_key cannot generate key with Switch = None")
+            print("Warning: ecu_switch_key cannot generate key with Switch = None")
             return "None.None"
 
         return switch.key()
 
     def create_switch(self, name, ecu, ports):
         if ecu is None:
-            ecu = self.__dummy_ecu__
+            ecu = self.__dummy_ecu
 
         ret = Switch(name, ecu, ports)
 
-        assert (self.ecu_switch_key(ret) not in self.__switches__)
-        self.__switches__[self.ecu_switch_key(ret)] = ret
+        assert (self.ecu_switch_key(ret) not in self.__switches)
+        self.__switches[self.ecu_switch_key(ret)] = ret
 
         return ret
 
-    def create_switch_port(self, portid, ctrl, port, default_vlan, vlans):
+    def create_switch_port(self, port_id, ctrl, port, default_vlan, vlans):
         # the portid is not unique and may be reused!
-        return SwitchPort(portid, ctrl, port, default_vlan, vlans)
+        return SwitchPort(port_id, ctrl, port, default_vlan, vlans)
 
     def create_ethernet_bus(self, name, connected_ctrls, switch_ports):
         ret = EthernetBus(name, connected_ctrls, switch_ports)
-        assert (name not in self.__ethernet_busses__)
-        self.__ethernet_busses__[name] = ret
+        assert (name not in self.__ethernet_busses)
+        self.__ethernet_busses[name] = ret
         return ret
 
     def create_ecu(self, name, controllers):
         ret = ECU(name, controllers)
-        assert (name not in self.__ecus__)
-        self.__ecus__[name] = ret
+        assert (name not in self.__ecus)
+        self.__ecus[name] = ret
         return ret
 
     def create_controller(self, name, interfaces):
         ret = Controller(name, interfaces)
         return ret
 
-    def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
-        ret = Interface(name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel)
+    def create_interface(self, name, vlan_id, ips, sockets, input_frame_triggerings, output_frame_triggerings, fr_channel):
+        ret = Interface(name, vlan_id, ips, sockets, input_frame_triggerings, output_frame_triggerings, fr_channel)
         return ret
 
-    def create_socket(self, name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
-                      eventgroupreceivers):
+    def create_socket(self, name, ip, proto, port_number, service_instances, service_instance_clients, event_handlers,
+                      event_group_receivers):
 
-        ret = Socket(name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
-                     eventgroupreceivers)
+        ret = Socket(name, ip, proto, port_number, service_instances, service_instance_clients, event_handlers,
+                     event_group_receivers)
 
-        if ret.is_multicast() and ip not in self.__mcast_senders__:
-            self.__mcast_senders__[ip] = []
+        if ret.is_multicast() and ip not in self.__mcast_senders:
+            self.__mcast_senders[ip] = []
 
         return ret
 
@@ -408,10 +435,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         g = Graph('G', filename=filename, engine='dot', graph_attr={'splines': 'true'})
 
         connections = []
-        for ecu in self.__ecus__.values():
+        for ecu in self.__ecus.values():
             connections += ecu.graphviz(g, vlans)
 
-        for eth_bus in self.__ethernet_busses__.values():
+        for eth_bus in self.__ethernet_busses.values():
             connections += eth_bus.graphviz(g, vlans)
 
         connections_cleaned = []
@@ -445,13 +472,13 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             if vlan == 0:
                 header.append("Untagged")
             else:
-                vlanname = self.__vlans__[vlan].name()
-                header.append(f"{vlan:#x} {vlanname}")
+                vlan_name = self.__vlans[vlan].name()
+                header.append(f"{vlan:#x} {vlan_name}")
 
         ret = [header]
 
-        for ecu in sorted(self.__ecus__.keys()):
-            ret += self.__ecus__[ecu].topology_table(vlan_cols)
+        for ecu in sorted(self.__ecus.keys()):
+            ret += self.__ecus[ecu].topology_table(vlan_cols)
 
         return ret
 
@@ -459,34 +486,34 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         header = ["ECU", "Switch|Ctrl", "SwitchPort", "VLAN-ID", "Name", "DefaultPrio"]
         ret = [header]
 
-        for ecu_name in sorted(self.__ecus__.keys()):
-            ecu = self.__ecus__[ecu_name]
+        for ecu_name in sorted(self.__ecus.keys()):
+            ecu = self.__ecus[ecu_name]
 
             for ctrl in sorted(ecu.controllers(), key=lambda x:x.name()):
-                for iface in sorted(ctrl.interfaces(),  key=lambda x:x.vlanid()):
-                    ret += [[ecu_name, ctrl.name(), "", f"0x{int(iface.vlanid()):x}", iface.vlanname(), ""]]
+                for iface in sorted(ctrl.interfaces(), key=lambda x:x.vlan_id()):
+                    ret += [[ecu_name, ctrl.name(), "", f"0x{int(iface.vlan_id()):x}", iface.vlan_name(), ""]]
 
             for switch in ecu.switches():
                 for switch_port in switch.ports():
                     port_id = switch_port.portid_generated()
                     for vlan in switch_port.vlans_objs():
-                        ret += [ [ecu_name, switch.name(), port_id, vlan.vlanid_str(), vlan.name(), vlan.priority()] ]
+                        ret += [[ecu_name, switch.name(), port_id, vlan.vlan_id_str(), vlan.name(), vlan.priority()]]
 
         return ret
 
     def calc_fwd_tables(self):
-        for ecuname, ecu in sorted(self.__ecus__.items()):
+        for ecuname, ecu in sorted(self.__ecus.items()):
             ecu.calc_fwd_tables()
 
     def print_fwd_tables(self, fn_prefix, fn_postfix):
-        for ecuname, ecu in sorted(self.__ecus__.items()):
+        for ecuname, ecu in sorted(self.__ecus.items()):
             ecu.print_fwd_tables(fn_prefix, fn_postfix)
 
     def access_control_table(self):
         header = ["ECU", "Switch", "SwPort", "ECU", "Ctrl", "VLAN", "IP", "Netmask/Prefix"]
         ret = [header]
 
-        for ecuname, ecu in sorted(self.__ecus__.items()):
+        for ecuname, ecu in sorted(self.__ecus.items()):
             ret += ecu.access_control_table(self)
 
         return ret
@@ -494,7 +521,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def extended_access_control_table(self, skip_multicast=False, file_format="csv"):
         if file_format == "json":
             ret = dict()
-            for ecuname, ecu in sorted(self.__ecus__.items()):
+            for ecuname, ecu in sorted(self.__ecus.items()):
                 if ecuname is None or ecuname == "":
                     continue
 
@@ -508,7 +535,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         header = ["ECU", "Switch", "SwPort", "ECU", "Ctrl", "VLAN", "IP", "Netmask/Prefix", "MAC"]
         ret = [header]
 
-        for ecuname, ecu in sorted(self.__ecus__.items()):
+        for ecuname, ecu in sorted(self.__ecus.items()):
             ret += ecu.extended_access_control_table(self, skip_multicast=skip_multicast)
 
         return ret
@@ -529,7 +556,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         ret = [header]
 
-        for ecuname, ecu in sorted(self.__ecus__.items()):
+        for ecuname, ecu in sorted(self.__ecus.items()):
             tmp = ecu.extended_access_control_matrix(self, tx_delimiter=tx_delimiter)
 
             for line in tmp:
@@ -549,42 +576,42 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         for iface in ctrl.interfaces():
             for socket in iface.sockets():
-                if socket.proto() == "udp":
+                if socket.protocol() == "udp":
                     for si in socket.instances():
-                        if si.service().serviceid() == 0xfffe:
-                            print(f"WARNING: skipping 0xfffe at PSI:" f"{socket.ip()}:{socket.portnumber()} ({socket.proto()})")
+                        if si.service().service_id() == 0xfffe:
+                            print(f"WARNING: skipping 0xfffe at PSI:" f"{socket.ip()}:{socket.port_number()} ({socket.protocol()})")
                         else:
-                            self.__add_service_instance_provider_socket__(si.service().serviceid(),
-                                                                          si.instanceid(),
+                            self.__add_service_instance_provider_socket__(si.service().service_id(),
+                                                                          si.instance_id(),
                                                                           swport.portid_full(gen_name=g_gen_portid),
                                                                           socket)
                     if socket.is_multicast():
-                        for si in socket.serviceinstanceclients():
-                            sid = si.service().serviceid()
+                        for si in socket.service_instance_clients():
+                            sid = si.service().service_id()
                             # this can be only other serv 0xfffe
-                            print(f"WARNING: skipping 0x{sid:04x} at CSI:{socket.ip()}:{socket.portnumber()} ({socket.proto()})")
+                            print(f"WARNING: skipping 0x{sid:04x} at CSI:{socket.ip()}:{socket.port_number()} ({socket.protocol()})")
 
-                        for ceg in socket.eventgroupreceivers():
-                            si = ceg.serviceinstance()
-                            if si.service().serviceid() == 0xfffe:
-                                print(f"WARNING: skipping 0xfffe at CEG:{socket.ip()}:{socket.portnumber()} ({socket.proto()})")
+                        for ceg in socket.event_group_receivers():
+                            si = ceg.service_instance()
+                            if si.service().service_id() == 0xfffe:
+                                print(f"WARNING: skipping 0xfffe at CEG:{socket.ip()}:{socket.port_number()} ({socket.protocol()})")
                             else:
                                 # TODO
                                 # this might be easier since the ceg references to the eh
                                 # relation should be ceg.socket() -> ceg.sender().socket()
-                                self.__add_service_instance_consumer_socket__(si.service().serviceid(),
-                                                                              si.instanceid(),
+                                self.__add_service_instance_consumer_socket__(si.service().service_id(),
+                                                                              si.instance_id(),
                                                                               swport.portid_full(gen_name=g_gen_portid),
                                                                               socket)
 
     def __check_busports_someip_multicast__(self):
-        for ethbus in self.__ethernet_busses__.values():
+        for ethbus in self.__ethernet_busses.values():
             for swport in ethbus.switch_ports():
                 for ctrl in ethbus.connected_controllers():
                     self.__get_someip_multicast_and_swport__(swport, ctrl)
 
     def __check_swports_for_someip_multicast__(self):
-        for swport in self.__switch_ports__.values():
+        for swport in self.__switch_ports.values():
             ctrl = swport.connected_to_ecu_ctrl()
 
             if ctrl is None:
@@ -599,25 +626,25 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         tmp = dict()
 
         if verbose:
-            print(f"\nService Instance Consumer Sockets")
-        for key, data in self.__service_instance_consumer_sockets__.items():
+            print("\nService Instance Consumer Sockets")
+        for key, data in self.__service_instance_consumer_sockets.items():
             sid_iid = f"0x{key:08x}"
             for swport, socket in data:
                 if verbose:
-                    print(f"C: {sid_iid}: {swport} 0x{socket.interface().vlanid():x} {socket.ip()}")
-                senders = self.__service_instance_provider_sockets__.get(key)
+                    print(f"C: {sid_iid}: {swport} 0x{socket.interface().vlan_id():x} {socket.ip()}")
+                senders = self.__service_instance_provider_sockets.get(key)
                 if senders is not None and len(senders) > 0:
                     for snd_port, snd_socket in senders:
                         if verbose:
-                            print(f"  S: {snd_port} 0x{snd_socket.interface().vlanid():x} {snd_socket.ip()}")
+                            print(f"  S: {snd_port} 0x{snd_socket.interface().vlan_id():x} {snd_socket.ip()}")
 
-                        swport_tx = self.__switch_ports__.get(snd_port, None)
-                        swport_rx = self.__switch_ports__.get(swport, None)
-                        vlanid_tx = snd_socket.interface().vlanid()
-                        vlanid_rx = socket.interface().vlanid()
+                        swport_tx = self.__switch_ports.get(snd_port, None)
+                        swport_rx = self.__switch_ports.get(swport, None)
+                        vlanid_tx = snd_socket.interface().vlan_id()
+                        vlanid_rx = socket.interface().vlan_id()
 
                         if swport_tx is None or swport_rx is None:
-                            print(f"DEBUG: self.__switch_ports__: {self.__switch_ports__}")
+                            print(f"DEBUG: self.__switch_ports__: {self.__switch_ports}")
 
                         assert(swport_tx is not None)
                         assert(swport_rx is not None)
@@ -635,13 +662,13 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def all_multicast_addresses(self):
         ret = []
 
-        for key, item in self.__multicast_paths__.items():
+        for key, item in self.__multicast_paths.items():
             mc_addr = item.mc_addr()
             if mc_addr not in ret:
                 ret.append(mc_addr)
 
         # adding addresses even though we could not construct a path
-        for mcast_addr in self.__mcast_senders__:
+        for mcast_addr in self.__mcast_senders:
             if mcast_addr not in ret:
                 ret.append(mcast_addr)
 
@@ -650,29 +677,29 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def create_multicast_csv(self, mc_addr=None):
         ret = []
 
-        for key in sorted(self.__multicast_paths__.keys()):
-            if mc_addr is None or self.__multicast_paths__[key].mc_addr() == mc_addr:
-                ret.append(self.__multicast_paths__[key].to_csv_line())
+        for key in sorted(self.__multicast_paths.keys()):
+            if mc_addr is None or self.__multicast_paths[key].mc_addr() == mc_addr:
+                ret.append(self.__multicast_paths[key].to_csv_line())
 
         return ret
 
     def add_ipv4_address_config(self, ip, netmask):
-        self.__ipv4_netmasks__[ip] = netmask
+        self.__ipv4_net_masks[ip] = netmask
 
     def get_ipv4_netmask(self, ip):
         try:
-            return self.__ipv4_netmasks__.get(ip)
+            return self.__ipv4_net_masks.get(ip)
         except ValueError:
             return None
 
-    def add_ipv6_address_config(self, ip, prefixlen):
+    def add_ipv6_address_config(self, ip, prefix_len):
         tmp = ipaddress.ip_address(ip).exploded
-        self.__ipv6_prefix_lengths__[tmp] = prefixlen
+        self.__ipv6_prefix_lengths[tmp] = prefix_len
 
     def get_ipv6_prefix_length(self, ip):
         try:
             tmp = ipaddress.ip_address(ip).exploded
-            return self.__ipv6_prefix_lengths__.get(tmp)
+            return self.__ipv6_prefix_lengths.get(tmp)
         except ValueError:
             return None
 
@@ -688,16 +715,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def parsing_done(self):
         # fill switch_ports
 
-        for sw in self.__switches__.values():
+        for sw in self.__switches.values():
             for port in sw.ports():
-                self.__switch_ports__[port.portid_full(gen_name=g_gen_portid)] = port
+                self.__switch_ports[port.portid_full(gen_name=g_gen_portid)] = port
 
     def endpoints(self):
         header = ("ECU", "Controller", "VLAN", "VLAN NAME", "IP", "Netmask/Prefix")
         ret = [header]
 
-        for ecuname in sorted(self.__ecus__):
-            ret = self.__ecus__[ecuname].export_endpoints(self, ret)
+        for ecuname in sorted(self.__ecus):
+            ret = self.__ecus[ecuname].export_endpoints(self, ret)
 
         return ret
 
@@ -718,13 +745,13 @@ class MulticastPath(BaseMulticastPath):
         return "__".join(sorted(self.__sid_iids__))
 
     def to_key(self):
-        ret = f"{self.switchport_tx_name()}{KEY_DELIM}{self.vlanid()}{KEY_DELIM}{self.source_addr()}{KEY_DELIM}" \
-              f"{self.switchport_rx_name()}{KEY_DELIM}{self.vlanid()}{KEY_DELIM}{self.mc_addr()}{KEY_DELIM}"
+        ret = f"{self.switchport_tx_name()}{KEY_DELIM}{self.vlan_id()}{KEY_DELIM}{self.source_addr()}{KEY_DELIM}" \
+              f"{self.switchport_rx_name()}{KEY_DELIM}{self.vlan_id()}{KEY_DELIM}{self.mc_addr()}{KEY_DELIM}"
         return ret
 
     def to_csv_line(self):
-        ret = [self.switchport_tx_name(), self.vlanid(), self.source_addr(),
-               self.switchport_rx_name(), self.vlanid(), self.mc_addr(),
+        ret = [self.switchport_tx_name(), self.vlan_id(), self.source_addr(),
+               self.switchport_rx_name(), self.vlan_id(), self.mc_addr(),
                f"{self.comment()}{self.sid_iids_to_string()}"]
 
         return ret
@@ -781,7 +808,7 @@ class Switch(BaseSwitch):
                 ctrl_name = ctrl.name()
                 ecu_name = ctrl.ecu().name()
                 for intf in ctrl.interfaces():
-                    vlanid = intf.vlanid()
+                    vlanid = intf.vlan_id()
 
                     ips_seen = []
                     for ip in intf.ips():
@@ -799,7 +826,7 @@ class Switch(BaseSwitch):
         # multicast is pulled: sender sw_port asks recursively, who needs and builds tree on return
 
         if count < 1:
-            print(f"WARNING: When tracing forwarding, counter expired! Loop in Topology?")
+            print("WARNING: When tracing forwarding, counter expired! Loop in Topology?")
             return
 
         vlan_entries = self.__fwd_table__.setdefault(vlan_id, {})
@@ -818,7 +845,7 @@ class Switch(BaseSwitch):
 
         # forward to more switches!?
         ret = False
-        for port in self.__ports__:
+        for port in self.ports():
             if port == sw_port:
                 continue
 
@@ -846,10 +873,10 @@ class Switch(BaseSwitch):
         self.__add_local_fwd_entry__(vlan_id, address, receiver_port, None, None)
 
     def calc_mcast_topology(self, vlan_id, address, sender_port):
-        ret = self.incoming_fwd_info(vlan_id, address, sender_port, None, None, True, self.__init_count__)
+        self.incoming_fwd_info(vlan_id, address, sender_port, None, None, True, self.__init_count__)
 
     def __populate_other_fwd_tables_ucast__(self, vlan_id, address, sw_port, ecu, ctrl):
-        for port in self.__ports__:
+        for port in self.ports():
             if port == sw_port:
                 continue
             remote_port = port.connected_to_port()
@@ -969,7 +996,7 @@ class Switch(BaseSwitch):
                 ips_per_vlan = dict()
 
                 for intf in ctrl.interfaces():
-                    vlanid = intf.vlanid()
+                    vlanid = intf.vlan_id()
                     if vlanid not in ips_per_vlan.keys():
                         ips_per_vlan[vlanid] = []
                     if len(intf.ips()) == 0:
@@ -1019,12 +1046,12 @@ class SwitchPort(BaseSwitchPort):
 
         ret += [(switch_or_bus.name(), self.portid_full(gen_name=g_gen_portid), self.vlans())]
         parent.node(self.portid_full(gen_name=g_gen_portid), label=self.portid(gen_name=g_gen_portid))
-        if self.__port__ is not None and self.__port__.switch() is not None:
+        if self.port() is not None and self.port().switch() is not None:
             ret += [(self.portid_full(gen_name=g_gen_portid),
-                     self.__port__.portid_full(gen_name=g_gen_portid),
+                     self.port().portid_full(gen_name=g_gen_portid),
                      self.vlans())]
-        elif self.__ctrl__ is not None:
-            ret += [(self.portid_full(gen_name=g_gen_portid), self.__ctrl__.name(), self.vlans())]
+        elif self.controller() is not None:
+            ret += [(self.portid_full(gen_name=g_gen_portid), self.controller().name(), self.vlans())]
 
         return ret
 
@@ -1036,7 +1063,7 @@ class EthernetBus(BaseEthernetBus):
         # XXX We do not check the VLANs of the Ethernet Bus, since we cannot know if they are present everywhere!
         #     We assume that the controller and switch ports know...
 
-        me = parent.node(self.name())
+        #me = parent.node(self.name())
 
         for port in self.switch_ports():
             if vlans is None:
@@ -1047,7 +1074,7 @@ class EthernetBus(BaseEthernetBus):
                         ret += [(self.name(), port.portid_full(gen_name=g_gen_portid), port.vlans())]
                         continue
 
-        for ctrl in self.__ctrls__:
+        for ctrl in self.__ctrls:
             if vlans is None:
                 ret += [(self.name(), ctrl.name(), ctrl.vlans())]
             else:
@@ -1073,63 +1100,63 @@ class ECU(BaseECU):
         return connections
 
     def calc_fwd_tables(self):
-        for switch in self.__switches__:
+        for switch in self.switches():
             switch.calc_fwd_table()
 
     def print_fwd_tables(self, fn_prefix, fn_postfix):
-        for switch in self.__switches__:
+        for switch in self.switches():
             switch.print_fwd_table(fn_prefix, fn_postfix, self.name())
 
     def topology_table(self, vlan_cols):
         ret = []
 
-        for switch in self.__switches__:
-            for swport in switch.ports():
-                ctrl = swport.connected_to_ecu_ctrl()
-                peerport = swport.connected_to_port()
+        for switch in self.switches():
+            for switch_port in switch.ports():
+                ctrl = switch_port.connected_to_ecu_ctrl()
+                peer_port = switch_port.connected_to_port()
                 if ctrl is not None:
-                    tmp = TopologyTableEntry(self.name(), None, switch.name(), swport.portid(gen_name=g_gen_portid),
+                    tmp = TopologyTableEntry(self.name(), None, switch.name(), switch_port.portid(gen_name=g_gen_portid),
                                              ctrl.ecu().name(), ctrl.name(), None, None,
-                                             swport.vlans())
+                                             switch_port.vlans())
                     ret.append(tmp.to_output_set(vlan_cols))
-                elif peerport is not None:
-                    peerswitch = peerport.switch()
-                    if peerswitch is None:
-                        print(f"ERROR: topology_table: peerswitch is None for peerport "
-                              f"{peerport.portid(gen_name=g_gen_portid)}")
-                    elif peerswitch.ecu() is None:
-                        print(f"ERROR: topology_table: peerswitch.ecu() is None for peerport "
-                              f"{peerport.portid(gen_name=g_gen_portid)}")
+                elif peer_port is not None:
+                    peer_switch = peer_port.switch()
+                    if peer_switch is None:
+                        print(f"ERROR: topology_table: peer_switch is None for peer_port "
+                              f"{peer_port.portid(gen_name=g_gen_portid)}")
+                    elif peer_switch.ecu() is None:
+                        print(f"ERROR: topology_table: peer_switch.ecu() is None for peer_port "
+                              f"{peer_port.portid(gen_name=g_gen_portid)}")
                     else:
                         tmp = TopologyTableEntry(self.name(), None, switch.name(),
-                                                 swport.portid(gen_name=g_gen_portid),
-                                                 peerswitch.ecu().name(), None, peerswitch.name(),
-                                                 peerport.portid(gen_name=g_gen_portid),
-                                                 swport.vlans())
+                                                 switch_port.portid(gen_name=g_gen_portid),
+                                                 peer_switch.ecu().name(), None, peer_switch.name(),
+                                                 peer_port.portid(gen_name=g_gen_portid),
+                                                 switch_port.vlans())
                         tmp2 = tmp.to_output_set(vlan_cols)
 
                         if tmp2 is not None:
                             ret.append(tmp2)
 
                         # checking for asymmetry
-                        if len(swport.vlans()) != len(peerport.vlans()):
+                        if len(switch_port.vlans()) != len(peer_port.vlans()):
                             print(f"Warning: Different number of vlans for "
-                                  f"{self.name()} {switch.name()} {swport.portid(gen_name=g_gen_portid)} -> "
-                                  f"{peerswitch.ecu().name()} {peerswitch.name()} "
-                                  f"{peerport.portid(gen_name=g_gen_portid)}")
+                                  f"{self.name()} {switch.name()} {switch_port.portid(gen_name=g_gen_portid)} -> "
+                                  f"{peer_switch.ecu().name()} {peer_switch.name()} "
+                                  f"{peer_port.portid(gen_name=g_gen_portid)}")
                         else:
-                            for v in swport.vlans():
-                                if v not in peerport.vlans():
+                            for v in switch_port.vlans():
+                                if v not in peer_port.vlans():
                                     print(f"Warning: VLAN {v} not found in peer port "
-                                          f"{self.name()} {switch.name()} {swport.portid(gen_name=g_gen_portid)}"
+                                          f"{self.name()} {switch.name()} {switch_port.portid(gen_name=g_gen_portid)}"
                                           f" -> "
-                                          f"{peerswitch.ecu().name()} {peerswitch.name()} "
-                                          f"{peerport.portid(gen_name=g_gen_portid)}")
+                                          f"{peer_switch.ecu().name()} {peer_switch.name()} "
+                                          f"{peer_port.portid(gen_name=g_gen_portid)}")
                 else:
                     tmp = TopologyTableEntry(self.name(), None, switch.name(),
-                                             swport.portid(gen_name=g_gen_portid),
+                                             switch_port.portid(gen_name=g_gen_portid),
                                              "...", None, None, None,
-                                             swport.vlans())
+                                             switch_port.vlans())
                     ret.append(tmp.to_output_set(vlan_cols))
 
         return ret
@@ -1137,7 +1164,7 @@ class ECU(BaseECU):
     def access_control_table(self, factory):
         ret = []
 
-        for switch in self.__switches__:
+        for switch in self.switches():
             ret += switch.access_control_table(factory)
 
         return ret
@@ -1147,23 +1174,23 @@ class ECU(BaseECU):
             ret = {}
 
             switches = ret.setdefault("switches", {})
-            for switch in self.__switches__:
+            for switch in self.switches():
                 switches[switch.name()] = switch.extended_access_control_table(factory,
-                                                                               skip_multicast=skip_multicast,
-                                                                               file_format=file_format)
+                                                                                     skip_multicast=skip_multicast,
+                                                                                     file_format=file_format)
 
             ctrls = ret.setdefault("controllers", {})
-            for ctrl in self.__controllers__:
+            for ctrl in self.controllers():
                 ctrls[ctrl.name()] = ctrl.extended_access_control_table(factory,
-                                                                        skip_multicast=skip_multicast,
-                                                                        file_format=file_format)
+                                                                              skip_multicast=skip_multicast,
+                                                                              file_format=file_format)
 
             return ret
 
         # default = csv
         ret = []
 
-        for switch in self.__switches__:
+        for switch in self.switches():
             ret += switch.extended_access_control_table(factory, skip_multicast=skip_multicast)
 
         return ret
@@ -1171,14 +1198,14 @@ class ECU(BaseECU):
     def extended_access_control_matrix(self, factory, tx_delimiter):
         ret = []
 
-        for switch in self.__switches__:
+        for switch in self.switches():
             ret += switch.extended_access_control_matrix(factory, tx_delimiter=tx_delimiter)
 
         return ret
 
     def export_endpoints(self, factory, ret):
-        for controller in sorted(self.__controllers__, key=lambda x:x.name()):
-            for interface in sorted(controller.interfaces(),  key=lambda x:x.vlanid()):
+        for controller in sorted(self.controllers(), key=lambda x:x.name()):
+            for interface in sorted(controller.interfaces(), key=lambda x:x.vlan_id()):
                 for ip in sorted(interface.ips()) :
                     if ip is not None:
                         str_ip = str(ip)
@@ -1189,8 +1216,8 @@ class ECU(BaseECU):
 
                     ret.append((self.name(),
                                 controller.name(),
-                                hex(interface.vlanid()) if interface.vlanid() is not None else hex(0),
-                                interface.vlanname(),
+                                hex(interface.vlan_id()) if interface.vlan_id() is not None else hex(0),
+                                interface.vlan_name(),
                                 str_ip,
                                 str_netmask_prefix))
         return ret
@@ -1203,7 +1230,7 @@ class Controller(BaseController):
             ret = {}
 
             for iface in self.interfaces():
-                addresses = ret.setdefault(hex(iface.vlanid()), [])
+                addresses = ret.setdefault(hex(iface.vlan_id()), [])
                 for address in sorted(iface.ips(), key=lambda x: addr_to_key(x)):
                     if skip_multicast and is_mcast(address):
                         continue
@@ -1233,12 +1260,12 @@ def write_to_xslx(filename, data, metadata, freeze_row=1, freeze_col=0):
     workbook = Workbook(filename)
     worksheet = workbook.add_worksheet()
 
-    headerformat = workbook.add_format({'bg_color': '#0B72B5', 'font_color': 'white'})
+    header_format = workbook.add_format({'bg_color': '#0B72B5', 'font_color': 'white'})
 
     for r, row in enumerate(data):
         for c, col in enumerate(row):
             if r == 0:
-                worksheet.write(r, c, col, headerformat)
+                worksheet.write(r, c, col, header_format)
             else:
                 worksheet.write(r, c, col)
 
@@ -1273,7 +1300,7 @@ def parse_arguments():
 
 def read_multicast_names_file(conf_factory, f, verbose=False):
     if verbose:
-        print(f"Reading multicast names file...")
+        print("Reading multicast names file...")
 
     ret = read_csv_to_dict(f, verbose=verbose)
 
@@ -1282,7 +1309,7 @@ def read_multicast_names_file(conf_factory, f, verbose=False):
 
 def read_metadata_file(conf_factory, f, verbose=False):
     if verbose:
-        print(f"Reading metadata file...")
+        print("Reading metadata file...")
 
     ret = read_csv_to_dict(f, verbose=verbose)
 
@@ -1297,7 +1324,7 @@ def read_metadata_file(conf_factory, f, verbose=False):
 
 def add_multicast_file(conf_factory, f, verbose=False):
     if verbose:
-        print(f"Reading multicast file...")
+        print("Reading multicast file...")
 
     csvreader = csv.reader(f, delimiter=',', quotechar='|')
     skip_first_line = True
@@ -1319,7 +1346,7 @@ def add_multicast_file(conf_factory, f, verbose=False):
 
         swport_src, vlanid_src, addr_src, swport_dst, vlanid_dst, addr_dst, comment = row[:7]
 
-        if swport_src not in conf_factory.__switch_ports__.keys():
+        if swport_src not in conf_factory.__switch_ports.keys():
             print(f"Error: {swport_src} not a valid Switchport! Expected Format: ecu_name.switch_name.port_name!")
             continue
 
@@ -1333,7 +1360,7 @@ def add_multicast_file(conf_factory, f, verbose=False):
             print(f"Error: {addr_src} not a valid IP or MAC Address!")
             continue
 
-        if swport_dst not in conf_factory.__switch_ports__.keys():
+        if swport_dst not in conf_factory.__switch_ports.keys():
             print(f"Error: {swport_dst} not a valid Switchport! Expected Format: ecu_name.switch_name.port_name!")
             continue
 
@@ -1347,8 +1374,8 @@ def add_multicast_file(conf_factory, f, verbose=False):
             print(f"Error: {addr_dst} not a valid IP or MAC Address!")
             continue
 
-        conf_factory.create_multicast_path(conf_factory.__switch_ports__[swport_src], vlanid_src, addr_src,
-                                           conf_factory.__switch_ports__[swport_dst], vlanid_dst, addr_dst,
+        conf_factory.create_multicast_path(conf_factory.__switch_ports[swport_src], vlanid_src, addr_src,
+                                           conf_factory.__switch_ports[swport_dst], vlanid_dst, addr_dst,
                                            comment)
 
     print()
@@ -1370,7 +1397,7 @@ def main():
     if args.ecu_name_mapping is not None:
         ecu_name_mapping = read_csv_to_dict(args.ecu_name_mapping)
 
-    conf_factory = SimpleConfigurationFactory()
+    conf_factory = TopologyConfigurationFactory()
     output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin,
                                    ecu_name_replacement=ecu_name_mapping)
 
@@ -1459,7 +1486,7 @@ def main():
 
     print("Generating outputs...")
 
-    print(f"Generating tables...")
+    print("Generating tables...")
     write_to_csv(f"{vlanfile}.csv", conf_factory.vlan_table())
     write_to_xslx(f"{vlanfile}.xlsx", conf_factory.vlan_table(), xlsx_metadata)
 
@@ -1501,19 +1528,19 @@ def main():
         write_to_csv(f"{file_name}.csv", data)
         write_to_xslx(f"{file_name}.xlsx", data, xlsx_metadata)
 
-    print(f"Exporting endpoints...")
+    print("Exporting endpoints...")
     write_to_csv(f"{endpfile}.csv", conf_factory.endpoints())
     write_to_xslx(f"{endpfile}.xlsx", conf_factory.endpoints(), xlsx_metadata)
 
-    for vlan in sorted(conf_factory.__vlans__):
+    for vlan in sorted(conf_factory.vlans()):
         print(f"Generating plot for VLAN {vlan}")
         fn_tmp = gvfile_prefix_details + f"__vlan_0x{vlan:x}.gv"
         conf_factory.graphviz(fn_tmp, vlans=[vlan], show=False, label_links=True)
         if remove_gv:
             os.remove(fn_tmp)
 
-    print(f"Generating plot for all VLANs")
-    fn_tmp = gvfile_prefix + f"__vlans_all.gv"
+    print("Generating plot for all VLANs")
+    fn_tmp = gvfile_prefix + "__vlans_all.gv"
     conf_factory.graphviz(fn_tmp, show=False, label_links=True)
     conf_factory.graphviz(gvfile, show=False)
     if remove_gv:

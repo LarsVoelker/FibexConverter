@@ -18,61 +18,62 @@
 # You should have received a copy of the GNU General Public License
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+import importlib.util
+import os
+import sys
 import xml.etree.ElementTree
+
 from abstract_parser import AbstractParser
 
-import importlib.util
-import sys
-import os
 
 class FibexParser(AbstractParser):
     def __init__(self, plugin_file, ecu_name_replacement):
         super().__init__()
         self.__conf_factory__ = None
 
-        self.__ns__ = {'fx': 'http://www.asam.net/xml/fbx',
-                       'ho': 'http://www.asam.net/xml',
-                       'xsi': 'http://www.w3.org/2001/XMLSchema-instance',
-                       'ethernet': 'http://www.asam.net/xml/fbx/ethernet',
-                       'flexray': 'http://www.asam.net/xml/fbx/flexray',
-                       'it': 'http://www.asam.net/xml/fbx/it',
-                       'service': 'http://www.asam.net/xml/fbx/services'}
+        self._ns = {'fx': 'http://www.asam.net/xml/fbx',
+                    'ho': 'http://www.asam.net/xml',
+                    'xsi': 'http://www.w3.org/2001/XMLSchema-instance',
+                    'ethernet': 'http://www.asam.net/xml/fbx/ethernet',
+                    'flexray': 'http://www.asam.net/xml/fbx/flexray',
+                    'it': 'http://www.asam.net/xml/fbx/it',
+                    'service': 'http://www.asam.net/xml/fbx/services'}
 
-        self.__services__ = dict()
-        self.__codings__ = dict()
-        self.__signals__ = dict()
-        self.__datatypes__ = dict()
-        self.__channels__ = dict()
-        self.__controllers__ = dict()
-        self.__coupling_ports__ = dict()
+        self.__services = dict()
+        self.__codings = dict()
+        self.__signals = dict()
+        self.__datatypes = dict()
+        self.__channels = dict()
+        self.__controllers = dict()
+        self.__coupling_ports = dict()
 
-        self.__ecu_name_replacement__ = ecu_name_replacement
-        self.__ecu_data__ = dict()
-        self.__ecus__ = dict()
-        self.__ecu_id_to_ecu_name_mapping__ = dict()
-        self.__ecus_ready__ = False
+        self.__ecu_name_replacement = ecu_name_replacement
+        self.__ecu_data = dict()
+        self.__ecus = dict()
+        self.__ecu_id_to_ecu_name_mapping = dict()
+        self.__ecus_ready = False
 
-        self.__frames__ = dict()
-        self.__frame_triggerings__ = dict()
-        self.__pdus__ = dict()
-        self.__signals__ = dict()
+        self.__frames = dict()
+        self.__frame_triggerings = dict()
+        self.__pdus = dict()
+        self.__signals = dict()
 
         # FIBEX-ID -> (FIBEX-ID of Service, Eventgroup-ID)
-        self.__eventgrouprefs__ = dict()
+        self.__eventgroup_refs = dict()
 
         # FIBEX-ID -> ServiceInstance
-        self.__ServiceInstances__ = dict()
+        self.__service_instances = dict()
 
         # FIBEX-ID -> ServiceEventgroupReceiver
-        self.__ServiceEventgroupReceiver__ = dict()
+        self.__service_eventgroup_receiver = dict()
 
         # FIBEX-ID -> (PSIS[], CSIS[], EH[], CEGS[])
-        self.__aeps__ = dict()
+        self.__aeps = dict()
 
         # AEP-ID -> Socket
-        self.__sockets__ = dict()
+        self.__sockets = dict()
 
-        self.__plugin__ = None
+        self.__plugin = None
         # Load plugin
         if plugin_file is not None:
             if not os.path.isfile(plugin_file):
@@ -86,15 +87,15 @@ class FibexParser(AbstractParser):
             sys.modules[module_name] = module
             spec.loader.exec_module(module)
 
-            self.__plugin__ = module
+            self.__plugin = module
 
     def create_ecu(self, ecu_id, ecu_name, ctrllist):
-        ret = None
+        #ret = None
 
-        if ecu_name in self.__ecu_data__:
+        if ecu_name in self.__ecu_data:
             print(f"ERROR: Duplicate ecu_id: {ecu_name} during create_ecu")
 
-        self.__ecu_data__[ecu_name] = (ecu_id, ctrllist)
+        self.__ecu_data[ecu_name] = (ecu_id, ctrllist)
         #ret = self.__conf_factory__.create_ecu(ecu_name, ctrllist)
         #self.__ecus__[ecu_id] = ret
 
@@ -103,10 +104,10 @@ class FibexParser(AbstractParser):
         # name -> ([ecu_id], [ctrl])
         tmp_data = dict()
 
-        for ecu_name, data in self.__ecu_data__.items():
+        for ecu_name, data in self.__ecu_data.items():
             # replace ecu_name, if in replacement data
-            if self.__ecu_name_replacement__ is not None and ecu_name in self.__ecu_name_replacement__.keys():
-                ecu_name = self.__ecu_name_replacement__[ecu_name]
+            if self.__ecu_name_replacement is not None and ecu_name in self.__ecu_name_replacement.keys():
+                ecu_name = self.__ecu_name_replacement[ecu_name]
 
             ecu_id, ctrllist = data
 
@@ -119,44 +120,44 @@ class FibexParser(AbstractParser):
             tmp_ctrllist = list(set(ctrllist + ecu_data[1]))
 
             if len(tmp_ctrllist) != len(ctrllist) + len(ecu_data[1]):
-                print(f"INTERNAL ERROR: Merging Controller lists reveals duplicates during finalize_ecus!")
+                print("INTERNAL ERROR: Merging Controller lists reveals duplicates during finalize_ecus!")
 
             tmp_data[ecu_name] =  (ecu_data[0], tmp_ctrllist)
 
         for ecu_name, ecu_data in tmp_data.items():
-            self.__ecus__[ecu_name] = self.__conf_factory__.create_ecu(ecu_name, ecu_data[1])
+            self.__ecus[ecu_name] = self.__conf_factory__.create_ecu(ecu_name, ecu_data[1])
 
             for ecu_id in ecu_data[0]:
-                self.__ecu_id_to_ecu_name_mapping__[ecu_id] = ecu_name
+                self.__ecu_id_to_ecu_name_mapping[ecu_id] = ecu_name
 
-        self.__ecus_ready__ = True
+        self.__ecus_ready = True
         pass
 
     def get_ecu(self, ecu_ref):
 
-        if not self.__ecus_ready__:
-            print(f"INTERNAL ERROR: get_ecu is called before ECUs are finalized!")
+        if not self.__ecus_ready:
+            print("INTERNAL ERROR: get_ecu is called before ECUs are finalized!")
 
-        return self.__ecus__.get(self.__ecu_id_to_ecu_name_mapping__.get(ecu_ref, None), None)
+        return self.__ecus.get(self.__ecu_id_to_ecu_name_mapping.get(ecu_ref, None), None)
 
     def get_signal(self, signal_ref):
-        for _, value in self.__signals__.items():
-            if value.__id__ == signal_ref:
+        for _, value in self.__signals.items():
+            if value.original_id() == signal_ref:
                 return value
 
         return None
 
     def add_pdu(self, pdu):
-        self.__pdus__[pdu.id()] = pdu
+        self.__pdus[pdu.original_id()] = pdu
 
     def get_pdu(self, pdu_ref):
-        return self.__pdus__.get(pdu_ref)
+        return self.__pdus.get(pdu_ref)
 
     def add_socket(self, aep_id, socket):
-        self.__sockets__[aep_id] = socket
+        self.__sockets[aep_id] = socket
 
     def get_socket_by_aep_id(self, aep_id):
-        return self.__sockets__.get(aep_id)
+        return self.__sockets.get(aep_id)
 
     def get_id(self, element):
         return self.get_attribute(element, 'ID')
@@ -169,19 +170,19 @@ class FibexParser(AbstractParser):
 
         if element is not None:
             coding = self.get_child_attribute(element, 'fx:UTILIZATION/fx:CODING-REF', 'ID-REF')
-            ret["Coding"] = self.get_from_dict_or_none(self.__codings__, coding)
+            ret["Coding"] = self.get_from_dict_or_none(self.__codings, coding)
 
-            high_low_byte_order = element.find('fx:UTILIZATION/fx:IS-HIGH-LOW-BYTE-ORDER', self.__ns__)
+            high_low_byte_order = element.find('fx:UTILIZATION/fx:IS-HIGH-LOW-BYTE-ORDER', self._ns)
             if high_low_byte_order is not None:
                 high_low_byte_order = ('true' == high_low_byte_order.text.lower())
             ret["HighLowByteOrder"] = high_low_byte_order
 
             ret["BitLength"] = self.element_text_to_int(element.find('fx:UTILIZATION/fx:BIT-LENGTH',
-                                                                     self.__ns__), -1)
+                                                                     self._ns), -1)
             ret["MinBitLength"] = self.element_text_to_int(element.find('fx:UTILIZATION/fx:MIN-BIT-LENGTH',
-                                                                        self.__ns__), -1)
+                                                                        self._ns), -1)
             ret["MaxBitLength"] = self.element_text_to_int(element.find('fx:UTILIZATION/fx:MAX-BIT-LENGTH',
-                                                                        self.__ns__), -1)
+                                                                        self._ns), -1)
 
         return ret
 
@@ -211,13 +212,13 @@ class FibexParser(AbstractParser):
 
         if element is not None:
             ret["ArrayLengthSize"] = self.element_text_to_int(element.find(
-                './fx:UTILIZATION/fx:SERIALIZATION-ATTRIBUTES/fx:ARRAY-LENGTH-FIELD-SIZE', self.__ns__), -1)
+                './fx:UTILIZATION/fx:SERIALIZATION-ATTRIBUTES/fx:ARRAY-LENGTH-FIELD-SIZE', self._ns), -1)
             ret["LengthFieldSize"] = self.element_text_to_int(element.find(
-                './fx:UTILIZATION/fx:SERIALIZATION-ATTRIBUTES/fx:LENGTH-FIELD-SIZE', self.__ns__), -1)
+                './fx:UTILIZATION/fx:SERIALIZATION-ATTRIBUTES/fx:LENGTH-FIELD-SIZE', self._ns), -1)
             ret["TypeFieldSize"] = self.element_text_to_int(element.find(
-                './fx:UTILIZATION/fx:SERIALIZATION-ATTRIBUTES/fx:TYPE-FIELD-SIZE', self.__ns__), 32)
+                './fx:UTILIZATION/fx:SERIALIZATION-ATTRIBUTES/fx:TYPE-FIELD-SIZE', self._ns), 32)
             ret["BitAlignment"] = self.element_text_to_int(element.find(
-                './fx:UTILIZATION/fx:SERIALIZATION-ATTRIBUTES/fx:BIT-ALIGNMENT', self.__ns__), 0)
+                './fx:UTILIZATION/fx:SERIALIZATION-ATTRIBUTES/fx:BIT-ALIGNMENT', self._ns), 0)
 
         return ret
 
@@ -237,50 +238,50 @@ class FibexParser(AbstractParser):
 
         compu_scale = None
 
-        ct = element.find('./ho:CODED-TYPE', self.__ns__)
+        ct = element.find('./ho:CODED-TYPE', self._ns)
         if ct is not None:
             coded_basetype = self.get_attribute(ct, 'ho:BASE-DATA-TYPE')
             coded_category = self.get_attribute(ct, 'CATEGORY')
             coded_encoding = self.get_attribute(ct, 'ENCODING')
             coded_termination = self.get_attribute(ct, 'TERMINATION')
-            bl = ct.find('./ho:BIT-LENGTH', self.__ns__)
+            bl = ct.find('./ho:BIT-LENGTH', self._ns)
             if bl is not None and bl.text is not None:
                 coded_bit_length = int(bl.text)
-            bl = ct.find('./ho:MIN-LENGTH', self.__ns__)
+            bl = ct.find('./ho:MIN-LENGTH', self._ns)
             if bl is not None and bl.text is not None:
                 coded_min_length = int(bl.text)
-            bl = ct.find('./ho:MAX-LENGTH', self.__ns__)
+            bl = ct.find('./ho:MAX-LENGTH', self._ns)
             if bl is not None and bl.text is not None:
                 coded_max_length = int(bl.text)
 
-        pt = element.find('./ho:PHYSICAL-TYPE', self.__ns__)
+        pt = element.find('./ho:PHYSICAL-TYPE', self._ns)
         if pt is not None:
             coded_basetype2 = self.get_attribute(pt, 'ho:BASE-DATA-TYPE')
 
         cs = element.find('./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:COMPU-INTERNAL-TO-PHYS/ho:COMPU-SCALES/ho:COMPU-SCALE/'
-                          'ho:COMPU-RATIONAL-COEFFS', self.__ns__)
+                          'ho:COMPU-RATIONAL-COEFFS', self._ns)
         if cs is not None:
             compu_scale = []
-            for num in cs.findall('./ho:COMPU-NUMERATOR/ho:V', self.__ns__):
+            for num in cs.findall('./ho:COMPU-NUMERATOR/ho:V', self._ns):
                 compu_scale.append(float(num.text))
             if len(compu_scale) != 2:
                 print(f"WARNING: We did not find to nums in the compu-numerator but {len(compu_scale)}!")
-            num = cs.find('./ho:COMPU-DENOMINATOR/ho:V', self.__ns__)
+            num = cs.find('./ho:COMPU-DENOMINATOR/ho:V', self._ns)
             if num is not None:
                 compu_scale.append(float(num.text))
             else:
                 compu_scale.append(None)
 
-        cm_cat = element.find('./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:CATEGORY', self.__ns__)
+        cm_cat = element.find('./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:CATEGORY', self._ns)
 
         if cm_cat is not None:
             cm_cat = cm_cat.text
 
         compu_consts = []
         for cs in element.findall('./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:COMPU-INTERNAL-TO-PHYS/ho:COMPU-SCALES/',
-                                  self.__ns__):
+                                  self._ns):
 
-            cc = cs.find('./ho:COMPU-CONST/ho:VT', self.__ns__)
+            cc = cs.find('./ho:COMPU-CONST/ho:VT', self._ns)
 
             if cc is not None:
                 compu_const = (cc.text,
@@ -308,17 +309,17 @@ class FibexParser(AbstractParser):
         return d
 
     def parse_codings(self, root):
-        for coding in root.findall('.//fx:CODINGS/fx:CODING', self.__ns__):
+        for coding in root.findall('.//fx:CODINGS/fx:CODING', self._ns):
             d = self.parse_coding(coding)
             if d is not None and 'ID' in d:
-                self.__codings__[d['ID']] = d
+                self.__codings[d['ID']] = d
 
     def parse_signal(self, element):
-        id = self.get_id(element)
-        oid = self.get_oid(element)
+        fibex_id = self.get_id(element)
+        #oid = self.get_oid(element)
         name = self.get_child_text(element, './ho:SHORT-NAME')
         code_id = self.get_child_attribute(element, './fx:CODING-REF', 'ID-REF')
-        coding = self.get_from_dict_or_none(self.__codings__, code_id)
+        coding = self.get_from_dict_or_none(self.__codings, code_id)
         if coding is None:
             print(f"WARNING: Signal Coding for Signal {name} is None")
         basetype = self.get_from_dict_or_none(coding, 'Basetype')
@@ -330,38 +331,38 @@ class FibexParser(AbstractParser):
 
         basetypelen = self.basetype_length(coding)
 
-        ret = self.__conf_factory__.create_signal(id, name, compu_scale, compu_consts, bit_len, min_len, max_len,
+        ret = self.__conf_factory__.create_signal(fibex_id, name, compu_scale, compu_consts, bit_len, min_len, max_len,
                                                   basetype, basetypelen)
-        self.__signals__[name] = ret
+        self.__signals[name] = ret
         return ret
 
     def parse_signals(self, root):
-        for signal in root.findall('.//fx:SIGNALS/fx:SIGNAL', self.__ns__):
+        for signal in root.findall('.//fx:SIGNALS/fx:SIGNAL', self._ns):
             s = self.parse_signal(signal)
             if s is not None:
-                self.__signals__[s.id()] = s
+                self.__signals[s.original_id()] = s
 
     def parse_signal_instance(self, element):
-        id = self.get_id(element)
+        fibex_id = self.get_id(element)
         bit_position = self.get_child_text(element, './fx:BIT-POSITION')
         is_high_low_byte_order = self.get_child_text(element, './fx:IS-HIGH-LOW-BYTE-ORDER')
         signal_ref = self.get_child_attribute(element, './fx:SIGNAL-REF', 'ID-REF')
 
-        ret = self.__conf_factory__.create_signal_instance(id, signal_ref, int(bit_position), is_high_low_byte_order)
+        ret = self.__conf_factory__.create_signal_instance(fibex_id, signal_ref, int(bit_position), is_high_low_byte_order)
         return ret
 
     def parse_multiplexer(self, element):
         # Switch
-        id = self.get_child_attribute(element, './fx:SWITCH', 'ID')
+        fibex_id = self.get_child_attribute(element, './fx:SWITCH', 'ID')
         name = self.get_child_text(element, './fx:SWITCH/ho:SHORT-NAME')
         bit_pos = int(self.get_child_text(element, './fx:SWITCH/fx:BIT-POSITION'))
         is_high_low_byte_order = self.get_child_text(element, './fx:SWITCH/fx:IS-HIGH-LOW-BYTE-ORDER')
         bit_length = int(self.get_child_text(element, './fx:SWITCH/ho:BIT-LENGTH'))
-        switch = self.__conf_factory__.create_multiplex_switch(id, name, bit_pos, is_high_low_byte_order, bit_length)
+        switch = self.__conf_factory__.create_multiplex_switch(fibex_id, name, bit_pos, is_high_low_byte_order, bit_length)
 
         # segment positions
         segs = []
-        for seg in element.findall('./fx:DYNAMIC-PART/fx:SEGMENT-POSITIONS/fx:SEGMENT-POSITION', self.__ns__):
+        for seg in element.findall('./fx:DYNAMIC-PART/fx:SEGMENT-POSITIONS/fx:SEGMENT-POSITION', self._ns):
             bit_pos = int(self.get_child_text(seg, './fx:BIT-POSITION'))
             high_low = self.get_child_text(seg, './fx:IS-HIGH-LOW-BYTE-ORDER')
             bit_len = int(self.get_child_text(seg, './ho:BIT-LENGTH'))
@@ -370,14 +371,14 @@ class FibexParser(AbstractParser):
         # switched pdu instances
         pdus = {}
         for switched_pdu in element.findall('./fx:DYNAMIC-PART/fx:SWITCHED-PDU-INSTANCES/fx:SWITCHED-PDU-INSTANCE',
-                                            self.__ns__):
+                                            self._ns):
             switch_code = self.get_child_text(switched_pdu, './fx:SWITCH-CODE')
             pdu_ref = self.get_child_attribute(switched_pdu, './fx:PDU-REF', 'ID-REF')
             pdus[int(switch_code)] = self.get_pdu(pdu_ref)
 
         # static segment positions
         static_segs = []
-        for seg in element.findall('./fx:STATIC-PART/fx:SEGMENT-POSITIONS/fx:SEGMENT-POSITION', self.__ns__):
+        for seg in element.findall('./fx:STATIC-PART/fx:SEGMENT-POSITIONS/fx:SEGMENT-POSITION', self._ns):
             bit_pos = int(self.get_child_text(seg, './fx:BIT-POSITION'))
             high_low = self.get_child_text(seg, './fx:IS-HIGH-LOW-BYTE-ORDER')
             bit_len = int(self.get_child_text(seg, './ho:BIT-LENGTH'))
@@ -398,11 +399,11 @@ class FibexParser(AbstractParser):
             print(f"DEBUG: parse_pdu: {short_name} byte_length:{byte_length} pdu_type:{pdu_type}")
 
         signal_instances = dict()
-        for signal_instance in element.findall('./fx:SIGNAL-INSTANCES/fx:SIGNAL-INSTANCE', self.__ns__):
+        for signal_instance in element.findall('./fx:SIGNAL-INSTANCES/fx:SIGNAL-INSTANCE', self._ns):
             si = self.parse_signal_instance(signal_instance)
-            si.add_signal(self.get_signal(si.__signal_ref__))
+            si.add_signal(self.get_signal(si.signal_ref()))
             if si is not None:
-                signal_instances[si.__id__] = si
+                signal_instances[si.original_id()] = si
 
         ret = self.__conf_factory__.create_pdu(id, short_name, byte_length, pdu_type, signal_instances)
         self.add_pdu(ret)
@@ -417,7 +418,7 @@ class FibexParser(AbstractParser):
         if verbose:
             print(f"DEBUG: parse_pdu:{short_name} byte_length:{byte_length} pdu_type:{pdu_type}")
 
-        multiplexer = element.find('./fx:MULTIPLEXER', self.__ns__)
+        multiplexer = element.find('./fx:MULTIPLEXER', self._ns)
 
         switch, seg_pos, pdu_instances, static_segs, static_pdu_id = self.parse_multiplexer(multiplexer)
 
@@ -430,14 +431,14 @@ class FibexParser(AbstractParser):
 
     def parse_pdus(self, root, verbose):
         # first pass without MULTIPLEXER
-        for pdu in root.findall('.//fx:PDUS/fx:PDU', self.__ns__):
-            if pdu.find('./fx:MULTIPLEXER', self.__ns__) is None:
+        for pdu in root.findall('.//fx:PDUS/fx:PDU', self._ns):
+            if pdu.find('./fx:MULTIPLEXER', self._ns) is None:
                 p = self.parse_signal_pdu(pdu, verbose)
                 if p is not None:
                     self.add_pdu(p)
 
         # second pass MULTIPLEXER only, since static PDUs need to already be parsed
-        for pdu in root.findall('.//fx:PDUS/fx:PDU/fx:MULTIPLEXER/..', self.__ns__):
+        for pdu in root.findall('.//fx:PDUS/fx:PDU/fx:MULTIPLEXER/..', self._ns):
             p = self.parse_multiplex_pdu(pdu, verbose)
             if p is not None:
                 self.add_pdu(p)
@@ -458,7 +459,7 @@ class FibexParser(AbstractParser):
     def parse_frame_triggering(self, element):
         id = self.get_id(element)
         frame_ref = self.get_child_attribute(element, './fx:FRAME-REF', 'ID-REF')
-        frame = self.__frames__.get(frame_ref, None)
+        frame = self.__frames.get(frame_ref, None)
 
         # let us find out what we have here...
 
@@ -494,12 +495,12 @@ class FibexParser(AbstractParser):
         return None
 
     def parse_frame_triggerings(self, root):
-        for frame_triggering in root.findall('.//fx:FRAME-TRIGGERING', self.__ns__):
+        for frame_triggering in root.findall('.//fx:FRAME-TRIGGERING', self._ns):
             f = self.parse_frame_triggering(frame_triggering)
             if f is not None:
-                if f.id() in self.__frame_triggerings__.keys():
+                if f.id() in self.__frame_triggerings.keys():
                     print(f"WARNING: creating another Frame Triggering with ID: {f.id()}")
-                self.__frame_triggerings__[f.id()] = f
+                self.__frame_triggerings[f.id()] = f
 
     def parse_frame(self, element, verbose):
         id = self.get_id(element)
@@ -508,25 +509,25 @@ class FibexParser(AbstractParser):
         frame_type = self.get_child_text(element, './fx:FRAME-TYPE')
 
         pdu_instances = dict()
-        for pdu_instance in element.findall('./fx:PDU-INSTANCES/fx:PDU-INSTANCE', self.__ns__):
+        for pdu_instance in element.findall('./fx:PDU-INSTANCES/fx:PDU-INSTANCE', self._ns):
             pi = self.parse_pdu_instance(pdu_instance)
             if pi is not None:
-                pdu = self.get_pdu(pi.__pdu_ref__)
+                pdu = self.get_pdu(pi.pdu_ref())
                 if pdu is None:
-                    print(f"ERROR: Frame {short_name} references unknown PDU {pi.__pdu_ref__}!")
+                    print(f"ERROR: Frame {short_name} references unknown PDU {pi.pdu_ref()}!")
                 else:
                     pi.add_pdu(pdu)
 
-                pdu_instances[pi.__id__] = pi
+                pdu_instances[pi.original_id()] = pi
 
         ret = self.__conf_factory__.create_frame(id, short_name, byte_length, frame_type, pdu_instances)
         return ret
 
     def parse_frames(self, root, verbose):
-        for frame in root.findall('.//fx:FRAMES/fx:FRAME', self.__ns__):
+        for frame in root.findall('.//fx:FRAMES/fx:FRAME', self._ns):
             f = self.parse_frame(frame, verbose)
             if f is not None:
-                self.__frames__[f.id()] = f
+                self.__frames[f.original_id()] = f
 
     def basetype_length(self, coding_dict):
         basetype = self.get_from_dict(coding_dict, "Basetype", "--INVALID--")
@@ -582,9 +583,9 @@ class FibexParser(AbstractParser):
 
         coding1 = self.get_from_dict_or_none(utils, "Coding")
         coding2 = None
-        coding_ref = element.find('fx:CODING-REF', self.__ns__)
+        coding_ref = element.find('fx:CODING-REF', self._ns)
         if coding_ref is not None:
-            coding2 = self.__codings__[self.get_attribute(coding_ref, 'ID-REF')]
+            coding2 = self.__codings[self.get_attribute(coding_ref, 'ID-REF')]
 
         if p["Type"] == "fx:COMMON-DATATYPE-TYPE" or p["Type"] == "fx:ENUM-DATATYPE-TYPE":
             if self.basetype_is_bitfield(coding1):
@@ -706,17 +707,17 @@ class FibexParser(AbstractParser):
 
                 items = {}
 
-                for i in element.findall('./fx:ENUMERATION-ELEMENTS/fx:ENUM-ELEMENT', self.__ns__):
+                for i in element.findall('./fx:ENUMERATION-ELEMENTS/fx:ENUM-ELEMENT', self._ns):
                     value = int(self.get_child_text(i, "fx:VALUE"))
                     name = self.get_child_text(i, "fx:SYNONYM")
                     desc = self.get_child_text(i, "ho:DESC")
                     items[value] = self.__conf_factory__.create_someip_parameter_enumeration_item(value, name, desc)
 
-                enumitems = self.dict_to_sorted_set(items)
+                enum_items = self.dict_to_sorted_set(items)
 
                 ret = self.__conf_factory__.create_someip_parameter_enumeration(
                     self.get_from_dict_or_none(p, "Name"),
-                    enumitems,
+                    enum_items,
                     ret
                 )
 
@@ -725,7 +726,7 @@ class FibexParser(AbstractParser):
 
             members = dict()
 
-            for member in element.findall('fx:MEMBERS/fx:MEMBER', self.__ns__):
+            for member in element.findall('fx:MEMBERS/fx:MEMBER', self._ns):
                 (pos, m) = self.parse_member(member, p["ComplexClass"])
                 members[pos] = m
 
@@ -737,7 +738,7 @@ class FibexParser(AbstractParser):
                     for m in p["Members"]:
 
                         child = self.interpret_datatype(
-                            self.get_from_dict_or_none(self.__datatypes__,
+                            self.get_from_dict_or_none(self.__datatypes,
                                                        self.get_from_dict_or_none(m, "DatatypeRef")),
                             self.get_from_dict_or_none(m, "Utilization"),
                             self.get_from_dict_or_none(m, "SerializationAttributes")
@@ -751,7 +752,7 @@ class FibexParser(AbstractParser):
                                 child
                             )
 
-                        signal = self.get_from_dict_or_none(self.__signals__,
+                        signal = self.get_from_dict_or_none(self.__signals,
                                                             self.get_from_dict_or_none(m, "SignalRef"))
 
                         member = self.__conf_factory__.create_someip_parameter_struct_member(
@@ -770,7 +771,7 @@ class FibexParser(AbstractParser):
                     members = dict()
                     for m in p["Members"]:
                         child = self.interpret_datatype(
-                            self.get_from_dict_or_none(self.__datatypes__,
+                            self.get_from_dict_or_none(self.__datatypes,
                                                        self.get_from_dict_or_none(m, "DatatypeRef")),
                             self.get_from_dict_or_none(m, "Utilization"),
                             self.get_from_dict_or_none(m, "SerializationAttributes")
@@ -812,7 +813,7 @@ class FibexParser(AbstractParser):
                         if "Position" in m and m["Position"] == 0:
 
                             child = self.interpret_datatype(
-                                self.get_from_dict_or_none(self.__datatypes__,
+                                self.get_from_dict_or_none(self.__datatypes,
                                                            self.get_from_dict_or_none(m, "DatatypeRef")),
                                 self.merge_utilizations(utils, self.get_from_dict_or_none(m, "Utilization")),
                                 self.get_from_dict_or_none(m, "SerializationAttributes")
@@ -831,7 +832,7 @@ class FibexParser(AbstractParser):
                         ret = self.__conf_factory__.create_someip_parameter_typedef(p["Name"], childname, child)
 
             else:
-                print(f"ERROR: ComplexClass: %s Members: %d is not understood" %
+                print("ERROR: ComplexClass: %s Members: %d is not understood" %
                       (self.get_from_dict_or_none(p, "ComplexClass"), len(p))
                       )
 
@@ -843,23 +844,23 @@ class FibexParser(AbstractParser):
         return ret
 
     def parse_datatypes(self, root):
-        self.__datatypes__ = dict()
+        self.__datatypes = dict()
 
-        for datatype in root.findall('.//fx:DATATYPES/fx:DATATYPE', self.__ns__):
+        for datatype in root.findall('.//fx:DATATYPES/fx:DATATYPE', self._ns):
             did = self.get_id(datatype)
             if did is not None:
-                self.__datatypes__[did] = datatype
+                self.__datatypes[did] = datatype
 
     def parse_array(self, element):
         ret = None
 
-        for dimension in element.findall('./fx:ARRAY-DECLARATION/fx:ARRAY-DIMENSION', self.__ns__):
+        for dimension in element.findall('./fx:ARRAY-DECLARATION/fx:ARRAY-DIMENSION', self._ns):
             if ret is None:
                 ret = dict()
-            minsize = self.element_text_to_int(dimension.find('fx:MINIMUM-SIZE', self.__ns__), 0)
-            maxsize = self.element_text_to_int(dimension.find('fx:MAXIMUM-SIZE', self.__ns__), -1)
-            dim = self.element_text_to_int(dimension.find('fx:DIMENSION', self.__ns__), -1)
-            bit = self.element_text_to_int(dimension.find('fx:BIT-ALIGNMENT', self.__ns__), 0)
+            minsize = self.element_text_to_int(dimension.find('fx:MINIMUM-SIZE', self._ns), 0)
+            maxsize = self.element_text_to_int(dimension.find('fx:MAXIMUM-SIZE', self._ns), -1)
+            dim = self.element_text_to_int(dimension.find('fx:DIMENSION', self._ns), -1)
+            bit = self.element_text_to_int(dimension.find('fx:BIT-ALIGNMENT', self._ns), 0)
 
             if dim > 0:
                 ret[dim] = {'dim': dim, 'max': maxsize, 'min': minsize, 'bitalignment': bit}
@@ -889,21 +890,21 @@ class FibexParser(AbstractParser):
         p["ID"] = self.get_id(param)
         p["OID"] = self.get_oid(param)
         p["Name"] = self.get_child_text(param, './ho:SHORT-NAME')
-        p["Desc"] = self.element_text(param.find('./ho:DESC', self.__ns__))
-        p["Mandatory"] = self.element_text(param.find('./service:MANDATORY', self.__ns__))
-        p["Position"] = self.element_text(param.find('./service:POSITION', self.__ns__))
+        p["Desc"] = self.element_text(param.find('./ho:DESC', self._ns))
+        p["Mandatory"] = self.element_text(param.find('./service:MANDATORY', self._ns))
+        p["Position"] = self.element_text(param.find('./service:POSITION', self._ns))
         if p["Position"] is not None:
             p["Position"] = int(p["Position"])
 
         dt = self.get_child_attribute(param, './fx:DATATYPE-REF', 'ID-REF')
-        p["Datatype"] = self.get_from_dict_or_none(self.__datatypes__, dt)
+        p["Datatype"] = self.get_from_dict_or_none(self.__datatypes, dt)
         if p["Datatype"] is None:
             print("ERROR: Parameter without datatype is kind of strange!!!")
 
         s = self.get_child_attribute(param, './fx:SIGNAL-REF', 'ID-REF')
         signal = None
         if s is not None:
-            signal = self.get_from_dict_or_none(self.__signals__, s)
+            signal = self.get_from_dict_or_none(self.__signals, s)
 
         p["Array"] = self.parse_array(param)
         utils = self.parse_utilization(param)
@@ -930,12 +931,12 @@ class FibexParser(AbstractParser):
             call_type = "REQUEST_RESPONSE"
 
         inparams = dict()
-        for param in element.findall('./service:INPUT-PARAMETERS/service:INPUT-PARAMETER', self.__ns__):
+        for param in element.findall('./service:INPUT-PARAMETERS/service:INPUT-PARAMETER', self._ns):
             (pos, p) = self.parse_parameter(param)[:2]
             inparams[pos] = p
 
         outparams = dict()
-        for param in element.findall('./service:RETURN-PARAMETERS/service:RETURN-PARAMETER', self.__ns__):
+        for param in element.findall('./service:RETURN-PARAMETERS/service:RETURN-PARAMETER', self._ns):
             (pos, p) = self.parse_parameter(param)[:2]
             outparams[pos] = p
 
@@ -967,7 +968,7 @@ class FibexParser(AbstractParser):
         retention = -1
 
         params = dict()
-        for param in element.findall('./service:INPUT-PARAMETERS/service:INPUT-PARAMETER', self.__ns__):
+        for param in element.findall('./service:INPUT-PARAMETERS/service:INPUT-PARAMETER', self._ns):
             (pos, p) = self.parse_parameter(param)[:2]
             params[pos] = p
 
@@ -1005,7 +1006,7 @@ class FibexParser(AbstractParser):
             print(f"ERROR: We are missing a datatype for {element}")
             return None
 
-        datatype = self.get_from_dict_or_none(self.__datatypes__, dt)
+        datatype = self.get_from_dict_or_none(self.__datatypes, dt)
         if datatype is None:
             print(f"ERROR: Unknown Datatype: {dt}")
             return None
@@ -1013,7 +1014,7 @@ class FibexParser(AbstractParser):
         signal = None
         s = self.get_child_attribute(element, './fx:SIGNAL-REF', 'ID-REF')
         if s is not None:
-            signal = self.get_from_dict_or_none(self.__signals__, s)
+            signal = self.get_from_dict_or_none(self.__signals, s)
             if signal is None:
                 print(f"ERROR: Unknown Signal: {s}")
                 return None
@@ -1057,25 +1058,24 @@ class FibexParser(AbstractParser):
         eventids = []
         notifierids = []
 
-        for eventref in element.findall('./service:EVENT-REFS/service:EVENT-REF', self.__ns__):
+        for eventref in element.findall('./service:EVENT-REFS/service:EVENT-REF', self._ns):
             ref = self.get_attribute(eventref, 'ID-REF')
             if events is not None and ref in events:
                 eventids += [events[ref]]
             else:
                 print(f"ERROR: Eventgroup {id} has EVENT-REF to {ref} but I cannot find the Event!")
 
-        for fieldref in element.findall('./service:FIELD-REFS/service:FIELD-REF', self.__ns__):
+        for fieldref in element.findall('./service:FIELD-REFS/service:FIELD-REF', self._ns):
             ref = self.get_attribute(fieldref, 'ID-REF')
             if fields is not None and ref in fields:
                 notifierids += [fields[ref]]
             else:
                 print("ERROR: Eventgroup %s has FIELD-REF to %s but I cannot find the Field!" % (id, ref))
 
-        self.__eventgrouprefs__[id] = (serviceid, egid)
+        self.__eventgroup_refs[id] = (serviceid, egid)
         return id, self.__conf_factory__.create_someip_service_eventgroup(name, egid, eventids, notifierids)
 
     def parse_service(self, service):
-        id = None
         sid = self.get_id(service)
         name = self.get_child_text(service, './ho:SHORT-NAME')
         service_id = int(self.get_child_text(service, './fx:SERVICE-IDENTIFIER'))
@@ -1083,28 +1083,28 @@ class FibexParser(AbstractParser):
         minor_version = int(self.get_child_text(service, './service:API-VERSION/service:MINOR'))
 
         methods = dict()
-        for method in service.findall('./service:METHODS/service:METHOD', self.__ns__):
-            id, m = self.parse_method(method)
-            methods[m.methodid()] = m
+        for method in service.findall('./service:METHODS/service:METHOD', self._ns):
+            original_id, m = self.parse_method(method)
+            methods[m.method_id()] = m
 
-        eventids = dict()
+        event_ids = dict()
         events = dict()
-        for event in service.findall('./service:EVENTS/service:EVENT', self.__ns__):
-            id, e = self.parse_event(event)
-            events[e.methodid()] = e
-            eventids[id] = e.methodid()
+        for event in service.findall('./service:EVENTS/service:EVENT', self._ns):
+            original_id, e = self.parse_event(event)
+            events[e.method_id()] = e
+            event_ids[original_id] = e.method_id()
 
-        fieldids = dict()
+        field_ids = dict()
         fields = dict()
-        for field in service.findall('./service:FIELDS/service:FIELD', self.__ns__):
-            id, f = self.parse_field(field)
-            fields[f.id()] = f
-            fieldids[id] = f.notifierid()
+        for field in service.findall('./service:FIELDS/service:FIELD', self._ns):
+            original_id, f = self.parse_field(field)
+            fields[f.internal_id()] = f
+            field_ids[original_id] = f.notifier_id()
 
         eventgroups = dict()
-        for eg in service.findall('./service:EVENT-GROUPS/service:EVENT-GROUP', self.__ns__):
-            id, eg = self.parse_eventgroup(eg, id, eventids, fieldids)
-            eventgroups[eg.id()] = eg
+        for eg in service.findall('./service:EVENT-GROUPS/service:EVENT-GROUP', self._ns):
+            original_id, eg = self.parse_eventgroup(eg, sid, event_ids, field_ids)
+            eventgroups[eg.eventgroup_id()] = eg
 
         s = self.__conf_factory__.create_someip_service(name, service_id, major_version, minor_version, methods, events,
                                                         fields, eventgroups)
@@ -1120,14 +1120,14 @@ class FibexParser(AbstractParser):
         p["DatatypeRef"] = self.get_child_attribute(element, 'fx:DATATYPE-REF', 'ID-REF')
         p["SignalRef"] = self.get_child_attribute(element, 'fx:SIGNAL-REF', 'ID-REF')
 
-        p["Index"] = self.element_text_to_int(element.find('fx:INDEX', self.__ns__), -1)
+        p["Index"] = self.element_text_to_int(element.find('fx:INDEX', self._ns), -1)
 
-        position = element.find('fx:POSITION', self.__ns__)
+        position = element.find('fx:POSITION', self._ns)
         if position is not None:
             position = int(position.text)
         p["Position"] = position
 
-        mandatory = element.find('fx:MANDATORY', self.__ns__)
+        mandatory = element.find('fx:MANDATORY', self._ns)
         if mandatory is not None:
             mandatory = "true" == mandatory.text or "True" == mandatory.text or "TRUE" == mandatory.text
         p["Mandatory"] = mandatory
@@ -1145,14 +1145,14 @@ class FibexParser(AbstractParser):
         return pos, p
 
     def parse_services(self, root):
-        self.__services__ = dict()
+        self.__services = dict()
 
-        for service in root.findall('.//fx:SERVICE-INTERFACE', self.__ns__):
+        for service in root.findall('.//fx:SERVICE-INTERFACE', self._ns):
             id, s = self.parse_service(service)
-            self.__services__[id] = s
+            self.__services[id] = s
 
     def parse_channels(self, root):
-        for ch in root.findall('.//fx:CHANNELS/fx:CHANNEL', self.__ns__):
+        for ch in root.findall('.//fx:CHANNELS/fx:CHANNEL', self._ns):
             channel = dict()
             channel["id"] = self.get_id(ch)
             channel["name"] = self.get_child_text(ch, "ho:SHORT-NAME")
@@ -1164,7 +1164,7 @@ class FibexParser(AbstractParser):
 
             channel["frametriggerings"] = {}
 
-            for v in ch.findall('ethernet:VIRTUAL-LAN', self.__ns__):
+            for v in ch.findall('ethernet:VIRTUAL-LAN', self._ns):
                 # = self.ID(v)
                 if channel["vlanid"] is not None:
                     print("WARNING: We have found a channel with more than 1 VLAN. We are skipping those.")
@@ -1172,17 +1172,17 @@ class FibexParser(AbstractParser):
                     channel["vlanid"] = self.get_child_text(v, "ethernet:VLAN-IDENTIFIER")
                     channel["vlanname"] = self.get_child_text(v, "ho:SHORT-NAME")
 
-            self.__channels__[channel["id"]] = channel
+            self.__channels[channel["id"]] = channel
 
     def parse_neps(self, element):
         neps = dict()
-        for n in element.findall('it:NETWORK-ENDPOINTS/it:NETWORK-ENDPOINT', self.__ns__):
+        for n in element.findall('it:NETWORK-ENDPOINTS/it:NETWORK-ENDPOINT', self._ns):
             nep = dict()
             nep["id"] = self.get_id(n)
             nep["name"] = self.get_child_text(n, "it:MANUFACTURER-EXTENSION/ho:SHORT-NAME")
 
             ipsv4 = []
-            for i in n.findall('it:NETWORK-ENDPOINT-ADDRESSES/it:NETWORK-ENDPOINT-ADDRESS/it:IPV4', self.__ns__):
+            for i in n.findall('it:NETWORK-ENDPOINT-ADDRESSES/it:NETWORK-ENDPOINT-ADDRESS/it:IPV4', self._ns):
                 ip = dict()
                 ip["addr"] = self.get_child_text(i, "it:IP-ADDRESS")
                 ip["addrsrc"] = self.get_child_text(i, "it:IPV4-ADDRESS-SOURCE")
@@ -1194,7 +1194,7 @@ class FibexParser(AbstractParser):
             nep["ipsv4"] = ipsv4
 
             ipsv6 = []
-            for i in n.findall('it:NETWORK-ENDPOINT-ADDRESSES/it:NETWORK-ENDPOINT-ADDRESS/it:IPV6', self.__ns__):
+            for i in n.findall('it:NETWORK-ENDPOINT-ADDRESSES/it:NETWORK-ENDPOINT-ADDRESS/it:IPV6', self._ns):
                 ip = dict()
                 ip["addr"] = self.get_child_text(i, "it:IPV6-ADDRESS")
                 ip["addrsrc"] = self.get_child_text(i, "it:IPV6-ADDRESS-SOURCE")
@@ -1210,32 +1210,32 @@ class FibexParser(AbstractParser):
         return neps
 
     def parse_psis(self, root):
-        for aep in root.findall('.//it:APPLICATION-ENDPOINT', self.__ns__):
+        for aep in root.findall('.//it:APPLICATION-ENDPOINT', self._ns):
             protover = self.get_child_text(aep, 'it:SERIALIZATION-TECHNOLOGY/it:VERSION')
             if protover is None:
                 protover = 1
 
             aepid = self.get_id(aep)
-            for psi in aep.findall('it:PROVIDED-SERVICE-INSTANCES/it:PROVIDED-SERVICE-INSTANCE', self.__ns__):
+            for psi in aep.findall('it:PROVIDED-SERVICE-INSTANCES/it:PROVIDED-SERVICE-INSTANCE', self._ns):
                 id = self.get_id(psi)
-                instanceid = self.get_child_text(psi, 'it:INSTANCE-IDENTIFIER')
+                instance_id = self.get_child_text(psi, 'it:INSTANCE-IDENTIFIER')
                 servref = self.get_child_attribute(psi, 'service:SERVICE-INTERFACE-REF', 'ID-REF')
-                if servref not in self.__services__:
+                if servref not in self.__services:
                     print(f"ERROR in FIBEX: I cannot find Service {servref}")
                 else:
-                    service = self.__services__[servref]
+                    service = self.__services[servref]
 
-                    si = self.__conf_factory__.create_someip_service_instance(service, instanceid, protover)
-                    self.__ServiceInstances__[id] = si
+                    si = self.__conf_factory__.create_someip_service_instance(service, instance_id, protover)
+                    self.__service_instances[id] = si
 
-                    if aepid not in self.__aeps__:
-                        self.__aeps__[aepid] = ([], [], [], [])
+                    if aepid not in self.__aeps:
+                        self.__aeps[aepid] = ([], [], [], [])
 
-                    psis, csis, ehs, cegs = self.__aeps__[aepid]
-                    self.__aeps__[aepid] = (psis + [si], csis, ehs, cegs)
+                    psis, csis, ehs, cegs = self.__aeps[aepid]
+                    self.__aeps[aepid] = (psis + [si], csis, ehs, cegs)
 
     def parse_psis_pass_two(self, root):
-        for aep in root.findall('.//it:APPLICATION-ENDPOINT', self.__ns__):
+        for aep in root.findall('.//it:APPLICATION-ENDPOINT', self._ns):
             # protover = self.get_child_text(aep, 'it:SERIALIZATION-TECHNOLOGY/it:VERSION')
             # if protover is None:
             #    protover = 1
@@ -1244,81 +1244,81 @@ class FibexParser(AbstractParser):
             for cegrefs in aep.findall(
                     'it:PROVIDED-SERVICE-INSTANCES/it:PROVIDED-SERVICE-INSTANCE/' +
                     'it:EVENT-HANDLERS/it:EVENT-HANDLER/it:CONSUMED-EVENT-GROUP-REFS',
-                    self.__ns__
+                    self._ns
             ):
 
                 eh = None
                 ref = None
-                for cegref in cegrefs.findall('it:CONSUMED-EVENT-GROUP-REF', self.__ns__):
+                for cegref in cegrefs.findall('it:CONSUMED-EVENT-GROUP-REF', self._ns):
                     ref = self.get_attribute(cegref, 'ID-REF')
 
-                if ref not in self.__ServiceEventgroupReceiver__:
+                if ref not in self.__service_eventgroup_receiver:
                     print(f"ERROR in FIBEX: I cannot find the CEGREF {ref}!")
                 else:
-                    egreceiver = self.__ServiceEventgroupReceiver__[ref]
+                    egreceiver = self.__service_eventgroup_receiver[ref]
 
                     if eh is None:
-                        eh = self.__conf_factory__.create_someip_service_eventgroup_sender(egreceiver.serviceinstance(),
-                                                                                           egreceiver.eventgroupid())
-                        eh.addreceiver(egreceiver)
+                        eh = self.__conf_factory__.create_someip_service_eventgroup_sender(egreceiver.service_instance(),
+                                                                                           egreceiver.eventgroup_id())
+                        eh.add_receiver(egreceiver)
 
-                    if aepid not in self.__aeps__:
-                        self.__aeps__[aepid] = ([], [], [], [])
+                    if aepid not in self.__aeps:
+                        self.__aeps[aepid] = ([], [], [], [])
 
-                    psis, csis, ehs, cegs = self.__aeps__[aepid]
-                    self.__aeps__[aepid] = (psis, csis, ehs + [eh], cegs)
+                    psis, csis, ehs, cegs = self.__aeps[aepid]
+                    self.__aeps[aepid] = (psis, csis, ehs + [eh], cegs)
 
     def parse_csis_and_cegs(self, root):
-        for aep in root.findall('.//it:APPLICATION-ENDPOINT', self.__ns__):
+        for aep in root.findall('.//it:APPLICATION-ENDPOINT', self._ns):
 
             aepid = self.get_id(aep)
-            for csi in aep.findall('it:CONSUMED-SERVICE-INSTANCES/it:CONSUMED-SERVICE-INSTANCE', self.__ns__):
+            for csi in aep.findall('it:CONSUMED-SERVICE-INSTANCES/it:CONSUMED-SERVICE-INSTANCE', self._ns):
                 psiid = self.get_child_attribute(csi, 'it:PROVIDED-SERVICE-INSTANCE-REF', 'ID-REF')
 
-                if psiid in self.__ServiceInstances__:
-                    si = self.__ServiceInstances__[psiid]
+                if psiid in self.__service_instances:
+                    si = self.__service_instances[psiid]
 
-                    tmp = self.__conf_factory__.create_someip_service_instance_client(si.service(), si.instanceid(),
-                                                                                      si.protover(), si)
+                    tmp = self.__conf_factory__.create_someip_service_instance_client(si.service(), si.instance_id(),
+                                                                                      si.protocol_version(), si)
 
-                    if aepid not in self.__aeps__:
-                        self.__aeps__[aepid] = ([], [], [], [])
+                    if aepid not in self.__aeps:
+                        self.__aeps[aepid] = ([], [], [], [])
 
-                    psis, csis, ehs, cegs = self.__aeps__[aepid]
-                    self.__aeps__[aepid] = (psis, csis + [tmp], ehs, cegs)
+                    psis, csis, ehs, cegs = self.__aeps[aepid]
+                    self.__aeps[aepid] = (psis, csis + [tmp], ehs, cegs)
 
-                    for ceg in csi.findall('it:CONSUMED-EVENT-GROUPS/it:CONSUMED-EVENT-GROUP', self.__ns__):
+                    for ceg in csi.findall('it:CONSUMED-EVENT-GROUPS/it:CONSUMED-EVENT-GROUP', self._ns):
                         cegid = self.get_id(ceg)
                         egref = self.get_child_attribute(ceg, 'service:EVENT-GROUP-REF', 'ID-REF')
                         aepref = self.get_child_attribute(ceg, 'it:APPLICATION-ENDPOINT-REF', 'ID-REF')
 
-                        if egref not in self.__eventgrouprefs__:
+                        if egref not in self.__eventgroup_refs:
                             print(f"ERROR in FIBEX: I cannot find Eventgroup {egref}!")
 
                         else:
-                            egid = self.__eventgrouprefs__[egref][1]
+                            egid = self.__eventgroup_refs[egref][1]
                             tmp = self.__conf_factory__.create_someip_service_eventgroup_receiver(si, egid, None)
 
-                            if cegid not in self.__ServiceEventgroupReceiver__.keys():
-                                self.__ServiceEventgroupReceiver__[cegid] = tmp
+                            if cegid not in self.__service_eventgroup_receiver.keys():
+                                self.__service_eventgroup_receiver[cegid] = tmp
                             else:
                                 print(f"ERROR in FIBEX: The CEG ID seems to be not unique {egid}!")
 
-                            if aepref not in self.__aeps__:
-                                self.__aeps__[aepref] = ([], [], [], [])
+                            if aepref not in self.__aeps:
+                                self.__aeps[aepref] = ([], [], [], [])
 
-                            psis, csis, ehs, cegs = self.__aeps__[aepref]
-                            self.__aeps__[aepref] = (psis, csis, ehs, cegs + [tmp])
+                            psis, csis, ehs, cegs = self.__aeps[aepref]
+                            self.__aeps[aepref] = (psis, csis, ehs, cegs + [tmp])
 
                 else:
                     print(f"ERROR in FIBEX: Cannot find PSI {psiid}")
 
     def parse_generic_frame_triggering_ref(self, root, path, frametriggerings):
         ret = {}
-        for port in root.findall(path, self.__ns__):
+        for port in root.findall(path, self._ns):
             frame_triggering_id = self.get_child_attribute(port, "./fx:FRAME-TRIGGERING-REF", "ID-REF")
 
-            tmp = self.__frame_triggerings__.get(frame_triggering_id, None)
+            tmp = self.__frame_triggerings.get(frame_triggering_id, None)
             if tmp is None:
                 print(f"WARNING: FrameTriggering {frame_triggering_id} not found!")
             else:
@@ -1343,12 +1343,12 @@ class FibexParser(AbstractParser):
         self.parse_csis_and_cegs(root)
         self.parse_psis_pass_two(root)
 
-        for e in root.findall('.//fx:ECUS/fx:ECU', self.__ns__):
+        for e in root.findall('.//fx:ECUS/fx:ECU', self._ns):
             ecu_name = self.get_child_text(e, "ho:SHORT-NAME")
             ecu_id = self.get_attribute(e, "ID")
 
             ctrls = dict()
-            for c in e.findall('fx:CONTROLLERS/fx:CONTROLLER', self.__ns__):
+            for c in e.findall('fx:CONTROLLERS/fx:CONTROLLER', self._ns):
                 ctrl = dict()
                 ctrl["id"] = self.get_id(c)
                 ctrl["name"] = self.get_child_text(c, "ho:SHORT-NAME")
@@ -1356,7 +1356,7 @@ class FibexParser(AbstractParser):
                 ctrl["ifaces"] = []
                 ctrls[ctrl["id"]] = ctrl
 
-            for c in e.findall('fx:CONNECTORS/fx:CONNECTOR', self.__ns__):
+            for c in e.findall('fx:CONNECTORS/fx:CONNECTOR', self._ns):
                 channelref = self.get_child_attribute(c, 'fx:CHANNEL-REF', 'ID-REF')
                 ctrlref = self.get_child_attribute(c, 'fx:CONTROLLER-REF', 'ID-REF')
 
@@ -1375,8 +1375,8 @@ class FibexParser(AbstractParser):
                     ctrl["ifaces"] = []
                     ctrls[ctrl["id"]] = ctrl
 
-                if channelref in self.__channels__:
-                    channel = self.__channels__[channelref]
+                if channelref in self.__channels:
+                    channel = self.__channels[channelref]
                     channel_fts = channel.get("frametriggerings", {})
                 else:
                     channel = None
@@ -1402,11 +1402,11 @@ class FibexParser(AbstractParser):
                         if ip not in interface_ips:
                             interface_ips.append(ip)
 
-                for aep in c.findall('it:APPLICATION-ENDPOINTS/it:APPLICATION-ENDPOINT', self.__ns__):
+                for aep in c.findall('it:APPLICATION-ENDPOINTS/it:APPLICATION-ENDPOINT', self._ns):
                     aep_id = self.get_id(aep)
 
-                    if aep_id in self.__aeps__:
-                        sis, csis, ehs, cegs = self.__aeps__[aep_id]
+                    if aep_id in self.__aeps:
+                        sis, csis, ehs, cegs = self.__aeps[aep_id]
                     else:
                         sis, csis, ehs, cegs = [], [], [], []
 
@@ -1472,14 +1472,14 @@ class FibexParser(AbstractParser):
                 tmp = self.__conf_factory__.create_controller(ctrl["name"], ctrl["ifaces"])
                 ctrllist += [tmp]
 
-                assert (tmp not in self.__controllers__)
-                self.__controllers__[key] = tmp
+                assert (tmp not in self.__controllers)
+                self.__controllers[key] = tmp
 
             self.create_ecu(ecu_id, ecu_name, ctrllist)
         self.finalize_ecus()
 
     def parse_topology(self, root, verbose=False):
-        for e in root.findall('.//fx:COUPLING-ELEMENTS/fx:COUPLING-ELEMENT', self.__ns__):
+        for e in root.findall('.//fx:COUPLING-ELEMENTS/fx:COUPLING-ELEMENT', self._ns):
             switch_name = self.get_child_text(e, "ho:SHORT-NAME")
             cluster_ref = self.get_child_attribute(e, "fx:CLUSTER-REF", "ID-REF")
             ecu_ref = self.get_child_attribute(e, "fx:ECU-REF", "ID-REF")
@@ -1496,10 +1496,10 @@ class FibexParser(AbstractParser):
                 continue
 
             coupling_ports = []
-            for c in e.findall('fx:COUPLING-PORTS/fx:COUPLING-PORT', self.__ns__):
+            for c in e.findall('fx:COUPLING-PORTS/fx:COUPLING-PORT', self._ns):
                 coupling_port_id = self.get_attribute(c, "ID")
                 controller_ref = self.get_child_attribute(c, "fx:CONTROLLER-REF", "ID-REF")
-                controller = self.__controllers__.get(controller_ref, None)
+                controller = self.__controllers.get(controller_ref, None)
 
                 if controller is None:
                     controller_ref_name = ""
@@ -1507,12 +1507,12 @@ class FibexParser(AbstractParser):
                     controller_ref_name = controller.name()
 
                 coupling_port_ref = self.get_child_attribute(c, "fx:COUPLING-PORT-REF", "ID-REF")
-                coupling_port = self.__coupling_ports__.get(coupling_port_ref, None)
+                coupling_port = self.__coupling_ports.get(coupling_port_ref, None)
 
                 default_vlan_ref = self.get_child_attribute(c, "ethernet:DEFAULT-VLAN/fx:CHANNEL-REF", "ID-REF")
 
                 if verbose:
-                    default_vlan_name = (self.__channels__.get(default_vlan_ref, {})).get("name", "")
+                    default_vlan_name = (self.__channels.get(default_vlan_ref, {})).get("name", "")
                     print(f"  Port ID:{coupling_port_id} CTRL-REF:{controller_ref} ({controller_ref_name}) "
                           f"PORT-REF:{coupling_port_ref} DEFAULT-VLAN:{default_vlan_ref} ({default_vlan_name})")
 
@@ -1520,16 +1520,16 @@ class FibexParser(AbstractParser):
                 assert (controller is None or coupling_port is None)
 
                 vlans = []
-                for v in c.findall('ethernet:VLAN-MEMBERSHIPS/ethernet:VLAN-MEMBERSHIP', self.__ns__):
+                for v in c.findall('ethernet:VLAN-MEMBERSHIPS/ethernet:VLAN-MEMBERSHIP', self._ns):
                     channel_ref = self.get_child_attribute(v, "fx:CHANNEL-REF", "ID-REF")
-                    channel_ref_name = (self.__channels__.get(channel_ref, {})).get("name", "")
+                    channel_ref_name = (self.__channels.get(channel_ref, {})).get("name", "")
                     default_prio = self.get_child_text(v, "ethernet:DEFAULT-PRIORITY/fx:PRIORITY")
                     default_prio = 0 if default_prio is None else int(default_prio)
 
                     if verbose:
                         print(f"    VLAN Channel:{channel_ref} ({channel_ref_name}) Default-Prio:{default_prio}")
 
-                    channel = self.__channels__.get(channel_ref, {})
+                    channel = self.__channels.get(channel_ref, {})
                     channel["vlanid"] = None if channel.get("vlanid", None) is None else int(channel["vlanid"])
                     vlans.append(self.__conf_factory__.create_vlan(channel["name"], channel["vlanid"], default_prio))
 
@@ -1539,7 +1539,7 @@ class FibexParser(AbstractParser):
                     coupling_port.set_connected_port(tmp)
 
                 coupling_ports.append(tmp)
-                self.__coupling_ports__[coupling_port_id] = tmp
+                self.__coupling_ports[coupling_port_id] = tmp
 
             self.__conf_factory__.create_switch(switch_name, ecu, coupling_ports)
 
@@ -1553,7 +1553,7 @@ class FibexParser(AbstractParser):
             print("*** Parsing Channels ***")
         self.parse_channels(root)
         if verbose:
-            for k, v in self.__channels__.items():
+            for k, v in self.__channels.items():
                 print(f"{k}: {v}")
             print("")
 
@@ -1561,7 +1561,7 @@ class FibexParser(AbstractParser):
             print("*** Parsing Codings ***")
         self.parse_codings(root)
         if verbose:
-            print(self.__codings__)
+            print(self.__codings)
             print("")
 
         if verbose:
@@ -1586,7 +1586,7 @@ class FibexParser(AbstractParser):
             print("*** Parsing PDUs ***")
         self.parse_pdus(root, verbose)
         if verbose:
-            for k, v in self.__pdus__.items():
+            for k, v in self.__pdus.items():
                 print(f"{k}: {v}")
             print("")
 
@@ -1614,8 +1614,8 @@ class FibexParser(AbstractParser):
         if verbose:
             print("")
 
-        if self.__plugin__ is not None:
-            plugin = self.__plugin__.FibexParserPlugin()
+        if self.__plugin is not None:
+            plugin = self.__plugin.FibexParserPlugin()
             plugin.parse_file(self, conf_factory, filename, verbose=verbose)
 
 

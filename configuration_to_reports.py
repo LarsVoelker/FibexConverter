@@ -19,13 +19,45 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import sys
-import time
-import os.path
 import argparse
+import os.path
+import time
 
-from parser_dispatcher import *  # @UnusedWildImport
-from configuration_base_classes import *  # @UnusedWildImport
+from configuration_base_classes import (
+    BaseConfigurationFactory,
+    BaseController,
+    BaseECU,
+    BaseInterface,
+    BaseSocket,
+    SOMEIPBaseParameter,
+    SOMEIPBaseParameterArray,
+    SOMEIPBaseParameterArrayDimension,
+    SOMEIPBaseParameterBasetype,
+    SOMEIPBaseParameterBitfield,
+    SOMEIPBaseParameterBitfieldItem,
+    SOMEIPBaseParameterEnumeration,
+    SOMEIPBaseParameterEnumerationItem,
+    SOMEIPBaseParameterString,
+    SOMEIPBaseParameterStruct,
+    SOMEIPBaseParameterStructMember,
+    SOMEIPBaseParameterTypedef,
+    SOMEIPBaseParameterUnion,
+    SOMEIPBaseParameterUnionMember,
+    SOMEIPBaseService,
+    SOMEIPBaseServiceEvent,
+    SOMEIPBaseServiceEventgroup,
+    SOMEIPBaseServiceEventgroupReceiver,
+    SOMEIPBaseServiceEventgroupSender,
+    SOMEIPBaseServiceField,
+    SOMEIPBaseServiceInstance,
+    SOMEIPBaseServiceInstanceClient,
+    SOMEIPBaseServiceMethod,
+)
+from parser_dispatcher import (
+    is_file_or_dir_valid,
+    parse_input_files,
+    parser_formats,
+)
 
 
 class SimpleConfigurationFactory(BaseConfigurationFactory):
@@ -41,82 +73,82 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__ecus__[name] = ret
         return ret
 
-    def create_controller(self, name, vlans):
-        ret = Controller(name, vlans)
+    def create_controller(self, name, interfaces):
+        ret = Controller(name, interfaces)
         return ret
 
-    def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
-        ret = Interface(name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel)
+    def create_interface(self, name, vlan_id, ips, sockets, input_frame_triggerings, output_frame_triggerings, fr_channel):
+        ret = Interface(name, vlan_id, ips, sockets, input_frame_triggerings, output_frame_triggerings, fr_channel)
         return ret
 
-    def create_socket(self, name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
-                      eventgroupreceivers):
-        ret = Socket(name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
-                     eventgroupreceivers)
+    def create_socket(self, name, ip, proto, port_number, service_instances, service_instance_clients, event_handlers,
+                      event_group_receivers):
+        ret = Socket(name, ip, proto, port_number, service_instances, service_instance_clients, event_handlers,
+                     event_group_receivers)
         return ret
 
-    def create_someip_service_instance(self, service, instanceid, protover):
-        ret = SOMEIPServiceInstance(service, instanceid, protover)
+    def create_someip_service_instance(self, service, instance_id, protocol_version):
+        ret = SOMEIPServiceInstance(service, instance_id, protocol_version)
         return ret
 
-    def create_someip_service_instance_client(self, service, instanceid, protover, server):
-        ret = SOMEIPServiceInstanceClient(service, instanceid, protover, server)
+    def create_someip_service_instance_client(self, service, instance_id, protocol_version, server):
+        ret = SOMEIPServiceInstanceClient(service, instance_id, protocol_version, server)
         return ret
 
-    def create_someip_service_eventgroup_sender(self, serviceinstance, eventgroupid):
-        ret = SOMEIPServiceEventgroupSender(serviceinstance, eventgroupid)
+    def create_someip_service_eventgroup_sender(self, service_instance, eventgroup_id):
+        ret = SOMEIPServiceEventgroupSender(service_instance, eventgroup_id)
         return ret
 
-    def create_someip_service_eventgroup_receiver(self, serviceinstance, eventgroupid, sender):
-        ret = SOMEIPServiceEventgroupReceiver(serviceinstance, eventgroupid, sender)
+    def create_someip_service_eventgroup_receiver(self, service_instance, eventgroup_id, sender):
+        ret = SOMEIPServiceEventgroupReceiver(service_instance, eventgroup_id, sender)
         return ret
 
-    def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
-        ret = SOMEIPService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
-        print("Adding Service(ID: 0x%04x Ver: %d.%d)" % (serviceid, majorver, minorver))
-        #        assert(self.add_service(serviceid, majorver, minorver, ret))
-        self.add_service(serviceid, majorver, minorver, ret)
+    def create_someip_service(self, name, service_id, major_version, minor_version, methods, events, fields, eventgroups):
+        ret = SOMEIPService(name, service_id, major_version, minor_version, methods, events, fields, eventgroups)
+        print("Adding Service(ID: 0x%04x Ver: %d.%d)" % (service_id, major_version, minor_version))
+        #        assert(self.add_service(service_id, major_version, minor_version, ret))
+        self.add_service(service_id, major_version, minor_version, ret)
         return ret
 
-    def create_someip_service_method(self, name, methodid, calltype, relia, inparams, outparams,
-                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1):
-        ret = SOMEIPServiceMethod(name, methodid, calltype, relia, inparams, outparams,
-                                  reqdebounce, reqmaxretention, resmaxretention)
+    def create_someip_service_method(self, name, method_id, call_type, reliable, in_parameters, out_parameters,
+                                     request_debounce=-1, request_max_retention=-1, response_max_retention=-1, tlv=False):
+        ret = SOMEIPServiceMethod(name, method_id, call_type, reliable, in_parameters, out_parameters,
+                                  request_debounce, request_max_retention, response_max_retention, tlv)
         return ret
 
-    def create_someip_service_event(self, name, methodid, relia, params,
-                                    debounce=-1, maxretention=-1):
-        ret = SOMEIPServiceEvent(name, methodid, relia, params,
-                                 debounce, maxretention)
+    def create_someip_service_event(self, name, method_id, reliable, params,
+                                    debounce=-1, max_retention=-1, tlv=False):
+        ret = SOMEIPServiceEvent(name, method_id, reliable, params,
+                                 debounce, max_retention, tlv)
         return ret
 
-    def create_someip_service_field(self, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
+    def create_someip_service_field(self, name, getter_id, setter_id, notifier_id, getter_reliable, setter_reliable, notifier_reliable,
                                     params,
-                                    getter_debouncereq, getter_retentionreq, getter_retentionres,
-                                    setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                    notifier_debounce, notifier_retention):
-        ret = SOMEIPServiceField(self, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
+                                    getter_debounce_request, getter_retention_request, getter_retention_response,
+                                    setter_debounce_request, setter_retention_request, setter_retention_response,
+                                    notifier_debounce, notifier_retention, tlv=False):
+        ret = SOMEIPServiceField(self, name, getter_id, setter_id, notifier_id, getter_reliable, setter_reliable, notifier_reliable,
                                  params,
-                                 getter_debouncereq, getter_retentionreq, getter_retentionres,
-                                 setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                 notifier_debounce, notifier_retention)
+                                 getter_debounce_request, getter_retention_request, getter_retention_response,
+                                 setter_debounce_request, setter_retention_request, setter_retention_response,
+                                 notifier_debounce, notifier_retention, tlv)
         return ret
 
-    def create_someip_service_eventgroup(self, name, eid, eventids, fieldids):
-        ret = SOMEIPServiceEventgroup(name, eid, eventids, fieldids)
+    def create_someip_service_eventgroup(self, name, eid, event_ids, field_ids):
+        ret = SOMEIPServiceEventgroup(name, eid, event_ids, field_ids)
         return ret
 
-    def create_someip_parameter(self, position, name, desc, mandatory, datatype, signal):
-        ret = SOMEIPParameter(position, name, desc, mandatory, datatype, signal)
+    def create_someip_parameter(self, position, name, desc, mandatory, data_type, signal):
+        ret = SOMEIPParameter(position, name, desc, mandatory, data_type, signal)
         return ret
 
-    def create_someip_parameter_basetype(self, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
-        ret = SOMEIPParameterBasetype(name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type)
+    def create_someip_parameter_basetype(self, name, data_type, bigendian, bitlength_basetype, bitlength_encoded_type):
+        ret = SOMEIPParameterBasetype(name, data_type, bigendian, bitlength_basetype, bitlength_encoded_type)
         return ret
 
-    def create_someip_parameter_string(self, name, chartype, bigendian, lowerlimit, upperlimit, termination,
+    def create_someip_parameter_string(self, name, char_type, big_endian, lower_limit, upper_limit, termination,
                                        length_of_length, pad_to):
-        ret = SOMEIPParameterString(name, chartype, bigendian, lowerlimit, upperlimit, termination, length_of_length,
+        ret = SOMEIPParameterString(name, char_type, big_endian, lower_limit, upper_limit, termination, length_of_length,
                                     pad_to)
         return ret
 
@@ -124,12 +156,12 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterArray(name, dims, child)
         return ret
 
-    def create_someip_parameter_array_dim(self, dim, lowerlimit, upperlimit, length_of_length, pad_to):
-        ret = SOMEIPParameterArrayDim(dim, lowerlimit, upperlimit, length_of_length, pad_to)
+    def create_someip_parameter_array_dim(self, dim, lower_limit, upper_limit, length_of_length, pad_to):
+        ret = SOMEIPParameterArrayDim(dim, lower_limit, upper_limit, length_of_length, pad_to)
         return ret
 
-    def create_someip_parameter_struct(self, name, length_of_length, pad_to, members):
-        ret = SOMEIPParameterStruct(name, length_of_length, pad_to, members)
+    def create_someip_parameter_struct(self, name, length_of_length, pad_to, members, tlv=False):
+        ret = SOMEIPParameterStruct(name, length_of_length, pad_to, members, tlv)
         return ret
 
     def create_someip_parameter_struct_member(self, position, name, mandatory, child, signal):
@@ -164,31 +196,31 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterBitfieldItem(bit_number, name)
         return ret
 
-    def add_service(self, serviceid, majorver, minorver, service):
-        sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
+    def add_service(self, service_id, major_version, minor_version, service):
+        sid = "%04x-%02x-%08x" % (service_id, major_version, minor_version)
         if sid in self.__services_long__:
             print("ERROR: Service (SID: 0x%04x, Major-Ver: %d, Minor-Ver: %d) already exists! Not overriding it!" %
-                  (serviceid, majorver, minorver))
+                  (service_id, major_version, minor_version))
             return False
         self.__services_long__[sid] = service
 
-        sid = "%04x-%02x" % (serviceid, majorver)
+        sid = "%04x-%02x" % (service_id, major_version)
         if sid in self.__services__:
-            print(f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver}) " +
-                  "already exists with a different Minor Version (not {minorver})! Not overriding it!")
+            print(f"ERROR: Service (SID: 0x{service_id:04x}, Major-Ver: {major_version}) " +
+                  f"already exists with a different Minor Version (not {minor_version})! Not overriding it!")
             return False
         self.__services__[sid] = service
         return True
 
-    def get_service(self, serviceid, majorver, minorver=None):
-        if minorver is None:
-            sid = "%04x-%02x" % (serviceid, majorver)
+    def get_service(self, service_id, major_version, minor_version=None):
+        if minor_version is None:
+            sid = "%04x-%02x" % (service_id, major_version)
             if sid in self.__services__:
                 return self.__services__[sid]
             else:
                 return None
         else:
-            sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
+            sid = "%04x-%02x-%08x" % (service_id, major_version, minor_version)
             if sid in self.__services_long__:
                 return self.__services_long__[sid]
             else:
@@ -199,8 +231,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def __str__(self):
         ret = "Services: \n"
-        for serviceid in sorted(self.__services__):
-            ret += self.__services__[serviceid].str(2)
+        for service_id in sorted(self.__services__):
+            ret += self.__services__[service_id].str(2)
 
         ret += "\nECUs: \n"
         for name in sorted(self.__ecus__):
@@ -258,9 +290,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 class ECU(BaseECU):
     def str(self, indent):
         ret = indent * " "
-        ret += f"ECU {self.__name__}\n"
+        ret += f"ECU {self.__name}\n"
 
-        for c in self.__controllers__:
+        for c in self.controllers():
             ret += c.str(indent + 2)
 
         return ret
@@ -269,8 +301,8 @@ class ECU(BaseECU):
 class Controller(BaseController):
     def str(self, indent):
         ret = indent * " "
-        ret += f"CTRL {self.__name__}\n"
-        for i in self.__interfaces__:
+        ret += f"CTRL {self.__name}\n"
+        for i in self.__interfaces:
             ret += i.str(indent + 2)
 
         return ret
@@ -279,8 +311,8 @@ class Controller(BaseController):
 class Interface(BaseInterface):
     def str(self, indent):
         ret = indent * " "
-        ret += "Interface %s (VLAN-ID: 0x%x)\n" % (self.__vlanname__, self.__vlanid__)
-        for s in self.__sockets__:
+        ret += "Interface %s (VLAN-ID: 0x%x)\n" % (self.__vlan_name, self.__vlan_id)
+        for s in self.__sockets:
             ret += s.str(indent + 2)
         return ret
 
@@ -288,14 +320,14 @@ class Interface(BaseInterface):
 class Socket(BaseSocket):
     def str(self, indent):
         ret = indent * " "
-        ret += "Socket %s %s:%s/%s\n" % (self.__name__, self.__ip__, self.__portnumber__, self.__proto__)
-        for i in self.__instances__:
+        ret += "Socket %s %s:%s/%s\n" % (self.__name, self.__ip, self.__port_number, self.__protocol)
+        for i in self.__instances:
             ret += i.str(indent + 2)
-        for i in self.__instanceclients__:
+        for i in self.__instance_clients:
             ret += i.str(indent + 2)
-        for c in self.__ehs__:
+        for c in self.__event_handlers:
             ret += c.str(indent + 2)
-        for c in self.__cegs__:
+        for c in self.__consumed_event_groups:
             ret += c.str(indent + 2)
         return ret
 
@@ -303,62 +335,62 @@ class Socket(BaseSocket):
 class SOMEIPServiceInstance(SOMEIPBaseServiceInstance):
     def str(self, indent):
         ret = indent * " "
-        ret += f"ServiceInstance Service-ID: 0x{self.__service__.serviceid():04x} "
-        ret += f"Version: {self.__service__.versionstring()} "
-        ret += f"Instance-ID: 0x{self.__instanceid__:04x} "
-        ret += f"Protover: {self.__protover__}\n"
+        ret += f"ServiceInstance Service-ID: 0x{self.__service.serviceid():04x} "
+        ret += f"Version: {self.__service.versionstring()} "
+        ret += f"Instance-ID: 0x{self.__instance_id:04x} "
+        ret += f"Protover: {self.__protocol_version}\n"
         return ret
 
     def key(self):
         return "0x%04x-0x%02x-0x%04x-%s" % (
-            self.__service__.serviceid(), self.__service__.majorversion(), self.__instanceid__, self.__service__.name())
+            self.service().service_id(), self.service().major_version(), self.instance_id(), self.service().name())
 
 
 class SOMEIPServiceInstanceClient(SOMEIPBaseServiceInstanceClient):
     def str(self, indent):
         ret = indent * " "
-        ret += f"ServiceInstanceClient Service-ID: 0x{self.__service__.serviceid():04x} "
-        ret += f"Version: {self.__service__.versionstring()} "
-        ret += f"Instance-ID: 0x{self.__instanceid__:04x} "
-        ret += f"Protover: {self.__protover__}\n"
+        ret += f"ServiceInstanceClient Service-ID: 0x{self.service().serviceid():04x} "
+        ret += f"Version: {self.service().versionstring()} "
+        ret += f"Instance-ID: 0x{self.instance_id():04x} "
+        ret += f"Protover: {self.protocol_version()}\n"
         return ret
 
 
 class SOMEIPServiceEventgroupSender(SOMEIPBaseServiceEventgroupSender):
     def str(self, indent):
         ret = indent * " "
-        ret += f"EventgroupSender: Service-ID: 0x{self.__si__.service().serviceid():04x} "
-        ret += f"Instance-ID: 0x{self.__si__.instanceid():04x} "
-        ret += f"Eventgroup-ID: 0x{self.__eventgroupid__:04x}\n"
+        ret += f"EventgroupSender: Service-ID: 0x{self.service_instance().service().service_id():04x} "
+        ret += f"Instance-ID: 0x{self.service_instance().instance_id():04x} "
+        ret += f"Eventgroup-ID: 0x{self.eventgroup_id():04x}\n"
         return ret
 
 
 class SOMEIPServiceEventgroupReceiver(SOMEIPBaseServiceEventgroupReceiver):
     def str(self, indent):
         ret = indent * " "
-        ret += f"EventgroupReceiver: Service-ID: 0x{self.__si__.service().serviceid():04x} "
-        ret += f"Instance-ID: 0x{self.__si__.instanceid():04x} "
-        ret += f"Eventgroup-ID: 0x{self.__eventgroupid__:04x}\n"
+        ret += f"EventgroupReceiver: Service-ID: 0x{self.service_instance().service().service_id():04x} "
+        ret += f"Instance-ID: 0x{self.service_instance().instance_id():04x} "
+        ret += f"Eventgroup-ID: 0x{self.eventgroup_id():04x}\n"
         return ret
 
 
 class SOMEIPService(SOMEIPBaseService):
     def str(self, indent):
         ret = indent * " "
-        ret += "%s (id: 0x%04x  ver: %d.%d)\n" % (self.__name__, self.__serviceid__,
-                                                  self.__major__, self.__minor__)
+        ret += "%s (id: 0x%04x  ver: %d.%d)\n" % (self.name(), self.service_id(),
+                                                  self.major_version(), self.minor_version())
 
-        for methodid in self.__methods__:
-            ret += self.__methods__[methodid].str(indent + 2)
+        for method in self.methods().values():
+            ret += method.str(indent + 2)
 
-        for eventsid in self.__events__:
-            ret += self.__events__[eventsid].str(indent + 2)
+        for event in self.events().values():
+            ret += event.str(indent + 2)
 
-        for fieldid in self.__fields__:
-            ret += self.__fields__[fieldid].str(indent + 2)
+        for field in self.fields().values():
+            ret += field.str(indent + 2)
 
-        for egid in self.__eventgroups__:
-            ret += self.__eventgroups__[egid].str(indent + 2)
+        for eg in self.eventgroups().values():
+            ret += eg.str(indent + 2)
 
         return ret
 
@@ -366,19 +398,19 @@ class SOMEIPService(SOMEIPBaseService):
 class SOMEIPServiceMethod(SOMEIPBaseServiceMethod):
     def str(self, indent):
         ret = indent * " "
-        ret += "Method %s (id: 0x%04x  type: %s  reli: %s)\n" % (self.__name__,
-                                                                 self.__methodid__,
-                                                                 self.__calltype__,
-                                                                 self.__reliable__)
+        ret += "Method %s (id: 0x%04x  type: %s  reli: %s)\n" % (self.name(),
+                                                                 self.method_id(),
+                                                                 self.call_type(),
+                                                                 self.reliable())
 
         ret += (indent + 2) * " "
         ret += "In Parameters: \n"
-        for param in self.__inparams__:
+        for param in self.in_parameters():
             ret += param.str(indent + 4)
 
         ret += (indent + 2) * " "
         ret += "Out Parameters: \n"
-        for param in self.__outparams__:
+        for param in self.out_parameters():
             ret += param.str(indent + 4)
 
         return ret
@@ -387,11 +419,11 @@ class SOMEIPServiceMethod(SOMEIPBaseServiceMethod):
 class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
     def str(self, indent):
         ret = indent * " "
-        ret += "Event %s (id: 0x%04x  reli: %s)\n" % (self.__name__,
-                                                      self.__methodid__,
-                                                      self.__reliable__)
+        ret += "Event %s (id: 0x%04x  reli: %s)\n" % (self.name(),
+                                                      self.method_id(),
+                                                      self.reliable())
 
-        for param in self.__params__:
+        for param in self.params():
             ret += param.str(indent + 2)
 
         return ret
@@ -400,24 +432,24 @@ class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
 class SOMEIPServiceField(SOMEIPBaseServiceField):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Field {self.__name__}\n"
+        ret += f"Field {self.name()}\n"
 
         indent += 2
-        if self.__getter__ is not None:
+        if self.getter() is not None:
             ret += indent * " "
-            ret += "Getter(id: 0x%04x  reli: %s)\n" % (self.__getter__.methodid(), self.__getter__.reliable())
+            ret += "Getter(id: 0x%04x  reli: %s)\n" % (self.getter().method_id(), self.getter().reliable())
 
-        if self.__setter__ is not None:
+        if self.setter() is not None:
             ret += indent * " "
-            ret += "Setter(id: 0x%04x  reli: %s)\n" % (self.__setter__.methodid(), self.__setter__.reliable())
+            ret += "Setter(id: 0x%04x  reli: %s)\n" % (self.setter().method_id(), self.setter().reliable())
 
-        if self.__notifier__ is not None:
+        if self.notifier() is not None:
             ret += indent * " "
-            ret += "Notifier(id: 0x%04x  reli: %s)\n" % (self.__notifier__.methodid(), self.__notifier__.reliable())
+            ret += "Notifier(id: 0x%04x  reli: %s)\n" % (self.notifier().method_id(), self.notifier().reliable())
 
         ret += indent * " "
         ret += "Parameters:\n"
-        for param in self.__params__:
+        for param in self.params():
             ret += param.str(indent + 2)
 
         return ret
@@ -426,13 +458,13 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
 class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Eventgroup {self.__name__} (id: 0x{self.__id__:04x})\n"
+        ret += f"Eventgroup {self.name()} (id: 0x{self.eventgroup_id():04x})\n"
 
-        if len(self.__eventids__) > 0:
+        if len(self.event_ids()) > 0:
             ret += (2 + indent) * " "
             ret += "Events: "
             first = True
-            for eid in self.__eventids__:
+            for eid in self.event_ids():
                 if not first:
                     ret += ", "
                 else:
@@ -440,11 +472,11 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
                 ret += f"0x{eid:04x}"
             ret += "\n"
 
-        if len(self.__fieldids__) > 0:
+        if len(self.field_ids()) > 0:
             ret += (2 + indent) * " "
             ret += "Notifiers: "
             first = True
-            for fid in self.__fieldids__:
+            for fid in self.field_ids():
                 if not first:
                     ret += ", "
                 else:
@@ -458,76 +490,71 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
 class SOMEIPParameter(SOMEIPBaseParameter):
     def str(self, indent):
         ret = indent * " "
-        ret += "Parameter %d %s (mandatory: %s)\n" % (self.__position__, self.__name__, self.__mandatory__)
-        if self.__datatype__ is None:
+        ret += "Parameter %d %s (mandatory: %s)\n" % (self.position(), self.name(), self.mandatory())
+        if self.data_type() is None:
             ret += "%sNone\n" % ((indent + 2) * " ")
         else:
-            ret += self.__datatype__.str(indent + 2)
+            ret += self.data_type().str(indent + 2)
 
         return ret
 
 
 class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
-    #     def str(self):
-    #         self.str(0)
-
     def str(self, indent):
         endian = "BE"
-        if not self.__bigendian__:
+        if not self.big_endian():
             endian = "LE"
 
         ret = indent * " "
-        ret += "%s %s %s (%d;%d)\n" % (self.__name__, self.__datatype__, endian,
-                                       self.__bitlength_basetype__, self.__bitlength_encoded_type__)
+        ret += "%s %s %s (%d;%d)\n" % (self.name(), self.data_type(), endian,
+                                       self.bit_length_base_type(), self.bit_length_encoded_type())
         return ret
 
 
 class SOMEIPParameterString(SOMEIPBaseParameterString):
     def str(self, indent):
-        endian = "BE"
-        if not self.__bigendian__:
-            endian = "LE"
+        endian = "BE" if self.big_endian() else "LE"
 
         ret = indent * " "
-        ret += "String %s %s %s (%d;%d) term: %s len: %d pad: %d\n" % (self.__name__, self.__chartype__, endian,
-                                                                       self.__lowerlimit__, self.__upperlimit__,
-                                                                       self.__termination__, self.__lengthOfLength__,
-                                                                       self.__padTo__)
+        ret += "String %s %s %s (%d;%d) term: %s len: %d pad: %d\n" % (self.name(), self.char_type(), endian,
+                                                                       self.lower_limit(), self.upper_limit(),
+                                                                       self.termination(), self.length_of_length(),
+                                                                       self.pad_to())
         return ret
 
 
 class SOMEIPParameterArray(SOMEIPBaseParameterArray):
     def str(self, indent):
         ret = indent * " "
-        ret += "Array {self.__name__}:\n"
-        for dim in self.__dims__:
-            ret += self.__dims__[dim].str(indent + 2)
-        if self.__child__ is None:
+        ret += f"Array {self.name()}:\n"
+        for dim in self.dimensions():
+            ret += self.dimensions()[dim].str(indent + 2)
+        if self.child() is None:
             ret += "%sNone\n" % ((indent + 2) * " ")
         else:
-            ret += self.__child__.str(indent + 2)
+            ret += self.child().str(indent + 2)
 
         return ret
 
 
-class SOMEIPParameterArrayDim(SOMEIPBaseParameterArrayDim):
+class SOMEIPParameterArrayDim(SOMEIPBaseParameterArrayDimension):
     def str(self, indent):
         ret = indent * " "
-        ret += "Dimension %d [%d-%d] lengthOfLength: %d padding: %d\n" % (self.__dim__,
-                                                                          self.__lowerlimit__,
-                                                                          self.__upperlimit__,
-                                                                          self.__lengthOfLength__,
-                                                                          self.__padTo__)
+        ret += "Dimension %d [%d-%d] lengthOfLength: %d padding: %d\n" % (self.dimension(),
+                                                                          self.lower_limit(),
+                                                                          self.upper_limit(),
+                                                                          self.length_of_length(),
+                                                                          self.pad_to())
         return ret
 
 
 class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Struct {self.__name__}:\n"
-        if self.__members__ is not None:
-            for m in sorted(self.__members__.keys()):
-                member = self.__members__[m]
+        ret += f"Struct {self.name()}:\n"
+        if self.members() is not None:
+            for m in sorted(self.members().keys()):
+                member = self.members()[m]
                 if member is not None:
                     ret += member.str(indent + 2)
                 else:
@@ -539,10 +566,10 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
 class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
     def str(self, indent):
         ret = indent * " "
-        ret += "%d %s (mandatory: %s)\n" % (self.__position__, self.__name__, self.__mandatory__)
+        ret += "%d %s (mandatory: %s)\n" % (self.position(), self.name(), self.mandatory())
 
-        if self.__child__ is not None:
-            ret += self.__child__.str(indent + 2)
+        if self.child() is not None:
+            ret += self.child().str(indent + 2)
 
         return ret
 
@@ -550,18 +577,18 @@ class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
 class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
     def str(self, indent):
         ret = indent * " "
-        ret += "Typedef: %s %s\n" % (self.__name__, self.__name2__)
-        if self.__child__ is not None:
-            ret += self.__child__.str(indent + 2)
+        ret += "Typedef: %s %s\n" % (self.name(), self.name2())
+        if self.child() is not None:
+            ret += self.child().str(indent + 2)
         return ret
 
 
 class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Enumeration {self.__name__}\n"
-        ret += self.__child__.str(indent + 2)
-        for i in self.__items__:
+        ret += f"Enumeration {self.name()}\n"
+        ret += self.child().str(indent + 2)
+        for i in self.items():
             i.str(indent + 2)
         return ret
 
@@ -569,17 +596,17 @@ class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
 class SOMEIPParameterEnumerationItem(SOMEIPBaseParameterEnumerationItem):
     def str(self, indent):
         ret = indent * " "
-        ret += f"{self.__value__}: {self.__name__}"
+        ret += f"{self.value()}: {self.name()}"
         return ret
 
 
 class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
     def str(self, indent):
         ret = indent * " "
-        ret += "Union {self.__name__}:\n"
-        if self.__members__ is not None:
-            for m in sorted(self.__members__.keys()):
-                member = self.__members__[m]
+        ret += f"Union {self.name()}:\n"
+        if self.members() is not None:
+            for m in sorted(self.members().keys()):
+                member = self.members()[m]
                 if member is not None:
                     ret += member.str(indent + 2)
                 else:
@@ -592,10 +619,10 @@ class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
     def str(self, indent):
         ret = indent * " "
 
-        ret += "%d %s (mandatory: %s)\n" % (self.__index__, self.__name__, self.__mandatory__)
+        ret += "%d %s (mandatory: %s)\n" % (self.index(), self.name(), self.mandatory())
 
-        if self.__child__ is not None:
-            ret += self.__child__.str(indent + 2)
+        if self.child() is not None:
+            ret += self.child().str(indent + 2)
 
         return ret
 
@@ -603,9 +630,9 @@ class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
 class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Bitfield {self.__name__}\n"
-        ret += self.__child__.str(indent + 2)
-        for i in self.__items__:
+        ret += f"Bitfield {self.name()}\n"
+        ret += self.child().str(indent + 2)
+        for i in self.items():
             ret += i.str(indent + 2)
         return ret
 
@@ -613,7 +640,7 @@ class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
 class SOMEIPParameterBitfieldItem(SOMEIPBaseParameterBitfieldItem):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Bit {self.__bit_number__}: {self.__name__}\n"
+        ret += f"Bit {self.bit_number()}: {self.name()}\n"
         return ret
 
 
@@ -643,28 +670,28 @@ def read_hex_integer_file(f):
     return ret
 
 
-def order_ecunames(ecunames, ecu_order):
+def order_ecu_names(ecu_names, ecu_order):
     ret = []
 
     for e in ecu_order:
-        if e in ecunames:
+        if e in ecu_names:
             ret.append(e)
-            ecunames.remove(e)
+            ecu_names.remove(e)
 
     # now add the rest
-    for e in ecunames:
+    for e in ecu_names:
         ret.append(e)
 
     return ret
 
 
-def calc_matrix(ignored_ecus, ignore_services, ecunames, data):
+def calc_matrix(ignored_ecus, ignore_services, ecu_names, data):
     # create a matrix of Server -> Client -> Service Instances
     # ignore the ECUs on the ignored ECU list
     matrix = {}
-    for s in ecunames:
+    for s in ecu_names:
         matrix[s] = {}
-        for c in ecunames:
+        for c in ecu_names:
             matrix[s][c] = []
 
     for server in data.keys():
@@ -684,16 +711,16 @@ def calc_matrix(ignored_ecus, ignore_services, ecunames, data):
 
 
 # returns a list of affected service-ids
-def generate_event_multiple_eg(target_dir, filenoext, postfix, conf_factory):
+def generate_event_multiple_eg(target_dir, file_no_ext, postfix, conf_factory):
     ret = []
 
-    textfile = os.path.join(target_dir, filenoext + postfix)
+    textfile = os.path.join(target_dir, file_no_ext + postfix)
     f = open(textfile, "w")
     f.write("Service;Service-ID;Type;Event/Field; Method-ID; EGs of Event/Field;Provider\n")
 
     # stats
     num_services = 0
-    num_eventsfields = 0
+    num_events_fields = 0
 
     for service in sorted(conf_factory.get_services().values(), key=lambda x: x.str(0)):
 
@@ -704,24 +731,24 @@ def generate_event_multiple_eg(target_dir, filenoext, postfix, conf_factory):
         providers = []
         for si in service.instances():
             if si.socket() is not None:
-                tmp = [si.instanceid(), si.socket().interface().controller().ecu().name()]
+                tmp = [si.instance_id(), si.socket().interface().controller().ecu().name()]
                 if tmp not in providers:
                     providers.append(tmp)
 
         # transform into ref matrices
         for eg in service.eventgroups().values():
-            for eventid in eg.eventids():
-                if eventid not in refs_events.keys():
-                    refs_events[eventid] = []
-                refs_events[eventid].append(eg.id())
-            for notifierid in eg.fieldids():
-                if notifierid not in refs_fields.keys():
-                    refs_fields[notifierid] = []
-                refs_fields[notifierid].append(eg.id())
+            for event_id in eg.event_ids():
+                if event_id not in refs_events.keys():
+                    refs_events[event_id] = []
+                refs_events[event_id].append(eg.eventgroup_id())
+            for notifier_id in eg.field_ids():
+                if notifier_id not in refs_fields.keys():
+                    refs_fields[notifier_id] = []
+                refs_fields[notifier_id].append(eg.eventgroup_id())
 
         # now check for dupes
-        for eventid in refs_events.keys():
-            egs = refs_events[eventid]
+        for event_id in refs_events.keys():
+            egs = refs_events[event_id]
             if len(egs) > 1:
                 egs_text = ""
                 for e in egs:
@@ -731,12 +758,12 @@ def generate_event_multiple_eg(target_dir, filenoext, postfix, conf_factory):
                 for pp in providers:
                     prov_text += ("0x%04x-%s, " % (pp[0], pp[1]))
                 f.write("%s;0x%04x;Event;%s;0x%04x;%s;%s\n" %
-                        (service.name(), service.serviceid(), service.event(eventid).name(), eventid, egs_text,
+                        (service.name(), service.service_id(), service.event(event_id).name(), event_id, egs_text,
                          prov_text))
-                num_eventsfields += 1
+                num_events_fields += 1
                 overlap_found = True
-        for fieldid in refs_fields.keys():
-            egs = refs_fields[fieldid]
+        for field_id in refs_fields.keys():
+            egs = refs_fields[field_id]
 
             if len(egs) > 1:
                 egs_text = ""
@@ -748,21 +775,21 @@ def generate_event_multiple_eg(target_dir, filenoext, postfix, conf_factory):
                     prov_text += ("0x%04x-%s, " % (pp[0], pp[1]))
 
                 f.write("%s;0x%04x;Field;%s;0x%04x;%s;%s\n" %
-                        (service.name(), service.serviceid(), service.field(fieldid).name(), fieldid, egs_text,
+                        (service.name(), service.service_id(), service.field(field_id).name(), field_id, egs_text,
                          prov_text))
-                num_eventsfields += 1
+                num_events_fields += 1
                 overlap_found = True
         if overlap_found:
             num_services += 1
-            ret.append(service.serviceid())
+            ret.append(service.service_id())
     f.close()
 
     return ret
 
 
-def generate_count_file(target_dir, filenoext, postfix, conf_factory):
+def generate_count_file(target_dir, file_no_ext, postfix, conf_factory):
     # Count Events/Fields per EG
-    textfile = os.path.join(target_dir, filenoext + postfix)
+    textfile = os.path.join(target_dir, file_no_ext + postfix)
     f = open(textfile, "w")
 
     # write header
@@ -777,34 +804,34 @@ def generate_count_file(target_dir, filenoext, postfix, conf_factory):
 
         for eg in service.eventgroups().values():
             maxsize = 0
-            for eventid in eg.eventids():
-                maxsize += service.event(eventid).size_max_out()
+            for event_id in eg.event_ids():
+                maxsize += service.event(event_id).size_max_out()
 
-            for fieldid in eg.fieldids():
-                maxsize += service.field(fieldid).size_max_out()
-            max_size_egs[eg.id()] = maxsize
+            for field_id in eg.field_ids():
+                maxsize += service.field(field_id).size_max_out()
+            max_size_egs[eg.eventgroup_id()] = maxsize
             max_size_service += maxsize
 
         # Second pass, get the rest.
         for eg in service.eventgroups().values():
-            eventcount = len(eg.eventids()) + len(eg.fieldids())
+            event_count = len(eg.event_ids()) + len(eg.field_ids())
 
             sis = ""
             for si in service.instances():
                 sis = sis + si.socket().interface().controller().ecu().name() + ","
 
             f.write("%s;0x%04x;%d;%s;0x%04x;%s;%d;%d;%d\n" % (
-                service.name(), service.serviceid(), max_size_service, eg.name(), eg.id(), sis,
+                service.name(), service.service_id(), max_size_service, eg.name(), eg.eventgroup_id(), sis,
                 len(service.eventgroups()),
-                eventcount, max_size_egs[eg.id()]))
+                event_count, max_size_egs[eg.eventgroup_id()]))
 
     f.close()
 
 
-def generate_size_file(target_dir, filenoext, postfix, conf_factory):
+def generate_size_file(target_dir, file_no_ext, postfix, conf_factory):
     tmp = conf_factory.get_size_of_methods()
 
-    textfile = os.path.join(target_dir, filenoext + postfix)
+    textfile = os.path.join(target_dir, file_no_ext + postfix)
     f = open(textfile, "w")
 
     # write header
@@ -825,19 +852,19 @@ def generate_size_file(target_dir, filenoext, postfix, conf_factory):
             reliable_true = False
             reliable_false = False
             if i[1].getter() is not None:
-                getter_id = i[1].getter().methodid()
+                getter_id = i[1].getter().method_id()
                 if i[1].getter().reliable():
                     reliable_true = True
                 else:
                     reliable_false = True
             if i[1].setter() is not None:
-                setter_id = i[1].setter().methodid()
+                setter_id = i[1].setter().method_id()
                 if i[1].setter().reliable():
                     reliable_true = True
                 else:
                     reliable_false = True
             if i[1].notifier() is not None:
-                method_id = i[1].notifier().methodid()
+                method_id = i[1].notifier().method_id()
                 if i[1].notifier().reliable():
                     reliable_true = True
                 else:
@@ -851,7 +878,7 @@ def generate_size_file(target_dir, filenoext, postfix, conf_factory):
             else:
                 reliable = ""
         else:
-            method_id = i[1].methodid()
+            method_id = i[1].method_id()
             reliable = "TRUE" if i[1].reliable() else "FALSE"
 
         if method_id == -1:
@@ -870,36 +897,36 @@ def generate_size_file(target_dir, filenoext, postfix, conf_factory):
             setter_id = f"0x{setter_id:04x}"
 
         f.write("%s;0x%04x;%s;%s;%s;%s;%s;%s;%s;%d;%d;%d;%d\n" % (
-            i[0].name(), i[0].serviceid(), sis, i[1].name(), i[2], reliable,
+            i[0].name(), i[0].service_id(), sis, i[1].name(), i[2], reliable,
             method_id, getter_id, setter_id,
             i[1].size_min_in(), i[1].size_max_in(), i[1].size_min_out(), i[1].size_max_out()))
     f.close()
 
 
-def generate_service_instance_matrix_file(target_dir, filenoext, postfix, ecunames, ignore_services, data,
+def generate_service_instance_matrix_file(target_dir, file_no_ext, postfix, ecu_names, ignore_services, data,
                                           service_with_overlapping_events):
     # dump out the service instance relations as a matrix: server+si x client
-    textfile = os.path.join(target_dir, filenoext + postfix)
+    textfile = os.path.join(target_dir, file_no_ext + postfix)
     f = open(textfile, "w")
 
     # write header
     f.write("%s;%s;%s;%s;" % ("Server", "Service Instances", "Overlapping Events/Fields?", "# Clients"))
-    for client in ecunames:
+    for client in ecu_names:
         f.write(f"{client};")
     f.write("\n")
 
-    for server in ecunames:
+    for server in ecu_names:
         if server in data.keys():
             for si in data[server].keys():
                 sid = int(si[0:6], 16)
                 overlap = 1 if sid in service_with_overlapping_events else 0
                 if sid not in ignore_services:
                     client_count = 0
-                    for client in ecunames:
+                    for client in ecu_names:
                         if client in data[server][si]:
                             client_count += 1
                     f.write("%s;%s;%d;%d;" % (server, si, overlap, client_count))
-                    for client in ecunames:
+                    for client in ecu_names:
                         if client in data[server][si]:
                             f.write("1;")
                         else:
@@ -908,9 +935,9 @@ def generate_service_instance_matrix_file(target_dir, filenoext, postfix, ecunam
     f.close()
 
 
-def generate_service_list(target_dir, filenoext, postfix, ignored_ecus, matrix):
+def generate_service_list(target_dir, file_no_ext, postfix, ignored_ecus, matrix):
     # dump out a list of service interfaces per Server-Client-Relation based on the matrix
-    textfile = os.path.join(target_dir, filenoext + postfix)
+    textfile = os.path.join(target_dir, file_no_ext + postfix)
 
     f = open(textfile, "w")
     f.write("%s;%s;%s\n" % ("Server", "Client", "Service Instances"))
@@ -919,11 +946,11 @@ def generate_service_list(target_dir, filenoext, postfix, ignored_ecus, matrix):
         if server not in ignored_ecus:
             for client in matrix[server].keys():
                 if client not in ignored_ecus:
-                    silist = list()
+                    si_list = list()
                     sis = ""
                     for si in matrix[server][client]:
-                        silist.append(si)
-                    for si in sorted(silist):
+                        si_list.append(si)
+                    for si in sorted(si_list):
                         if sis != "":
                             sis += ","
                         sis += si
@@ -933,23 +960,23 @@ def generate_service_list(target_dir, filenoext, postfix, ignored_ecus, matrix):
     f.close()
 
 
-def generate_service_matrix(target_dir, filenoext, postfix, ecunames, ignored_ecus, matrix):
+def generate_service_matrix(target_dir, file_no_ext, postfix, ecu_names, ignored_ecus, matrix):
     # dump out a matrix (=count of relations) based on the matrix
-    textfile = os.path.join(target_dir, filenoext + postfix)
+    textfile = os.path.join(target_dir, file_no_ext + postfix)
     f = open(textfile, "w")
 
     # header first
-    for client in ecunames:
+    for client in ecu_names:
         if client not in ignored_ecus:
             f.write(f";{client}")
 
     f.write(";\n")
 
-    for server in ecunames:
+    for server in ecu_names:
         if server not in ignored_ecus:
             f.write(f"{server};")
 
-            for client in ecunames:
+            for client in ecu_names:
                 if client not in ignored_ecus:
                     f.write(f"{len(matrix[server][client])};")
 
@@ -983,7 +1010,7 @@ def main():
 
     # setup output path
     (path, f) = os.path.split(args.filename)
-    filenoext = ".".join(f.split('.')[:-1])
+    file_no_ext = ".".join(f.split('.')[:-1])
     target_dir = os.path.join(output_dir, "reports")
 
     if not os.path.exists(target_dir):
@@ -991,42 +1018,42 @@ def main():
         time.sleep(0.5)
 
     # get the names of all ECUs not on the ignored_ecus list
-    ecunamesall = sorted(conf_factory.get_ecu_names())
-    ecunames = sorted(conf_factory.get_ecu_names())
+    ecu_names_all = sorted(conf_factory.get_ecu_names())
+    ecu_names = sorted(conf_factory.get_ecu_names())
     for i in ignored_ecus:
-        if i in ecunames:
-            ecunames.remove(i)
+        if i in ecu_names:
+            ecu_names.remove(i)
 
-    ecunames = order_ecunames(ecunames, ecu_order)
-    ecunamesall = order_ecunames(ecunamesall, ecu_order)
+    ecu_names = order_ecu_names(ecu_names, ecu_order)
+    ecu_names_all = order_ecu_names(ecu_names_all, ecu_order)
 
     # get the data ready
     data = conf_factory.get_service_instance_client_relations()
-    matrix = calc_matrix(ignored_ecus, ignore_services, ecunames, data)
+    matrix = calc_matrix(ignored_ecus, ignore_services, ecu_names, data)
 
     # generate the outputs
     print("")
     print("Generating overlapping EG file")
-    service_with_overlapping_events = generate_event_multiple_eg(target_dir, filenoext,
+    service_with_overlapping_events = generate_event_multiple_eg(target_dir, file_no_ext,
                                                                  "__events_fields_in_multiple_EGs.csv", conf_factory)
 
     print("Generating Eventgroup statistics")
-    generate_count_file(target_dir, filenoext, "__eventgroup_stats.csv", conf_factory)
+    generate_count_file(target_dir, file_no_ext, "__eventgroup_stats.csv", conf_factory)
 
     print("Generating sizes file")
-    generate_size_file(target_dir, filenoext, "__sizes.csv", conf_factory)
+    generate_size_file(target_dir, file_no_ext, "__sizes.csv", conf_factory)
 
     print("Generating instance matrices")
-    generate_service_instance_matrix_file(target_dir, filenoext, "__si_matrix_filtered.csv", ecunames, ignore_services,
+    generate_service_instance_matrix_file(target_dir, file_no_ext, "__si_matrix_filtered.csv", ecu_names, ignore_services,
                                           data, service_with_overlapping_events)
-    generate_service_instance_matrix_file(target_dir, filenoext, "__si_matrix_full.csv", ecunamesall, [], data,
+    generate_service_instance_matrix_file(target_dir, file_no_ext, "__si_matrix_full.csv", ecu_names_all, [], data,
                                           service_with_overlapping_events)
 
     print("Generating service instance usage list")
-    generate_service_list(target_dir, filenoext, "__service_instance_usage_list.csv", ignored_ecus, matrix)
+    generate_service_list(target_dir, file_no_ext, "__service_instance_usage_list.csv", ignored_ecus, matrix)
 
     print("Generating service instance usage matrix")
-    generate_service_matrix(target_dir, filenoext, "__service_instance_usage_matrix.csv", ecunames, ignored_ecus,
+    generate_service_matrix(target_dir, file_no_ext, "__service_instance_usage_matrix.csv", ecu_names, ignored_ecus,
                             matrix)
 
     print("Done.")
