@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2025  Dr. Lars Voelker
+# Copyright (C) 2015-2026  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
 # Copyright (C) 2020-2025  Dr. Lars Voelker, Technica Engineering GmbH
 
@@ -9,7 +9,7 @@
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
 # of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -19,13 +19,64 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import sys
-import time
-import os.path
 import argparse
+import ipaddress
+import os.path
+import time
 
-from parser_dispatcher import *  # @UnusedWildImport
-from configuration_base_classes import *  # @UnusedWildImport
+from configuration_base_classes import (
+    BaseConfigurationFactory,
+    BaseController,
+    BaseECU,
+    BaseEthernetPDUInstance,
+    BaseFrame,
+    BaseFrameTriggeringCAN,
+    BaseFrameTriggeringFlexRay,
+    BaseInterface,
+    BaseMultiplexPDU,
+    BaseMultiplexPDUSegmentPosition,
+    BaseMultiplexPDUSwitch,
+    BasePDU,
+    BasePDUInstance,
+    BaseSignal,
+    BaseSignalInstance,
+    BaseSocket,
+    BaseSwitch,
+    BaseSwitchPort,
+    SOMEIPBaseParameter,
+    SOMEIPBaseParameterArray,
+    SOMEIPBaseParameterArrayDim,
+    SOMEIPBaseParameterBasetype,
+    SOMEIPBaseParameterBitfield,
+    SOMEIPBaseParameterBitfieldItem,
+    SOMEIPBaseParameterEnumeration,
+    SOMEIPBaseParameterEnumerationItem,
+    SOMEIPBaseParameterString,
+    SOMEIPBaseParameterStruct,
+    SOMEIPBaseParameterStructMember,
+    SOMEIPBaseParameterTypedef,
+    SOMEIPBaseParameterUnion,
+    SOMEIPBaseParameterUnionMember,
+    SOMEIPBaseService,
+    SOMEIPBaseServiceEvent,
+    SOMEIPBaseServiceEventgroup,
+    SOMEIPBaseServiceEventgroupReceiver,
+    SOMEIPBaseServiceEventgroupSender,
+    SOMEIPBaseServiceField,
+    SOMEIPBaseServiceInstance,
+    SOMEIPBaseServiceInstanceClient,
+    SOMEIPBaseServiceMethod,
+    ip_to_key,
+    is_ip,
+    is_ip_mcast,
+    read_csv_to_dict,
+)
+from parser_dispatcher import (
+    is_file_or_dir_valid,
+    is_file_valid,
+    parse_input_files,
+    parser_formats,
+)
 
 
 class SimpleConfigurationFactory(BaseConfigurationFactory):
@@ -47,7 +98,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def create_switch(self, name, ecu, ports):
         ret = Switch(name, ecu, ports)
-        assert (name not in self.__switches__)
+        assert name not in self.__switches__
         self.__switches__[name] = ret
         return ret
 
@@ -56,7 +107,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def create_ecu(self, name, controllers):
         ret = ECU(name, controllers)
-        assert (name not in self.__ecus__)
+        assert name not in self.__ecus__
         self.__ecus__[name] = ret
         return ret
 
@@ -64,8 +115,25 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = Controller(name, interfaces)
         return ret
 
-    def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
-        ret = Interface(name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel)
+    def create_interface(
+        self,
+        name,
+        vlanid,
+        ips,
+        sockets,
+        input_frame_trigs,
+        output_frame_trigs,
+        fr_channel,
+    ):
+        ret = Interface(
+            name,
+            vlanid,
+            ips,
+            sockets,
+            input_frame_trigs,
+            output_frame_trigs,
+            fr_channel,
+        )
         channel = self.__channels__.setdefault(name, {})
         frame_triggerings = channel.setdefault("frametriggerings", {})
 
@@ -76,10 +144,27 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         return ret
 
-    def create_socket(self, name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
-                      eventgroupreceivers):
-        ret = Socket(name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
-                     eventgroupreceivers)
+    def create_socket(
+        self,
+        name,
+        ip,
+        proto,
+        portnumber,
+        serviceinstances,
+        serviceinstanceclients,
+        eventhandlers,
+        eventgroupreceivers,
+    ):
+        ret = Socket(
+            name,
+            ip,
+            proto,
+            portnumber,
+            serviceinstances,
+            serviceinstanceclients,
+            eventhandlers,
+            eventgroupreceivers,
+        )
         return ret
 
     def create_someip_service_instance(self, service, instanceid, protover):
@@ -104,28 +189,77 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 
-    def create_someip_service_method(self, name, methodid, calltype, relia, inparams, outparams,
-                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1, tlv=False):
-        ret = SOMEIPServiceMethod(name, methodid, calltype, relia, inparams, outparams,
-                                  reqdebounce, reqmaxretention, resmaxretention, tlv)
+    def create_someip_service_method(
+        self,
+        name,
+        methodid,
+        calltype,
+        relia,
+        inparams,
+        outparams,
+        reqdebounce=-1,
+        reqmaxretention=-1,
+        resmaxretention=-1,
+        tlv=False,
+    ):
+        ret = SOMEIPServiceMethod(
+            name,
+            methodid,
+            calltype,
+            relia,
+            inparams,
+            outparams,
+            reqdebounce,
+            reqmaxretention,
+            resmaxretention,
+            tlv,
+        )
         return ret
 
-    def create_someip_service_event(self, name, methodid, relia, params,
-                                    debounce=-1, maxretention=-1, tlv=False):
-        ret = SOMEIPServiceEvent(name, methodid, relia, params,
-                                 debounce, maxretention, tlv)
+    def create_someip_service_event(self, name, methodid, relia, params, debounce=-1, maxretention=-1, tlv=False):
+        ret = SOMEIPServiceEvent(name, methodid, relia, params, debounce, maxretention, tlv)
         return ret
 
-    def create_someip_service_field(self, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
-                                    params,
-                                    getter_debouncereq, getter_retentionreq, getter_retentionres,
-                                    setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                    notifier_debounce, notifier_retention, tlv=False):
-        ret = SOMEIPServiceField(self, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
-                                 params,
-                                 getter_debouncereq, getter_retentionreq, getter_retentionres,
-                                 setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                 notifier_debounce, notifier_retention, tlv)
+    def create_someip_service_field(
+        self,
+        name,
+        getterid,
+        setterid,
+        notifierid,
+        getterreli,
+        setterreli,
+        notifierreli,
+        params,
+        getter_debouncereq,
+        getter_retentionreq,
+        getter_retentionres,
+        setter_debouncereq,
+        setter_retentionreq,
+        setter_retentionres,
+        notifier_debounce,
+        notifier_retention,
+        tlv=False,
+    ):
+        ret = SOMEIPServiceField(
+            self,
+            name,
+            getterid,
+            setterid,
+            notifierid,
+            getterreli,
+            setterreli,
+            notifierreli,
+            params,
+            getter_debouncereq,
+            getter_retentionreq,
+            getter_retentionres,
+            setter_debouncereq,
+            setter_retentionreq,
+            setter_retentionres,
+            notifier_debounce,
+            notifier_retention,
+            tlv,
+        )
         return ret
 
     def create_someip_service_eventgroup(self, name, eid, eventids, fieldids):
@@ -140,10 +274,27 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterBasetype(name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type)
         return ret
 
-    def create_someip_parameter_string(self, name, chartype, bigendian, lowerlimit, upperlimit, termination,
-                                       length_of_length, pad_to):
-        ret = SOMEIPParameterString(name, chartype, bigendian, lowerlimit, upperlimit, termination, length_of_length,
-                                    pad_to)
+    def create_someip_parameter_string(
+        self,
+        name,
+        chartype,
+        bigendian,
+        lowerlimit,
+        upperlimit,
+        termination,
+        length_of_length,
+        pad_to,
+    ):
+        ret = SOMEIPParameterString(
+            name,
+            chartype,
+            bigendian,
+            lowerlimit,
+            upperlimit,
+            termination,
+            length_of_length,
+            pad_to,
+        )
         return ret
 
     def create_someip_parameter_array(self, name, dims, child):
@@ -190,8 +341,29 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterBitfieldItem(bit_number, name)
         return ret
 
-    def create_signal(self, id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen):
-        ret = Signal(id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen)
+    def create_signal(
+        self,
+        id,
+        name,
+        compu_scale,
+        compu_consts,
+        bit_len,
+        min_len,
+        max_len,
+        basetype,
+        basetypelen,
+    ):
+        ret = Signal(
+            id,
+            name,
+            compu_scale,
+            compu_consts,
+            bit_len,
+            min_len,
+            max_len,
+            basetype,
+            basetypelen,
+        )
         return ret
 
     def create_signal_instance(self, id, signal_ref, bit_position, is_high_low_byte_order):
@@ -207,10 +379,29 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__pdus__[id] = ret
         return ret
 
-    def create_multiplex_pdu(self, id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
-                            static_segs, static_pdu):
-        ret = MultiplexPDU(id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
-                           static_segs, static_pdu)
+    def create_multiplex_pdu(
+        self,
+        id,
+        short_name,
+        byte_length,
+        pdu_type,
+        switch,
+        seg_pos,
+        pdu_instances,
+        static_segs,
+        static_pdu,
+    ):
+        ret = MultiplexPDU(
+            id,
+            short_name,
+            byte_length,
+            pdu_type,
+            switch,
+            seg_pos,
+            pdu_instances,
+            static_segs,
+            static_pdu,
+        )
 
         if id in self.__pdus__:
             print(f"WARNING: Creating Multiplex PDU with existing ID {id}!")
@@ -233,13 +424,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def create_frame(self, id, short_name, byte_length, frame_type, pdu_instances):
         if short_name in self.__frames__:
             i = 1
+            tmp_name = f"{short_name}__duplicate{i}"
             while i == 1 or tmp_name in self.__frames__:
                 tmp_name = f"{short_name}__duplicate{i}"
                 i += 1
 
             short_name = tmp_name
 
-        assert (short_name not in self.__frames__)
+        assert short_name not in self.__frames__
 
         ret = Frame(id, short_name, byte_length, frame_type, pdu_instances)
         self.__frames__[short_name] = ret
@@ -260,16 +452,19 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def add_service(self, serviceid, majorver, minorver, service):
         sid = f"{serviceid:04x}-{majorver:02x}-{minorver:08x}"
         if sid in self.__services_long__:
-            print(f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, " +
-                  f"Minor-Ver: {minorver:d}) already exists! Not overriding it!")
+            print(
+                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, " + f"Minor-Ver: {minorver:d}) already exists! Not overriding it!"
+            )
             return False
 
         self.__services_long__[sid] = service
 
         sid = f"{serviceid:04x}-{majorver:02x}"
         if sid in self.__services__:
-            print(f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d})" +
-                  f"already exists with a different Minor Version (not {minorver:d})! Not overriding it!")
+            print(
+                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d})"
+                + f"already exists with a different Minor Version (not {minorver:d})! Not overriding it!"
+            )
             return False
 
         self.__services__[sid] = service
@@ -382,7 +577,7 @@ class SwitchPort(BaseSwitchPort):
             ret += "\n"
 
         ret += (indent + 2) * " "
-        ret += f"VLANs:\n"
+        ret += "VLANs:\n"
         ret += self.str_vlans(indent + 4)
         return ret
 
@@ -537,10 +732,9 @@ class SOMEIPServiceMethod(SOMEIPBaseServiceMethod):
         if self.__resretentiontime___ >= 0:
             extra += f" max_response_retention:{str(self.__resretentiontime___)}s"
 
-        extra += ' TLV' if self.__tlv__ else ''
+        extra += " TLV" if self.__tlv__ else ""
         ret = indent * " "
-        ret += f"Method {self.__name__} (id:0x{self.__methodid__:04x} type:{self.__calltype__} " + \
-               f"reli:{self.__reliable__}{extra})\n"
+        ret += f"Method {self.__name__} (id:0x{self.__methodid__:04x} type:{self.__calltype__} " + f"reli:{self.__reliable__}{extra})\n"
 
         ret += (indent + 2) * " "
         ret += "In Parameters: \n"
@@ -564,7 +758,7 @@ class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
             extra += f" max_retention:{str(self.__retentiontime___)}s"
 
         ret = indent * " "
-        extra += ', TLV:True' if self.__tlv__ else ''
+        extra += ", TLV:True" if self.__tlv__ else ""
         if self.legacy():
             ret += f"Event {self.__name__} (id:0x{self.__methodid__:04x} reli:{self.__reliable__}{extra}, Legacy PDU)\n"
         else:
@@ -617,8 +811,7 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
             if self.__notifier__.__retentiontime___ >= 0:
                 extra += f" max_retention:{str(self.__notifier__.max_buffer_retention_time())}s"
             ret += indent * " "
-            ret += f"Notifier(id:0x{self.__notifier__.methodid():04x} reli:{self.__notifier__.reliable()}{extra}" \
-                   f"{legacy})\n"
+            ret += f"Notifier(id:0x{self.__notifier__.methodid():04x} reli:{self.__notifier__.reliable()}{extra}" f"{legacy})\n"
 
         ret += indent * " "
         ret += "Parameters:\n"
@@ -681,8 +874,7 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
             endian = "LE"
 
         ret = indent * " "
-        ret += f"{self.__name__} {self.__datatype__} {endian} ({self.__bitlength_basetype__:d};" + \
-               f"{self.__bitlength_encoded_type__:d})\n"
+        ret += f"{self.__name__} {self.__datatype__} {endian} ({self.__bitlength_basetype__:d};" + f"{self.__bitlength_encoded_type__:d})\n"
         return ret
 
 
@@ -693,9 +885,11 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
             endian = "LE"
 
         ret = indent * " "
-        ret += f"String {self.__name__} {self.__chartype__} {endian} ({self.__lowerlimit__:d};" + \
-               f"{self.__upperlimit__:d}) term: {self.__termination__} " + \
-               f"len: {self.__lengthOfLength__:d} pad: {self.__padTo__:d}\n"
+        ret += (
+            f"String {self.__name__} {self.__chartype__} {endian} ({self.__lowerlimit__:d};"
+            + f"{self.__upperlimit__:d}) term: {self.__termination__} "
+            + f"len: {self.__lengthOfLength__:d} pad: {self.__padTo__:d}\n"
+        )
         return ret
 
 
@@ -716,15 +910,17 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
 class SOMEIPParameterArrayDim(SOMEIPBaseParameterArrayDim):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Dimension {self.__dim__:d} [{self.__lowerlimit__:d}-{self.__upperlimit__:d}] " + \
-               f"lengthOfLength: {self.__lengthOfLength__:d} padding: {self.__padTo__:d}\n"
+        ret += (
+            f"Dimension {self.__dim__:d} [{self.__lowerlimit__:d}-{self.__upperlimit__:d}] "
+            + f"lengthOfLength: {self.__lengthOfLength__:d} padding: {self.__padTo__:d}\n"
+        )
         return ret
 
 
 class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
     def str(self, indent):
         ret = indent * " "
-        tlv = ' (TLV: True)' if self.__tlv__ else ''
+        tlv = " (TLV: True)" if self.__tlv__ else ""
 
         ret += f"Struct {self.__name__}{tlv}:\n"
         if self.__members__ is not None:
@@ -834,7 +1030,7 @@ class Signal(BaseSignal):
         if self.__compu_scale__ is not None and len(self.__compu_scale__) == 3:
             ret += f", f(x) = {self.__compu_scale__[1]}/{self.__compu_scale__[2]} * x + {self.__compu_scale__[0]}"
         if self.__compu_consts__ is not None and len(self.__compu_consts__) > 0:
-            ret += f", Consts: "
+            ret += ", Consts: "
             first = True
             for name, start, end in self.__compu_consts__:
                 if first:
@@ -842,7 +1038,7 @@ class Signal(BaseSignal):
                 else:
                     ret += ", "
                 ret += f"{name} ({start}-{end})"
-            ret += f" "
+            ret += " "
         return ret + "\n"
 
 
@@ -890,8 +1086,7 @@ class MultiplexPDU(BaseMultiplexPDU):
 
         for switch_code in sorted(self.__pdu_instances__):
             pdu = self.__pdu_instances__[switch_code]
-            pdu_str = pdu.str(indent + 4, indent_first_line=False, start_offset=dyn_seg_start) \
-                      if pdu is not None else "PDU NOT FOUND!\n"
+            pdu_str = pdu.str(indent + 4, indent_first_line=False, start_offset=dyn_seg_start) if pdu is not None else "PDU NOT FOUND!\n"
 
             ret += (indent + 4) * " "
             ret += f"[Switch Code: {switch_code}]: {pdu_str}"
@@ -903,12 +1098,14 @@ class MultiplexPDU(BaseMultiplexPDU):
                 static_seg_start = seg.bit_position()
 
         if self.__static_pdu__ is not None:
-            pdu_str = self.__static_pdu__.str(indent + 4, indent_first_line=False, start_offset=static_seg_start)\
-                      if self.__static_pdu__ is not None else "PDU NOT FOUND!\n"
+            pdu_str = (
+                self.__static_pdu__.str(indent + 4, indent_first_line=False, start_offset=static_seg_start)
+                if self.__static_pdu__ is not None
+                else "PDU NOT FOUND!\n"
+            )
 
             ret += (indent + 4) * " "
             ret += f"[Static PDU] {pdu_str}"
-
 
         return ret
 
@@ -936,8 +1133,7 @@ class MultiplexPDUSegmentPosition(BaseMultiplexPDUSegmentPosition):
 
         end_bit = self.__bit_position__ + self.__bit_length__ - 1
         high_low = "high low byte order" if self.__is_high_low_byte_order__ else "low high byte order"
-        ret += f"[Bit pos.: {self.__bit_position__}..{end_bit}] " \
-               f"{prefix} Segment {self.__bit_length__} bits ({high_low})  \n"
+        ret += f"[Bit pos.: {self.__bit_position__}..{end_bit}] " f"{prefix} Segment {self.__bit_length__} bits ({high_low})  \n"
 
         return ret
 
@@ -963,7 +1159,7 @@ class PDUInstance(BasePDUInstance):
         if self.__pdu__ is not None:
             ret += self.__pdu__.str(indent + 2, indent_first_line=False)
         else:
-            ret += f" *** missing PDU ***\n"
+            ret += " *** missing PDU ***\n"
 
         return ret
 
@@ -989,7 +1185,7 @@ class FrameTriggeringCAN(BaseFrameTriggeringCAN):
         ret = indent * " "
 
         frame = self.__frame__.name() if self.__frame__ is not None else "undefined"
-        frame_id = self.__frame__.id() if self.__frame__ is not None else "undefined"
+        # frame_id = self.__frame__.id() if self.__frame__ is not None else "undefined"
 
         ret += f"FrameTriggeringCAN (CAN-ID: {self.__can_id__}) for Frame {frame}\n"
         return ret
@@ -1004,23 +1200,36 @@ class FrameTriggeringFlexRay(BaseFrameTriggeringFlexRay):
         elif self.__base_cycle__ is not None and self.__cycle_repetition__ is not None:
             timing = f"Base Cycle: {self.__base_cycle__}, Cycle Rep: {self.__cycle_repetition__}"
         else:
-            timing = f"Undefined Timing"
+            timing = "Undefined Timing"
 
         frame = self.__frame__.name() if self.__frame__ is not None else "undefined"
-        frame_id = self.__frame__.id() if self.__frame__ is not None else "undefined"
+        # frame_id = self.__frame__.id() if self.__frame__ is not None else "undefined"
 
         ret += f"FrameTriggeringFlexRay (Slot ID: {self.__slot_id__}, {timing}) for Frame {frame}\n"
         return ret
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Converting configuration to text.')
-    parser.add_argument('type', choices=parser_formats, help='format')
-    parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
-    parser.add_argument('--ecu-name-mapping', type=argparse.FileType('r'), default=None, help='Key/Value CSV file')
-    parser.add_argument('--generate-switch-port-names', action='store_true')
-    parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
-                        default=None)
+    parser = argparse.ArgumentParser(description="Converting configuration to text.")
+    parser.add_argument("type", choices=parser_formats, help="format")
+    parser.add_argument(
+        "filename",
+        help="filename or directory",
+        type=lambda x: is_file_or_dir_valid(parser, x),
+    )
+    parser.add_argument(
+        "--ecu-name-mapping",
+        type=argparse.FileType("r"),
+        default=None,
+        help="Key/Value CSV file",
+    )
+    parser.add_argument("--generate-switch-port-names", action="store_true")
+    parser.add_argument(
+        "--plugin",
+        help="filename of parser plugin",
+        type=lambda x: is_file_valid(parser, x),
+        default=None,
+    )
 
     args = parser.parse_args()
     return args
@@ -1039,8 +1248,13 @@ def main():
         ecu_name_mapping = read_csv_to_dict(args.ecu_name_mapping)
 
     conf_factory = SimpleConfigurationFactory()
-    output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin,
-                                   ecu_name_replacement=ecu_name_mapping)
+    output_dir = parse_input_files(
+        args.filename,
+        args.type,
+        conf_factory,
+        plugin_file=args.plugin,
+        ecu_name_replacement=ecu_name_mapping,
+    )
 
     print("Generating output directories:")
 
@@ -1048,8 +1262,8 @@ def main():
         target_dir = os.path.join(output_dir, "text")
         textfile = os.path.join(target_dir, "all_files" + ".txt")
     elif os.path.isfile(args.filename):
-        (path, f) = os.path.split(args.filename)
-        filenoext = '.'.join(f.split('.')[:-1])
+        path, f = os.path.split(args.filename)
+        filenoext = ".".join(f.split(".")[:-1])
         target_dir = os.path.join(output_dir, "text")
         textfile = os.path.join(target_dir, filenoext + ".txt")
 

@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2025  Dr. Lars Voelker
+# Copyright (C) 2015-2026  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
 # Copyright (C) 2020-2025  Dr. Lars Voelker, Technica Engineering GmbH
 
@@ -9,7 +9,7 @@
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
 # of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -19,9 +19,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import ipaddress
-import macaddress
 import csv
+import ipaddress
+
+import macaddress
 
 
 def bits_to_bytes(bits):
@@ -54,12 +55,13 @@ def addr_to_key(addr):
     print(f"Warning: addr_to_key was called with {addr} and this seems to be no IP or MAC Address!")
     return "None"
 
+
 def is_mac(mac):
     if mac is None:
         return False
 
     try:
-        tmp = macaddress.EUI48(mac)
+        macaddress.EUI48(mac)
     except ValueError:
         return False
 
@@ -80,7 +82,7 @@ def is_mac_mcast(mac):
 
 def mac_to_key(mac):
     if mac is None:
-        return f"None"
+        return "None"
 
     try:
         tmp = macaddress.EUI48(mac)
@@ -110,14 +112,15 @@ def is_ip_mcast(ip):
 
     return ip.is_multicast
 
+
 def ip_to_key(ip):
     if ip is None:
-        return f"None"
+        return "None"
 
     try:
         tmp = ipaddress.ip_address(ip)
     except ValueError:
-        return f"None"
+        return "None"
 
     key = f"ipvx-{ip}"
 
@@ -136,7 +139,7 @@ def mcast_addr_to_mac_mcast(addr):
         ret = ""
         tmp = ipaddress.ip_address(addr)
         if tmp.version == 4:
-            ret =  f"01-00-5e-{(tmp.packed[1] & 127):02x}-{tmp.packed[2]:02x}-{tmp.packed[3]:02x}"
+            ret = f"01-00-5e-{(tmp.packed[1] & 127):02x}-{tmp.packed[2]:02x}-{tmp.packed[3]:02x}"
         elif tmp.version == 6:
             ret = f"33-33-{(tmp.packed[12]):02x}-{(tmp.packed[13]):02x}-{(tmp.packed[14]):02x}-{(tmp.packed[15]):02x}"
         else:
@@ -150,7 +153,7 @@ def mcast_addr_to_mac_mcast(addr):
 def read_csv_to_dict(f, verbose=False):
     ret = {}
 
-    csvreader = csv.reader(f, delimiter=',', quotechar='"')
+    csvreader = csv.reader(f, delimiter=",", quotechar='"')
     skip_first_line = True
     for row in csvreader:
         if skip_first_line:
@@ -162,7 +165,7 @@ def read_csv_to_dict(f, verbose=False):
             continue
 
         if verbose:
-            print("  " + ', '.join(row))
+            print("  " + ", ".join(row))
 
         if len(row) != 2:
             print(f"Error: Line in file too short/long: {', '.join(row)} ({len(row)})")
@@ -185,8 +188,25 @@ class BaseConfigurationFactory(object):
     def create_vlan(self, name, vlanid, prio):
         return BaseVLAN(name, vlanid, prio)
 
-    def create_multicast_path(self, switchport_tx, vlan_tx, src_addr, switchport_rx, vlan_rx, mcast_addr, comment):
-        return BaseMulticastPath(switchport_tx, vlan_tx, src_addr, switchport_rx, vlan_rx, mcast_addr, comment)
+    def create_multicast_path(
+        self,
+        switchport_tx,
+        vlan_tx,
+        src_addr,
+        switchport_rx,
+        vlan_rx,
+        mcast_addr,
+        comment,
+    ):
+        return BaseMulticastPath(
+            switchport_tx,
+            vlan_tx,
+            src_addr,
+            switchport_rx,
+            vlan_rx,
+            mcast_addr,
+            comment,
+        )
 
     def create_switch(self, name, ecu, ports):
         return BaseSwitch(name, ecu, ports)
@@ -203,13 +223,47 @@ class BaseConfigurationFactory(object):
     def create_controller(self, name, interfaces):
         return BaseController(name, interfaces)
 
-    def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
-        return BaseInterface(name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel)
+    def create_interface(
+        self,
+        name,
+        vlanid,
+        ips,
+        sockets,
+        input_frame_trigs,
+        output_frame_trigs,
+        fr_channel,
+    ):
+        return BaseInterface(
+            name,
+            vlanid,
+            ips,
+            sockets,
+            input_frame_trigs,
+            output_frame_trigs,
+            fr_channel,
+        )
 
-    def create_socket(self, name, ip, proto, portnumber,
-                      serviceinstances, serviceinstanceclients, eventhandlers, eventgroupreceivers):
-        return BaseSocket(name, ip, proto, portnumber,
-                          serviceinstances, serviceinstanceclients, eventhandlers, eventgroupreceivers)
+    def create_socket(
+        self,
+        name,
+        ip,
+        proto,
+        portnumber,
+        serviceinstances,
+        serviceinstanceclients,
+        eventhandlers,
+        eventgroupreceivers,
+    ):
+        return BaseSocket(
+            name,
+            ip,
+            proto,
+            portnumber,
+            serviceinstances,
+            serviceinstanceclients,
+            eventhandlers,
+            eventgroupreceivers,
+        )
 
     def create_someip_service_instance(self, service, instanceid, protover):
         return SOMEIPBaseServiceInstance(service, instanceid, protover)
@@ -226,26 +280,75 @@ class BaseConfigurationFactory(object):
     def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
         return SOMEIPBaseService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
 
-    def create_someip_service_method(self, name, methodid, calltype, relia, inparams, outparams,
-                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1, tlv=False):
-        return SOMEIPBaseServiceMethod(name, methodid, calltype, relia, inparams, outparams,
-                                       reqdebounce, reqmaxretention, resmaxretention, tlv)
+    def create_someip_service_method(
+        self,
+        name,
+        methodid,
+        calltype,
+        relia,
+        inparams,
+        outparams,
+        reqdebounce=-1,
+        reqmaxretention=-1,
+        resmaxretention=-1,
+        tlv=False,
+    ):
+        return SOMEIPBaseServiceMethod(
+            name,
+            methodid,
+            calltype,
+            relia,
+            inparams,
+            outparams,
+            reqdebounce,
+            reqmaxretention,
+            resmaxretention,
+            tlv,
+        )
 
-    def create_someip_service_event(self, name, methodid, relia, params,
-                                    debounce=-1, maxretention=-1, tlv=False):
-        return SOMEIPBaseServiceEvent(name, methodid, relia, params,
-                                      debounce, maxretention, tlv)
+    def create_someip_service_event(self, name, methodid, relia, params, debounce=-1, maxretention=-1, tlv=False):
+        return SOMEIPBaseServiceEvent(name, methodid, relia, params, debounce, maxretention, tlv)
 
-    def create_someip_service_field(self, name, getterid, setterid, notifierid,
-                                    getterreli, setterreli, notifierreli, params,
-                                    getter_debouncereq, getter_retentionreq, getter_retentionres,
-                                    setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                    notifier_debounce, notifier_retention, tlv=False):
-        ret = SOMEIPBaseServiceField(self, name, getterid, setterid, notifierid,
-                                     getterreli, setterreli, notifierreli, params,
-                                     getter_debouncereq, getter_retentionreq, getter_retentionres,
-                                     setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                     notifier_debounce, notifier_retention, tlv)
+    def create_someip_service_field(
+        self,
+        name,
+        getterid,
+        setterid,
+        notifierid,
+        getterreli,
+        setterreli,
+        notifierreli,
+        params,
+        getter_debouncereq,
+        getter_retentionreq,
+        getter_retentionres,
+        setter_debouncereq,
+        setter_retentionreq,
+        setter_retentionres,
+        notifier_debounce,
+        notifier_retention,
+        tlv=False,
+    ):
+        ret = SOMEIPBaseServiceField(
+            self,
+            name,
+            getterid,
+            setterid,
+            notifierid,
+            getterreli,
+            setterreli,
+            notifierreli,
+            params,
+            getter_debouncereq,
+            getter_retentionreq,
+            getter_retentionres,
+            setter_debouncereq,
+            setter_retentionreq,
+            setter_retentionres,
+            notifier_debounce,
+            notifier_retention,
+            tlv,
+        )
         return ret
 
     def create_someip_service_eventgroup(self, name, eid, eventids, fieldids):
@@ -257,10 +360,27 @@ class BaseConfigurationFactory(object):
     def create_someip_parameter_basetype(self, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
         return SOMEIPBaseParameterBasetype(name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type)
 
-    def create_someip_parameter_string(self, name, chartype, bigendian, lowerlimit, upperlimit, termination,
-                                       length_of_length, pad_to):
-        return SOMEIPBaseParameterString(name, chartype, bigendian, lowerlimit, upperlimit, termination,
-                                         length_of_length, pad_to)
+    def create_someip_parameter_string(
+        self,
+        name,
+        chartype,
+        bigendian,
+        lowerlimit,
+        upperlimit,
+        termination,
+        length_of_length,
+        pad_to,
+    ):
+        return SOMEIPBaseParameterString(
+            name,
+            chartype,
+            bigendian,
+            lowerlimit,
+            upperlimit,
+            termination,
+            length_of_length,
+            pad_to,
+        )
 
     def create_someip_parameter_array(self, name, dims, child):
         return SOMEIPBaseParameterArray(name, dims, child)
@@ -295,8 +415,29 @@ class BaseConfigurationFactory(object):
     def create_someip_parameter_bitfield_item(self, bit_number, name):
         return SOMEIPBaseParameterBitfieldItem(bit_number, name)
 
-    def create_signal(self, id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen):
-        return BaseSignal(id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen)
+    def create_signal(
+        self,
+        id,
+        name,
+        compu_scale,
+        compu_consts,
+        bit_len,
+        min_len,
+        max_len,
+        basetype,
+        basetypelen,
+    ):
+        return BaseSignal(
+            id,
+            name,
+            compu_scale,
+            compu_consts,
+            bit_len,
+            min_len,
+            max_len,
+            basetype,
+            basetypelen,
+        )
 
     def create_signal_instance(self, id, signal_ref, bit_position, is_high_low_byte_order):
         return BaseSignalInstance(id, signal_ref, bit_position, is_high_low_byte_order)
@@ -304,10 +445,29 @@ class BaseConfigurationFactory(object):
     def create_pdu(self, id, short_name, byte_length, pdu_type, signal_instances):
         return BasePDU(id, short_name, byte_length, pdu_type, signal_instances)
 
-    def create_multiplex_pdu(self, id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
-                             static_segs, static_pdu):
-        return BaseMultiplexPDU(id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances,
-                                static_segs, static_pdu)
+    def create_multiplex_pdu(
+        self,
+        id,
+        short_name,
+        byte_length,
+        pdu_type,
+        switch,
+        seg_pos,
+        pdu_instances,
+        static_segs,
+        static_pdu,
+    ):
+        return BaseMultiplexPDU(
+            id,
+            short_name,
+            byte_length,
+            pdu_type,
+            switch,
+            seg_pos,
+            pdu_instances,
+            static_segs,
+            static_pdu,
+        )
 
     def create_multiplex_switch(self, id, short_name, bit_position, is_high_low_byte_order, bit_length):
         return BaseMultiplexPDUSwitch(id, short_name, bit_position, is_high_low_byte_order, bit_length)
@@ -332,8 +492,10 @@ class BaseConfigurationFactory(object):
 
     def create_pdu_route(self, sender_socket, receiving_socket, pdu_name, pdu_id):
         if sender_socket.is_multicast():
-            print(f"ERROR: Multicast Sockets cannot be used for sending!"
-                  f" {sender_socket.ip()} -> {receiving_socket.ip()}: {pdu_name} 0x{pdu_id:08x}")
+            print(
+                f"ERROR: Multicast Sockets cannot be used for sending!"
+                f" {sender_socket.ip()} -> {receiving_socket.ip()}: {pdu_name} 0x{pdu_id:08x}"
+            )
             return False
         return True
 
@@ -348,19 +510,17 @@ class BaseConfigurationFactory(object):
         eth_bus = socket.interface().controller().get_eth_bus()
 
         if eth_bus is None:
-            print(f"WARNING: cannot find sw_port and not eth bus either for eth bus! "
-                  f"Ctrl: {socket.interface().controller().name()}")
+            print(f"WARNING: cannot find sw_port and not eth bus either for eth bus! " f"Ctrl: {socket.interface().controller().name()}")
             return None
 
         sw_ports = eth_bus.switch_ports()
 
         if len(sw_ports) == 0:
-            print(f"WARNING: cannot find uplink port to eth bus! "
-                  f"Ctrl: {socket.interface().controller().name()}")
+            print(f"WARNING: cannot find uplink port to eth bus! " f"Ctrl: {socket.interface().controller().name()}")
             return None
 
         if len(sw_ports) > 1:
-            print(f"ERROR: Eth Bus with more than 1 uplink to switch is unsupported!")
+            print("ERROR: Eth Bus with more than 1 uplink to switch is unsupported!")
 
         return sw_ports[0]
 
@@ -379,12 +539,25 @@ class BaseConfigurationFactory(object):
     def parsing_done(self):
         pass
 
+
 class BaseItem(object):
     def legacy(self):
         return False
 
+
 class BaseCoding(BaseItem):
-    def __init__(self, id, name, coded_basetype, coded_category, coded_termination, coded_bit_length, coded_max_length, compu_scale, compu_consts):
+    def __init__(
+        self,
+        id,
+        name,
+        coded_basetype,
+        coded_category,
+        coded_termination,
+        coded_bit_length,
+        coded_max_length,
+        compu_scale,
+        compu_consts,
+    ):
         self.__id__ = id
         self.__name__ = name
         self.__coded_basetype__ = coded_basetype
@@ -422,10 +595,18 @@ class BaseVLAN(BaseItem):
 
 
 class BaseMulticastPath(BaseItem):
-    def __init__(self, switchport_tx, vlanid_tx, source_addr, switchport_rx, vlanid_rx, multicast_addr, comment):
+    def __init__(
+        self,
+        switchport_tx,
+        vlanid_tx,
+        source_addr,
+        switchport_rx,
+        vlanid_rx,
+        multicast_addr,
+        comment,
+    ):
         if vlanid_tx != vlanid_rx:
-            print(f"Currently only Multicast Path with same VLAN supported Addr:{multicast_addr} vlan_tx:{vlanid_tx} "
-                  f"vlan_rx:{vlanid_rx}!")
+            print(f"Currently only Multicast Path with same VLAN supported Addr:{multicast_addr} vlan_tx:{vlanid_tx} " f"vlan_rx:{vlanid_rx}!")
             raise ValueError
 
         self.__vlanid__ = vlanid_tx
@@ -472,7 +653,7 @@ class BaseMulticastPath(BaseItem):
 class BaseSwitchPort(BaseItem):
     # TODO: we need to add ethernet_bus to init!?
     def __init__(self, portid, ctrl, port, default_vlan, vlans):
-        assert(ctrl is None or port is None)
+        assert ctrl is None or port is None
 
         self.__portid__ = portid
         self.__ctrl__ = None
@@ -524,10 +705,10 @@ class BaseSwitchPort(BaseItem):
         return self.__switch__
 
     def set_connected_port(self, peer_port):
-        assert (peer_port is not None)
-        assert (self.__port__ is None)
+        assert peer_port is not None
+        assert self.__port__ is None
 
-        if self.__ctrl__ is not None or self.__eth_bus__ is not None != 0:
+        if self.__ctrl__ is not None or self.__eth_bus__ is not None:
             print(f"WARNING: SwitchPort {self.__portid__} adds port but was connected before! Overwritting!")
 
         self.__port__ = peer_port
@@ -536,8 +717,8 @@ class BaseSwitchPort(BaseItem):
         return self.__port__
 
     def set_ethernet_bus(self, eth_bus):
-        assert(eth_bus is not None)
-        assert(self.__eth_bus__ is None)
+        assert eth_bus is not None
+        assert self.__eth_bus__ is None
 
         if self.__ctrl__ is not None or self.__eth_bus__ is not None:
             print(f"WARNING: SwitchPort {self.__portid__} adds eth bus but was connected before! Overwritting!")
@@ -548,8 +729,8 @@ class BaseSwitchPort(BaseItem):
         return self.__eth_bus__
 
     def set_connected_ctrl(self, peer_ctrl):
-        assert (peer_ctrl is not None)
-        assert (self.__ctrl__ is None)
+        assert peer_ctrl is not None
+        assert self.__ctrl__ is None
 
         if self.__port__ is not None or self.__eth_bus__ is not None:
             print(f"WARNING: SwitchPort {self.__portid__} adds ctrl to port but was connected before! Overwritting!")
@@ -606,6 +787,7 @@ class BaseSwitch(BaseItem):
             return f"None.{self.name()}"
 
         return f"{self.ecu().name()}.{self.name()}"
+
 
 class BaseEthernetBus(BaseItem):
     def __init__(self, name, connected_ctrls, switch_ports):
@@ -667,7 +849,6 @@ class BaseController(BaseItem):
         return self.__interfaces__
 
     def vlans(self):
-        ret = []
         vlans = []
 
         for interface in self.__interfaces__:
@@ -685,16 +866,16 @@ class BaseController(BaseItem):
         return self.__ecu__
 
     def set_switch_port(self, peer_port):
-        assert(self.__peer_port__ is None)
-        assert(self.__eth_bus__ is None)
+        assert self.__peer_port__ is None
+        assert self.__eth_bus__ is None
         self.__peer_port__ = peer_port
 
     def get_switch_port(self):
         return self.__peer_port__
 
     def set_eth_bus(self, eth_buf):
-        assert(self.__peer_port__ is None)
-        assert(self.__eth_bus__ is None)
+        assert self.__peer_port__ is None
+        assert self.__eth_bus__ is None
         self.__eth_bus__ = eth_buf
 
     def get_eth_bus(self):
@@ -702,7 +883,16 @@ class BaseController(BaseItem):
 
 
 class BaseInterface(BaseItem):
-    def __init__(self, vlanname, vlanid, ips, sockets, frame_triggerings_in, frame_triggerings_out, fr_channel):
+    def __init__(
+        self,
+        vlanname,
+        vlanid,
+        ips,
+        sockets,
+        frame_triggerings_in,
+        frame_triggerings_out,
+        fr_channel,
+    ):
         self.__vlanname__ = vlanname
         self.__sockets__ = sockets
         self.__ips__ = ips
@@ -808,8 +998,17 @@ class BaseInterface(BaseItem):
 
 
 class BaseSocket(BaseItem):
-    def __init__(self, name, ip, proto, portnumber, serviceinstances, serviceinstanceclients, eventhandlers,
-                 eventgroupreceivers):
+    def __init__(
+        self,
+        name,
+        ip,
+        proto,
+        portnumber,
+        serviceinstances,
+        serviceinstanceclients,
+        eventhandlers,
+        eventgroupreceivers,
+    ):
         self.__name__ = name
         self.__ip__ = ip
 
@@ -853,9 +1052,14 @@ class BaseSocket(BaseItem):
         self_if = None if self.__interface__ is None else self.__interface__.controller().name()
         othr_if = None if other.__interface__ is None else other.__interface__.controller().name()
 
-        return self.__name__ == other.__name__ and self.__ip__ == other.__ip__ \
-               and self.__ipaddress__ == other.__ipaddress__ and self.__proto__ == other.__proto__ \
-               and  self.__portnumber__ == other.__portnumber__ and self_if != othr_if
+        return (
+            self.__name__ == other.__name__
+            and self.__ip__ == other.__ip__
+            and self.__ipaddress__ == other.__ipaddress__
+            and self.__proto__ == other.__proto__
+            and self.__portnumber__ == other.__portnumber__
+            and self_if != othr_if
+        )
 
     def name(self):
         return self.__name__
@@ -864,10 +1068,10 @@ class BaseSocket(BaseItem):
         return self.__ip__
 
     def is_ipv4(self):
-        return type(self.__ipaddress__) == ipaddress.IPv4Address
+        return isinstance(self.__ipaddress__, ipaddress.IPv4Address)
 
     def is_ipv6(self):
-        return type(self.__ipaddress__) == ipaddress.IPv6Address
+        return isinstance(self.__ipaddress__, ipaddress.IPv6Address)
 
     def is_multicast(self):
         return self.__ipaddress__ is not None and self.__ipaddress__.is_multicast
@@ -1116,8 +1320,19 @@ class SOMEIPBaseService(BaseItem):
 
 
 class SOMEIPBaseServiceMethod(BaseItem):
-    def __init__(self, name, methodid, calltype, relia, inparams, outparams, reqdebounce=-1, reqmaxretention=-1,
-                 resmaxretention=-1, tlv=False):
+    def __init__(
+        self,
+        name,
+        methodid,
+        calltype,
+        relia,
+        inparams,
+        outparams,
+        reqdebounce=-1,
+        reqmaxretention=-1,
+        resmaxretention=-1,
+        tlv=False,
+    ):
         self.__name__ = name
         self.__methodid__ = methodid
         self.__calltype__ = calltype
@@ -1196,7 +1411,16 @@ class SOMEIPBaseServiceMethod(BaseItem):
 
 
 class SOMEIPBaseServiceEvent(BaseItem):
-    def __init__(self, name, methodid, relia, params, debouncetimerange=-1, maxbufferretentiontime=-1, tlv=False):
+    def __init__(
+        self,
+        name,
+        methodid,
+        relia,
+        params,
+        debouncetimerange=-1,
+        maxbufferretentiontime=-1,
+        tlv=False,
+    ):
         self.__name__ = name
         self.__methodid__ = methodid
         self.__reliable__ = relia
@@ -1254,12 +1478,27 @@ class SOMEIPBaseServiceEvent(BaseItem):
 
 
 class SOMEIPBaseServiceField(BaseItem):
-    def __init__(self, config_factory, name, getterid, setterid, notifierid, getterreli, setterreli, notifierreli,
-                 params,
-                 getter_reqdebounce=-1, getter_reqmaxretention=-1, getter_resmaxretention=-1,
-                 setter_reqdebounce=-1, setter_reqmaxretention=-1, setter_resmaxretention=-1,
-                 notifier_debounce=-1, notifier_maxretention=-1,
-                 tlv=False):
+    def __init__(
+        self,
+        config_factory,
+        name,
+        getterid,
+        setterid,
+        notifierid,
+        getterreli,
+        setterreli,
+        notifierreli,
+        params,
+        getter_reqdebounce=-1,
+        getter_reqmaxretention=-1,
+        getter_resmaxretention=-1,
+        setter_reqdebounce=-1,
+        setter_reqmaxretention=-1,
+        setter_resmaxretention=-1,
+        notifier_debounce=-1,
+        notifier_maxretention=-1,
+        tlv=False,
+    ):
         self.__name__ = name
 
         self.__getter__ = None
@@ -1273,20 +1512,38 @@ class SOMEIPBaseServiceField(BaseItem):
 
         if getterid is not None:
             self.__getter__ = config_factory.create_someip_service_method(
-                name + "-Getter", getterid, "REQUEST_RESPONSE", getterreli, [], params,
-                getter_reqdebounce, getter_reqmaxretention, getter_resmaxretention
+                name + "-Getter",
+                getterid,
+                "REQUEST_RESPONSE",
+                getterreli,
+                [],
+                params,
+                getter_reqdebounce,
+                getter_reqmaxretention,
+                getter_resmaxretention,
             )
 
         if setterid is not None:
             self.__setter__ = config_factory.create_someip_service_method(
-                name + "-Setter", setterid, "REQUEST_RESPONSE", setterreli, params, params,
-                setter_reqdebounce, setter_reqmaxretention, setter_resmaxretention
+                name + "-Setter",
+                setterid,
+                "REQUEST_RESPONSE",
+                setterreli,
+                params,
+                params,
+                setter_reqdebounce,
+                setter_reqmaxretention,
+                setter_resmaxretention,
             )
 
         if notifierid is not None:
             self.__notifier__ = config_factory.create_someip_service_event(
-                name + "-Notifier", notifierid, notifierreli, params,
-                notifier_debounce, notifier_maxretention
+                name + "-Notifier",
+                notifierid,
+                notifierreli,
+                params,
+                notifier_debounce,
+                notifier_maxretention,
             )
 
         # find smallest ID after stripping None
@@ -1455,11 +1712,11 @@ class SOMEIPBaseParameterBasetype(BaseItem):
             return False
 
         return (
-                self.name() == other.name() and
-                self.datatype() == other.datatype() and
-                self.bigendian() == other.bigendian() and
-                self.bitlength_basetype() == other.bitlength_basetype() and
-                self.bitlength_encoded_type() == other.bitlength_encoded_type()
+            self.name() == other.name()
+            and self.datatype() == other.datatype()
+            and self.bigendian() == other.bigendian()
+            and self.bitlength_basetype() == other.bitlength_basetype()
+            and self.bitlength_encoded_type() == other.bitlength_encoded_type()
         )
 
     def size_min_bits(self):
@@ -1470,7 +1727,17 @@ class SOMEIPBaseParameterBasetype(BaseItem):
 
 
 class SOMEIPBaseParameterString(BaseItem):
-    def __init__(self, name, chartype, bigendian, lowerlimit, upperlimit, termination, length_of_length, pad_to):
+    def __init__(
+        self,
+        name,
+        chartype,
+        bigendian,
+        lowerlimit,
+        upperlimit,
+        termination,
+        length_of_length,
+        pad_to,
+    ):
         self.__name__ = name
         self.__chartype__ = chartype
         self.__bigendian__ = bigendian
@@ -1517,14 +1784,14 @@ class SOMEIPBaseParameterString(BaseItem):
             return False
 
         return (
-                self.name() == other.name() and
-                self.chartype() == other.chartype() and
-                self.bigendian() == other.bigendian() and
-                self.lowerlimit() == other.lowerlimit() and
-                self.upperlimit() == other.upperlimit() and
-                self.termination() == other.termination() and
-                self.length_of_length() == other.length_of_length() and
-                self.pad_to() == other.pad_to()
+            self.name() == other.name()
+            and self.chartype() == other.chartype()
+            and self.bigendian() == other.bigendian()
+            and self.lowerlimit() == other.lowerlimit()
+            and self.upperlimit() == other.upperlimit()
+            and self.termination() == other.termination()
+            and self.length_of_length() == other.length_of_length()
+            and self.pad_to() == other.pad_to()
         )
 
     def size_min_bits(self):
@@ -1611,11 +1878,11 @@ class SOMEIPBaseParameterArrayDim(BaseItem):
             return False
 
         return (
-                self.dim() == other.dim() and
-                self.lowerlimit() == other.lowerlimit() and
-                self.upperlimit() == other.upperlimit() and
-                self.length_of_length() == other.length_of_length() and
-                self.pad_to() == other.pad_to()
+            self.dim() == other.dim()
+            and self.lowerlimit() == other.lowerlimit()
+            and self.upperlimit() == other.upperlimit()
+            and self.length_of_length() == other.length_of_length()
+            and self.pad_to() == other.pad_to()
         )
 
     def calc_size_min_bits(self, inner_length):
@@ -1665,11 +1932,11 @@ class SOMEIPBaseParameterStruct(BaseItem):
             return False
 
         return (
-                self.name() == other.name() and
-                self.members() == other.members() and
-                self.length_of_length() == other.length_of_length() and
-                self.pad_to() == other.pad_to() and
-                self.tlv() == other.tlv()
+            self.name() == other.name()
+            and self.members() == other.members()
+            and self.length_of_length() == other.length_of_length()
+            and self.pad_to() == other.pad_to()
+            and self.tlv() == other.tlv()
         )
 
     def size_min_bits(self):
@@ -1725,11 +1992,11 @@ class SOMEIPBaseParameterStructMember(BaseItem):
             return False
 
         return (
-                self.name() == other.name() and
-                self.position() == other.position() and
-                self.mandatory() == other.mandatory() and
-                self.child() == other.child() and
-                self.signal() == self.signal()
+            self.name() == other.name()
+            and self.position() == other.position()
+            and self.mandatory() == other.mandatory()
+            and self.child() == other.child()
+            and self.signal() == self.signal()
         )
 
     def legacy(self):
@@ -1757,11 +2024,7 @@ class SOMEIPBaseParameterTypedef(BaseItem):
         if not isinstance(other, self.__class__):
             return False
 
-        return (
-                self.name() == other.name() and
-                self.name2() == other.name2() and
-                self.child() == other.child()
-        )
+        return self.name() == other.name() and self.name2() == other.name2() and self.child() == other.child()
 
     def size_min_bits(self):
         return self.__child__.size_min_bits()
@@ -1789,11 +2052,7 @@ class SOMEIPBaseParameterEnumeration(BaseItem):
         if not isinstance(other, self.__class__):
             return False
 
-        return (
-                self.name() == other.name() and
-                self.items() == other.items() and
-                self.child() == other.child()
-        )
+        return self.name() == other.name() and self.items() == other.items() and self.child() == other.child()
 
     def size_min_bits(self):
         return self.__child__.size_min_bits()
@@ -1821,11 +2080,7 @@ class SOMEIPBaseParameterEnumerationItem(BaseItem):
         if not isinstance(other, self.__class__):
             return False
 
-        return (
-                self.name() == other.name() and
-                self.desc() == other.desc() and
-                self.value() == other.value()
-        )
+        return self.name() == other.name() and self.desc() == other.desc() and self.value() == other.value()
 
 
 class SOMEIPBaseParameterUnion(BaseItem):
@@ -1865,11 +2120,11 @@ class SOMEIPBaseParameterUnion(BaseItem):
             return False
 
         return (
-                self.name() == other.name() and
-                self.members() == other.members() and
-                self.length_of_length() == other.length_of_length() and
-                self.length_of_length() == other.length_of_length() and
-                self.pad_to() == other.pad_to()
+            self.name() == other.name()
+            and self.members() == other.members()
+            and self.length_of_length() == other.length_of_length()
+            and self.length_of_length() == other.length_of_length()
+            and self.pad_to() == other.pad_to()
         )
 
     def size_min_bits(self):
@@ -1923,10 +2178,7 @@ class SOMEIPBaseParameterUnionMember(BaseItem):
             return False
 
         return (
-                self.name() == other.name() and
-                self.index() == other.index() and
-                self.mandatory() == other.mandatory() and
-                self.child() == other.child()
+            self.name() == other.name() and self.index() == other.index() and self.mandatory() == other.mandatory() and self.child() == other.child()
         )
 
 
@@ -1949,11 +2201,7 @@ class SOMEIPBaseParameterBitfield(BaseItem):
         if not isinstance(other, self.__class__):
             return False
 
-        return (
-                self.name() == other.name() and
-                self.items() == other.items() and
-                self.child() == other.child()
-        )
+        return self.name() == other.name() and self.items() == other.items() and self.child() == other.child()
 
     def size_min_bits(self):
         return self.__child__.size_min_bits()
@@ -1977,14 +2225,22 @@ class SOMEIPBaseParameterBitfieldItem(BaseItem):
         if not isinstance(other, self.__class__):
             return False
 
-        return (
-                self.name() == other.name() and
-                self.bit_number() == other.bit_number()
-        )
+        return self.name() == other.name() and self.bit_number() == other.bit_number()
 
 
 class BaseSignal(BaseItem):
-    def __init__(self, id, name, compu_scale, compu_const, bit_length, min_length, max_length, basetype, basetypelen):
+    def __init__(
+        self,
+        id,
+        name,
+        compu_scale,
+        compu_const,
+        bit_length,
+        min_length,
+        max_length,
+        basetype,
+        basetypelen,
+    ):
         self.__id__ = id
         self.__name__ = name
         self.__compu_scale__ = compu_scale
@@ -2039,11 +2295,11 @@ class BaseSignal(BaseItem):
             return False
 
         return (
-                self.id() == self.id() and
-                self.name() == other.name() and
-                self.compu_scale() == other.compu_scale() and
-                self.basetype() == other.basetype() and
-                self.compu_consts() == other.compu_consts()
+            self.id() == self.id()
+            and self.name() == other.name()
+            and self.compu_scale() == other.compu_scale()
+            and self.basetype() == other.basetype()
+            and self.compu_consts() == other.compu_consts()
         )
 
 
@@ -2113,9 +2369,20 @@ class BasePDU(BaseAbstractPDU):
 
         return ret
 
+
 class BaseMultiplexPDU(BaseAbstractPDU):
-    def __init__(self, id, short_name, byte_length, pdu_type, switch, segment_positions, pdu_instances,
-                 static_segs, static_pdu):
+    def __init__(
+        self,
+        id,
+        short_name,
+        byte_length,
+        pdu_type,
+        switch,
+        segment_positions,
+        pdu_instances,
+        static_segs,
+        static_pdu,
+    ):
         super(BaseMultiplexPDU, self).__init__(id, short_name, byte_length, pdu_type)
 
         if switch is None and len(segment_positions) != 0:
@@ -2124,11 +2391,10 @@ class BaseMultiplexPDU(BaseAbstractPDU):
 
         if switch is not None and len(segment_positions) == 0:
             print(f"ERROR: PDU: {short_name} has a Switch but no Dynamic Segments!")
-            #raise ValueError
+            # raise ValueError
 
         if len(segment_positions) > 1:
-            print(f"ERROR: We only support up to 1 Dynamic Segment per PDU! "
-                   f"PDU {short_name} has {len(segment_positions)}")
+            print(f"ERROR: We only support up to 1 Dynamic Segment per PDU! " f"PDU {short_name} has {len(segment_positions)}")
             raise ValueError
 
         if static_pdu is None and len(static_segs) != 0:
@@ -2140,10 +2406,8 @@ class BaseMultiplexPDU(BaseAbstractPDU):
             raise ValueError
 
         if len(static_segs) > 1:
-            print(f"ERROR: We only support up to 1 Static Segment per PDU. "
-                   f"PDU {short_name} has {len(static_segs)}")
+            print(f"ERROR: We only support up to 1 Static Segment per PDU. " f"PDU {short_name} has {len(static_segs)}")
             raise ValueError
-
 
         self.__switch__ = switch
         self.__segment_positions__ = segment_positions
@@ -2233,6 +2497,7 @@ class BaseEthernetPDUInstance(BaseItem):
     def pdu_update_bit_position(self):
         return self.__pdu_update_bit_position__
 
+
 class BasePDUInstance(BaseItem):
     def __init__(self, id, pdu_ref, bit_position, is_high_low_byte_order, pdu_update_bit_position):
         self.__id__ = id
@@ -2253,6 +2518,7 @@ class BasePDUInstance(BaseItem):
 
     def pdu_update_bit_position(self):
         return self.__pdu_update_bit_position__
+
 
 class BaseFrame(BaseItem):
     def __init__(self, id, short_name, frame_type, byte_length, pdu_instances):
@@ -2280,6 +2546,7 @@ class BaseFrame(BaseItem):
     def pdu_instances(self):
         return self.__pdu_instances__
 
+
 class BaseFrameTriggering(BaseItem):
     def __init__(self, id, frame):
         self.__id__ = id
@@ -2302,6 +2569,7 @@ class BaseFrameTriggering(BaseItem):
 
     def is_ethernet(self):
         return False
+
 
 class BaseFrameTriggeringCAN(BaseFrameTriggering):
     def __init__(self, id, frame, can_id):
@@ -2329,15 +2597,19 @@ class BaseFrameTriggeringFlexRay(BaseFrameTriggering):
         self.__cycle_repetition__ = cycle_repetition
 
     def scheduling(self):
-        return self.__slot_id__, self.__cycle_counter__, self.__base_cycle__, self.__cycle_repetition__
+        return (
+            self.__slot_id__,
+            self.__cycle_counter__,
+            self.__base_cycle__,
+            self.__cycle_repetition__,
+        )
 
     def calc_key(self):
         tmp_cycle_counter = 0 if self.__cycle_counter__ is None else self.__cycle_counter__
         tmp_base_cycle = 0 if self.__base_cycle__ is None else self.__base_cycle__
         tmp_cycle_repetition = 0 if self.__cycle_repetition__ is None else self.__cycle_repetition__
 
-        ret  = f"FlexRay-0x{self.__slot_id__:04x}-0x{tmp_cycle_counter:04x}-0x{tmp_base_cycle:04x}-" \
-               f"0x{tmp_cycle_repetition:04x}"
+        ret = f"FlexRay-0x{self.__slot_id__:04x}-0x{tmp_cycle_counter:04x}-0x{tmp_base_cycle:04x}-" f"0x{tmp_cycle_repetition:04x}"
         return ret
 
     def is_flexray(self):

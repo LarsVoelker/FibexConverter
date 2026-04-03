@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2024  Dr. Lars Voelker
+# Copyright (C) 2015-2026  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
 # Copyright (C) 2020-2024  Dr. Lars Voelker, Technica Engineering GmbH
 
@@ -19,28 +19,41 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import sys
-import os.path
 import glob
+import os.path
+import sys
 
 from fibex_parser import FibexParser
 
 parser_formats = ["FIBEX"]
 
+
 def is_file_or_dir_valid(parser, arg):
     if not os.path.exists(arg):
         parser.error(f"File or directory does not exist: {arg}")
+        return None
     else:
         return arg
+
 
 def is_file_valid(parser, arg):
     if not os.path.isfile(arg):
         parser.error(f"File does not exist: {arg}")
+        return None
     else:
         return arg
 
-def parse_input_files(filename, t, conf_factory, plugin_file=None, ecu_name_replacement=None, print_filename=True,
-                      file_filter="", verbose=False):
+
+def parse_input_files(
+    filename,
+    t,
+    conf_factory,
+    plugin_file=None,
+    ecu_name_replacement=None,
+    print_filename=True,
+    file_filter="",
+    verbose=False,
+):
     if file_filter == "":
         if t.upper() == "FIBEX":
             file_filter = "/**/FBX*.xml"
@@ -50,8 +63,8 @@ def parse_input_files(filename, t, conf_factory, plugin_file=None, ecu_name_repl
         output_dir = filename
     elif os.path.isfile(filename):
         files = [filename]
-        (path, f) = os.path.split(filename)
-        filenoext = '.'.join(f.split('.')[:-1])
+        path, f = os.path.split(filename)
+        filenoext = ".".join(f.split(".")[:-1])
         output_dir = os.path.join(path, filenoext)
     else:
         print(f"File not found: {filename}")

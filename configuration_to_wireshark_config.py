@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2025  Dr. Lars Voelker
+# Copyright (C) 2015-2026  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
 # Copyright (C) 2020-2025  Dr. Lars Voelker, Technica Engineering GmbH
 
@@ -9,7 +9,7 @@
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
 # of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -19,13 +19,39 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import argparse
+import os.path
 import sys
 import time
-import os.path
-import argparse
 
-from parser_dispatcher import * # @UnusedWildImport
-from configuration_base_classes import *  # @UnusedWildImport
+from configuration_base_classes import (
+    BaseConfigurationFactory,
+    BaseECU,
+    BaseInterface,
+    BaseSocket,
+    SOMEIPBaseParameter,
+    SOMEIPBaseParameterArray,
+    SOMEIPBaseParameterArrayDim,
+    SOMEIPBaseParameterBasetype,
+    SOMEIPBaseParameterBitfield,
+    SOMEIPBaseParameterEnumeration,
+    SOMEIPBaseParameterEnumerationItem,
+    SOMEIPBaseParameterString,
+    SOMEIPBaseParameterStruct,
+    SOMEIPBaseParameterStructMember,
+    SOMEIPBaseParameterTypedef,
+    SOMEIPBaseParameterUnion,
+    SOMEIPBaseParameterUnionMember,
+    SOMEIPBaseService,
+    SOMEIPBaseServiceEvent,
+    SOMEIPBaseServiceField,
+    SOMEIPBaseServiceMethod,
+    ip_to_key,
+    is_ip,
+    is_ip_mcast,
+    read_csv_to_dict,
+)
+from parser_dispatcher import is_file_or_dir_valid, is_file_valid, parse_input_files, parser_formats
 
 DEBUG_LEGACY_STRIPPING = False
 
@@ -42,7 +68,7 @@ class WiresharkParameterTypes:
 
 
 def cleanup_string(tmp):
-    ret = tmp.replace("\"", "'")
+    ret = tmp.replace('"', "'")
     return ret
 
 
@@ -56,11 +82,13 @@ def cleanup_datatype_string(tmp):
         ret = "float"
     return ret
 
+
 def translate_datatype(dt):
     if dt.lower().startswith("a_"):
         return dt[2:].lower()
     else:
         return dt.lower()
+
 
 class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
@@ -130,8 +158,25 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         self.__ecus__[name] = tmp
         return tmp
 
-    def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
-        ret = BaseInterface(name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel)
+    def create_interface(
+        self,
+        name,
+        vlanid,
+        ips,
+        sockets,
+        input_frame_trigs,
+        output_frame_trigs,
+        fr_channel,
+    ):
+        ret = BaseInterface(
+            name,
+            vlanid,
+            ips,
+            sockets,
+            input_frame_trigs,
+            output_frame_trigs,
+            fr_channel,
+        )
 
         channel = self.__channels__.setdefault(name, {})
 
@@ -157,10 +202,27 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         return ret
 
-    def create_socket(self, name, ip, proto, portnumber,
-                      serviceinstances, serviceinstanceclients, eventhandlers, eventgroupreceivers):
-        tmp = BaseSocket(name, ip, proto, portnumber,
-                         serviceinstances, serviceinstanceclients, eventhandlers, eventgroupreceivers)
+    def create_socket(
+        self,
+        name,
+        ip,
+        proto,
+        portnumber,
+        serviceinstances,
+        serviceinstanceclients,
+        eventhandlers,
+        eventgroupreceivers,
+    ):
+        tmp = BaseSocket(
+            name,
+            ip,
+            proto,
+            portnumber,
+            serviceinstances,
+            serviceinstanceclients,
+            eventhandlers,
+            eventgroupreceivers,
+        )
 
         self.__sockets__.append(tmp)
         return tmp
@@ -171,26 +233,75 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 
-    def create_someip_service_method(self, name, methodid, calltype, relia, inparams, outparams,
-                                     reqdebounce=-1, reqmaxretention=-1, resmaxretention=-1, tlv=False):
-        return SOMEIPServiceMethod(name, methodid, calltype, relia, inparams, outparams,
-                                   reqdebounce, reqmaxretention, resmaxretention, tlv)
+    def create_someip_service_method(
+        self,
+        name,
+        methodid,
+        calltype,
+        relia,
+        inparams,
+        outparams,
+        reqdebounce=-1,
+        reqmaxretention=-1,
+        resmaxretention=-1,
+        tlv=False,
+    ):
+        return SOMEIPServiceMethod(
+            name,
+            methodid,
+            calltype,
+            relia,
+            inparams,
+            outparams,
+            reqdebounce,
+            reqmaxretention,
+            resmaxretention,
+            tlv,
+        )
 
-    def create_someip_service_event(self, name, methodid, relia, params,
-                                    debounce=-1, maxretention=-1, tlv=False):
-        return SOMEIPServiceEvent(name, methodid, relia, params,
-                                  debounce, maxretention, tlv)
+    def create_someip_service_event(self, name, methodid, relia, params, debounce=-1, maxretention=-1, tlv=False):
+        return SOMEIPServiceEvent(name, methodid, relia, params, debounce, maxretention, tlv)
 
-    def create_someip_service_field(self, name, getterid, setterid, notifierid,
-                                    getterreli, setterreli, notifierreli, params,
-                                    getter_debouncereq, getter_retentionreq, getter_retentionres,
-                                    setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                    notifier_debounce, notifier_retention, tlv=False):
-        ret = SOMEIPServiceField(self, name, getterid, setterid, notifierid,
-                                 getterreli, setterreli, notifierreli, params,
-                                 getter_debouncereq, getter_retentionreq, getter_retentionres,
-                                 setter_debouncereq, setter_retentionreq, setter_retentionres,
-                                 notifier_debounce, notifier_retention, tlv)
+    def create_someip_service_field(
+        self,
+        name,
+        getterid,
+        setterid,
+        notifierid,
+        getterreli,
+        setterreli,
+        notifierreli,
+        params,
+        getter_debouncereq,
+        getter_retentionreq,
+        getter_retentionres,
+        setter_debouncereq,
+        setter_retentionreq,
+        setter_retentionres,
+        notifier_debounce,
+        notifier_retention,
+        tlv=False,
+    ):
+        ret = SOMEIPServiceField(
+            self,
+            name,
+            getterid,
+            setterid,
+            notifierid,
+            getterreli,
+            setterreli,
+            notifierreli,
+            params,
+            getter_debouncereq,
+            getter_retentionreq,
+            getter_retentionres,
+            setter_debouncereq,
+            setter_retentionreq,
+            setter_retentionres,
+            notifier_debounce,
+            notifier_retention,
+            tlv,
+        )
         return ret
 
     def create_someip_parameter(self, position, name, desc, mandatory, datatype, signal):
@@ -200,8 +311,14 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         if bitlength_basetype != bitlength_encoded_type:
             name = "%s-%d" % (name, bitlength_encoded_type)
 
-        ret = SOMEIPParameterBasetype(self.__globalid_basetypes__, name, datatype, bigendian, bitlength_basetype,
-                                      bitlength_encoded_type)
+        ret = SOMEIPParameterBasetype(
+            self.__globalid_basetypes__,
+            name,
+            datatype,
+            bigendian,
+            bitlength_basetype,
+            bitlength_encoded_type,
+        )
 
         if self.__space_optimized__:
             for key in self.__param_basetypes__:
@@ -214,10 +331,28 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         return ret
 
-    def create_someip_parameter_string(self, name, chartype, bigendian, lowerlimit, upperlimit, termination,
-                                       length_of_length, pad_to):
-        ret = SOMEIPParameterString(self.__globalid_strings__, name, chartype, bigendian, lowerlimit, upperlimit,
-                                    termination, length_of_length, pad_to)
+    def create_someip_parameter_string(
+        self,
+        name,
+        chartype,
+        bigendian,
+        lowerlimit,
+        upperlimit,
+        termination,
+        length_of_length,
+        pad_to,
+    ):
+        ret = SOMEIPParameterString(
+            self.__globalid_strings__,
+            name,
+            chartype,
+            bigendian,
+            lowerlimit,
+            upperlimit,
+            termination,
+            length_of_length,
+            pad_to,
+        )
 
         if self.__space_optimized__:
             for key in self.__param_strings__:
@@ -290,7 +425,14 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         return SOMEIPBaseParameterEnumerationItem(value, name, desc)
 
     def create_someip_parameter_union(self, name, length_of_length, length_of_type, pad_to, members):
-        ret = SOMEIPParameterUnion(self.__globalid_unions__, name, length_of_length, length_of_type, pad_to, members)
+        ret = SOMEIPParameterUnion(
+            self.__globalid_unions__,
+            name,
+            length_of_length,
+            length_of_type,
+            pad_to,
+            members,
+        )
 
         #        if self.__space_optimized__:
         #            for key in self.__param_unions__:
@@ -314,10 +456,10 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
     def create_pdu_route(self, sender_socket, receiving_socket, pdu_name, pdu_id):
         pdu_d = dict()
-        pdu_d['name'] = pdu_name
-        pdu_d['id'] = pdu_id
+        pdu_d["name"] = pdu_name
+        pdu_d["id"] = pdu_id
 
-        if pdu_id in self.__eth_pdus__.keys() and self.__eth_pdus__[pdu_id]['name'] != pdu_name:
+        if pdu_id in self.__eth_pdus__.keys() and self.__eth_pdus__[pdu_id]["name"] != pdu_name:
             print(f"WARNING: Overwriting PDU with ID:{hex(pdu_id)}! {self.__eth_pdus__[pdu_id]['name']} -> {pdu_name}")
             return False
 
@@ -328,8 +470,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
         if sid in self.__services_long__:
             print(
-                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, " +
-                f"Minor-Ver: {minorver:d}) already exists! Not overriding it!"
+                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, " + f"Minor-Ver: {minorver:d}) already exists! Not overriding it!"
             )
             return False
         self.__services_long__[sid] = service
@@ -337,8 +478,8 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         sid = "%04x-%02x" % (serviceid, majorver)
         if sid in self.__services__:
             print(
-                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}) " +
-                f"already exists with a different Minor Version (not {minorver:d})! Not overriding it!"
+                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}) "
+                + f"already exists with a different Minor Version (not {minorver:d})! Not overriding it!"
             )
             return False
         self.__services__[sid] = service
@@ -383,10 +524,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
             if s.serviceid() in d.keys():
                 if d[s.serviceid()] != s.name():
-                    print(
-                        f"ERROR: We got the same Service-ID 0x{s.serviceid():04x} " +
-                        f"with different names {d[s.serviceid()].name()} {s.name()}"
-                    )
+                    print(f"ERROR: We got the same Service-ID 0x{s.serviceid():04x} " + f"with different names {d[s.serviceid()].name()} {s.name()}")
             else:
                 d[s.serviceid()] = s
 
@@ -402,7 +540,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         for key in keys:
             s = d[key]
-            fs.write(f"\"{key:04x}\",\"{s.name()}\"\n")
+            fs.write(f'"{key:04x}","{s.name()}"\n')
 
             dm = dict()
 
@@ -433,7 +571,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                     dm[tmp[fid].notifier().methodid()] = tmp[fid].name() + "_Notifier"
 
             for mkey in sorted(dm.keys()):
-                fm.write(f"\"{key:04x}\",\"{mkey:04x}\",\"{dm[mkey]}\"\n")
+                fm.write(f'"{key:04x}","{mkey:04x}","{dm[mkey]}"\n')
 
             de = dict()
 
@@ -442,7 +580,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 de[tmp[eg].id()] = tmp[eg].name()
 
             for egkey in sorted(de.keys()):
-                fe.write(f"\"{key:04x}\",\"{egkey:04x}\",\"{de[egkey]}\"\n")
+                fe.write(f'"{key:04x}","{egkey:04x}","{de[egkey]}"\n')
 
         fs.close()
         fm.close()
@@ -463,31 +601,37 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
     def write_parameter_configlines(f, service, method, msgtype, params, version):
         for p in params:
             if p.datatype() is not None:
-                tmp = "\"%04x\",\"%04x\",\"%d\",\"%x\"" % (service.serviceid(),
-                                                           method.methodid(),
-                                                           service.majorversion(),
-                                                           msgtype)
+                tmp = '"%04x","%04x","%d","%x"' % (
+                    service.serviceid(),
+                    method.methodid(),
+                    service.majorversion(),
+                    msgtype,
+                )
                 if version > 1:
                     if method.tlv():
-                        tmp += f",\"TRUE\""
+                        tmp += ',"TRUE"'
                     else:
-                        tmp += f",\"FALSE\""
+                        tmp += ',"FALSE"'
 
-                tmp += ",\"%d\"" % (len(params))
+                tmp += ',"%d"' % (len(params))
 
-                tmp += ",\"%d\",\"%s\",\"%d\",\"%08x\"" % (p.position(),
-                                                           p.name(),
-                                                           p.datatype().paramtype(version),
-                                                           p.datatype().globalid(version))
+                tmp += ',"%d","%s","%d","%08x"' % (
+                    p.position(),
+                    p.name(),
+                    p.datatype().paramtype(version),
+                    p.datatype().globalid(version),
+                )
 
                 if version > 1:
-                    tmp += f",\"{service.name()}.{method.name()}.{p.name()}\""
+                    tmp += f',"{service.name()}.{method.name()}.{p.name()}"'
 
                 tmp += "\n"
                 f.write(tmp)
             else:
-                print(f"ERROR: Cannot write config, if p.datatype() = None! "
-                      f"Service: {service.name()} Method: {method.name()} Param: {p.name()} Pos: {p.position()}")
+                print(
+                    f"ERROR: Cannot write config, if p.datatype() = None! "
+                    f"Service: {service.name()} Method: {method.name()} Param: {p.name()} Pos: {p.position()}"
+                )
 
     def write_parameter_config(self, filename, version=1):
         # Service-ID,Method-ID,Version,MessageType,Num-Of-Params,Position,Name,Datatype,Datatype-ID
@@ -511,8 +655,14 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
             for key in sorted(serv.events()):
                 if version == 1 or not serv.events()[key].legacy():
-                    self.write_parameter_configlines(f, serv, serv.events()[key], 0x02, serv.events()[key].params(),
-                                                     version)
+                    self.write_parameter_configlines(
+                        f,
+                        serv,
+                        serv.events()[key],
+                        0x02,
+                        serv.events()[key].params(),
+                        version,
+                    )
                 elif DEBUG_LEGACY_STRIPPING:
                     print(f"--> skipping legacy event: {serv.name()} (0x{serv.serviceid():x}) {method.name()} (0x{method.methodid():x})")
 
@@ -520,14 +670,48 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 field = serv.fields()[key]
                 if version == 1 or not field.legacy():
                     if field.getter() is not None:
-                        self.write_parameter_configlines(f, serv, field.getter(), 0x00, field.getter().inparams(), version)
-                        self.write_parameter_configlines(f, serv, field.getter(), 0x80, field.getter().outparams(), version)
+                        self.write_parameter_configlines(
+                            f,
+                            serv,
+                            field.getter(),
+                            0x00,
+                            field.getter().inparams(),
+                            version,
+                        )
+                        self.write_parameter_configlines(
+                            f,
+                            serv,
+                            field.getter(),
+                            0x80,
+                            field.getter().outparams(),
+                            version,
+                        )
                     if field.setter() is not None:
-                        self.write_parameter_configlines(f, serv, field.setter(), 0x00, field.setter().inparams(), version)
-                        self.write_parameter_configlines(f, serv, field.setter(), 0x80, field.setter().outparams(), version)
+                        self.write_parameter_configlines(
+                            f,
+                            serv,
+                            field.setter(),
+                            0x00,
+                            field.setter().inparams(),
+                            version,
+                        )
+                        self.write_parameter_configlines(
+                            f,
+                            serv,
+                            field.setter(),
+                            0x80,
+                            field.setter().outparams(),
+                            version,
+                        )
                     if field.notifier() is not None:
-                        self.write_parameter_configlines(f, serv, field.notifier(), 0x02, field.notifier().params(),
-                                                         version)
+                        self.write_parameter_configlines(
+                            f,
+                            serv,
+                            field.notifier(),
+                            0x02,
+                            field.notifier().params(),
+                            version,
+                        )
                 elif DEBUG_LEGACY_STRIPPING:
                     print(f"--> skipping legacy field: {serv.name()} (0x{serv.serviceid():x}) {field.name()}")
 
@@ -621,18 +805,13 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
     def write_signal_pdu_configline(self, f, pdu_id, name):
         # Legacy-ID, Name
 
-        f.write(f"\"{pdu_id:08x}\","
-                f"\"{name}\"\n"
-                )
+        f.write(f'"{pdu_id:08x}",' f'"{name}"\n')
 
     def write_can_busid_configline(self, f, interfaceid, busname, busid):
         if interfaceid is None:
-            interfaceid = 0xffffffff
+            interfaceid = 0xFFFFFFFF
 
-        f.write(f"\"{interfaceid:08x}\","
-                f"\"{busname}\","
-                f"\"{busid:04x}\"\n"
-                )
+        f.write(f'"{interfaceid:08x}",' f'"{busname}",' f'"{busid:04x}"\n')
 
     def write_signal_pdu_binding_someip_configline(self, f, service, method, msgtype, pdu_id):
         # Service-ID, Method-ID, MessageType, Version, Legacy-ID
@@ -640,20 +819,14 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         if not method.legacy():
             return
 
-        f.write(f"\"{service.serviceid():04x}\","
-                f"\"{method.methodid():04x}\","
-                f"\"{service.majorversion():02x}\","
-                f"\"{msgtype:02x}\","
-                f"\"{pdu_id:08x}\"\n"
-                )
+        f.write(
+            f'"{service.serviceid():04x}",' f'"{method.methodid():04x}",' f'"{service.majorversion():02x}",' f'"{msgtype:02x}",' f'"{pdu_id:08x}"\n'
+        )
 
     def write_signal_pdu_binding_can_configline(self, f, can_id, bus_id, pdu_id):
         # uint32 CAN-ID, uint16 Bus-ID, uint32 PDU-ID
 
-        f.write(f"\"{can_id:08x}\","
-                f"\"{bus_id:04x}\","
-                f"\"{pdu_id:08x}\"\n"
-                )
+        f.write(f'"{can_id:08x}",' f'"{bus_id:04x}",' f'"{pdu_id:08x}"\n')
 
     def write_signal_pdu_binding_fr_configline(self, f, channel, slot_id, base_cycle, cycle_rep, cycle_cnt, pdu_id):
         # channel (0,1), uint8 Cycle, uint16 Frame-ID, uint32 PDU-ID
@@ -670,11 +843,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         cycle = base_cycle
         while cycle < MAX_CYCLE:
-            f.write(f"\"{channel_cfg:02x}\","
-                    f"\"{cycle:02x}\","
-                    f"\"{slot_id:04x}\","
-                    f"\"{pdu_id:08x}\"\n"
-                    )
+            f.write(f'"{channel_cfg:02x}",' f'"{cycle:02x}",' f'"{slot_id:04x}",' f'"{pdu_id:08x}"\n')
             if cycle_rep == 0:
                 return
 
@@ -688,17 +857,11 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         for value, start, end in cc:
             if 0 <= int(start) <= pow(2, 64) and 0 <= int(end) <= pow(2, 64):
-                f_enum.write(f"\"{pdu_id:08x}\","
-                             f"\"{position}\","
-                             f"\"{len(cc)}\","
-                             f"\"{int(start):x}\","
-                             f"\"{int(end):x}\","
-                             f"\"{cleanup_string(value)}\""
-                             "\n"
-                             )
+                f_enum.write(
+                    f'"{pdu_id:08x}",' f'"{position}",' f'"{len(cc)}",' f'"{int(start):x}",' f'"{int(end):x}",' f'"{cleanup_string(value)}"' "\n"
+                )
             else:
-                print(f"WARNING: CompuConst<0 or >2^64 not supported! "
-                      f"{pdu_id:08x}:{position} {start}-{end} {value}")
+                print(f"WARNING: CompuConst<0 or >2^64 not supported! " f"{pdu_id:08x}:{position} {start}-{end} {value}")
 
     def write_someip_signal_configlines(self, f, f_enum, pdu_id, pdu_name, params):
         # signals (f)
@@ -730,22 +893,23 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 if m.signal() is not None:
                     self.write_signal_value_configlines(f_enum, pdu_id, m.position(), m.signal())
 
-                f.write(f"\"{pdu_id:08x}\","
-                        f"\"{len(tmp)}\","
-                        f"\"{m.position()}\","
-                        f"\"{m.name()}\","
-                        f"\"{pdu_name}.{m.name()}\","
-                        f"\"{cleanup_datatype_string(m.child().datatype())}\","
-                        f"\"{endian}\","
-                        f"\"{m.child().bitlength_basetype()}\","
-                        f"\"{m.child().bitlength_encoded_type()}\","
-                        f"\"{scaler}\","
-                        f"\"{offset}\","
-                        f"\"FALSE\","
-                        f"\"-1\","
-                        f"\"{hidden}\""
-                        "\n"
-                        )
+                f.write(
+                    f'"{pdu_id:08x}",'
+                    f'"{len(tmp)}",'
+                    f'"{m.position()}",'
+                    f'"{m.name()}",'
+                    f'"{pdu_name}.{m.name()}",'
+                    f'"{cleanup_datatype_string(m.child().datatype())}",'
+                    f'"{endian}",'
+                    f'"{m.child().bitlength_basetype()}",'
+                    f'"{m.child().bitlength_encoded_type()}",'
+                    f'"{scaler}",'
+                    f'"{offset}",'
+                    f'"FALSE",'
+                    f'"-1",'
+                    f'"{hidden}"'
+                    "\n"
+                )
             return
 
         for p in params:
@@ -761,43 +925,57 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
             if p.signal() is not None:
                 self.write_signal_value_configlines(f_enum, pdu_id, p.position(), p.signal())
 
-            f.write(f"\"{pdu_id:08x}\","
-                    f"\"{len(params)}\","
-                    f"\"{p.position()}\","
-                    f"\"{p.name()}\","
-                    f"\"{pdu_name}.{p.name()}\","
-                    f"\"{cleanup_datatype_string(p.datatype().datatype())}\","
-                    f"\"{endian}\","
-                    f"\"{p.datatype().bitlength_basetype()}\","
-                    f"\"{p.datatype().bitlength_encoded_type()}\","
-                    f"\"{scaler}\","
-                    f"\"{offset}\","
-                    f"\"FALSE\","
-                    f"\"-1\","
-                    f"\"{hidden}\""
-                    "\n"
-                    )
+            f.write(
+                f'"{pdu_id:08x}",'
+                f'"{len(params)}",'
+                f'"{p.position()}",'
+                f'"{p.name()}",'
+                f'"{pdu_name}.{p.name()}",'
+                f'"{cleanup_datatype_string(p.datatype().datatype())}",'
+                f'"{endian}",'
+                f'"{p.datatype().bitlength_basetype()}",'
+                f'"{p.datatype().bitlength_encoded_type()}",'
+                f'"{scaler}",'
+                f'"{offset}",'
+                f'"FALSE",'
+                f'"-1",'
+                f'"{hidden}"'
+                "\n"
+            )
 
-    def generate_signal_configline_parts(self, pdu_id, pdu_name, pos, name, dt, endian,
-                                         bitlength_basetype, bitlength_encoded_type,
-                                         scaler, offset, hidden):
+    def generate_signal_configline_parts(
+        self,
+        pdu_id,
+        pdu_name,
+        pos,
+        name,
+        dt,
+        endian,
+        bitlength_basetype,
+        bitlength_encoded_type,
+        scaler,
+        offset,
+        hidden,
+    ):
         endian_upper = "TRUE" if endian else "FALSE"
 
-        tmp1 = f"\"{pdu_id:08x}\",\""
-        tmp2 = f"\"," \
-               f"\"{pos}\"," \
-               f"\"{name}\"," \
-               f"\"{pdu_name}.{name}\"," \
-               f"\"{cleanup_datatype_string(dt)}\"," \
-               f"\"{endian_upper}\"," \
-               f"\"{bitlength_basetype}\"," \
-               f"\"{bitlength_encoded_type}\"," \
-               f"\"{scaler}\"," \
-               f"\"{offset}\"," \
-               f"\"FALSE\"," \
-               f"\"-1\"," \
-               f"\"{hidden}\"" \
-               "\n"
+        tmp1 = f'"{pdu_id:08x}","'
+        tmp2 = (
+            f'",'
+            f'"{pos}",'
+            f'"{name}",'
+            f'"{pdu_name}.{name}",'
+            f'"{cleanup_datatype_string(dt)}",'
+            f'"{endian_upper}",'
+            f'"{bitlength_basetype}",'
+            f'"{bitlength_encoded_type}",'
+            f'"{scaler}",'
+            f'"{offset}",'
+            f'"FALSE",'
+            f'"-1",'
+            f'"{hidden}"'
+            "\n"
+        )
 
         return tmp1, tmp2
 
@@ -811,8 +989,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         for pdu_instance in pdu_instances.values():
             if pdu_instance.pdu_update_bit_position() is not None:
-                print(f"WARNING: Update Bits currently not supported! "
-                      f"{name} PDU: {pdu_instance.pdu().name()}. Ignoring the Update Bits!")
+                print(f"WARNING: Update Bits currently not supported! " f"{name} PDU: {pdu_instance.pdu().name()}. Ignoring the Update Bits!")
                 # TODO: We need to generate the AUTOSAR I-PDU-M config to support Update Bits
 
         # check and sort pdu intances of frame
@@ -849,13 +1026,19 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
                         dummy_length = min(start_pos - current_bit_pos, 32)
 
-                        tmp1, tmp2 = self.generate_signal_configline_parts(pdu_id, pdu.name(), pos,
-                                                                           f"dummy_{dummy_number}",
-                                                                           "uint",
-                                                                           "TRUE",
-                                                                           32,
-                                                                           dummy_length,
-                                                                           1.0, 0.0, "TRUE")
+                        tmp1, tmp2 = self.generate_signal_configline_parts(
+                            pdu_id,
+                            pdu.name(),
+                            pos,
+                            f"dummy_{dummy_number}",
+                            "uint",
+                            "TRUE",
+                            32,
+                            dummy_length,
+                            1.0,
+                            0.0,
+                            "TRUE",
+                        )
                         tmp.append((tmp1, tmp2))
 
                         pos += 1
@@ -881,16 +1064,23 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                         bitlen_base = 8
 
                     if basetype.lower() in ("bytefield", "a_bytefield"):
-                        print(f"        WARNING: bytefield support is not complete. Results may be not correct!")
+                        print("        WARNING: bytefield support is not complete. Results may be not correct!")
                         basetype = "UINT"
                         bitlen_base = 64
 
-                    tmp1, tmp2 = self.generate_signal_configline_parts(pdu_id, pdu.name(), pos, signal.name(),
-                                                                       basetype,
-                                                                       signal_instance.is_high_low_byte_order(),
-                                                                       bitlen_base,
-                                                                       signal_length,
-                                                                       signal.scaler(), signal.offset(), "FALSE")
+                    tmp1, tmp2 = self.generate_signal_configline_parts(
+                        pdu_id,
+                        pdu.name(),
+                        pos,
+                        signal.name(),
+                        basetype,
+                        signal_instance.is_high_low_byte_order(),
+                        bitlen_base,
+                        signal_length,
+                        signal.scaler(),
+                        signal.offset(),
+                        "FALSE",
+                    )
                     tmp.append((tmp1, tmp2))
 
                     pos += 1
@@ -956,8 +1146,15 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                     pdu_id = self.write_signal_pdu(f_pdu, f_sig, f_sigv, frame)
 
                     slot_id, cycle_cnt, base_cycle, cycle_rep = ft.scheduling()
-                    self.write_signal_pdu_binding_fr_configline(f_bind_fr, channel["fr-channel"],
-                                                                slot_id, base_cycle, cycle_rep, cycle_cnt, pdu_id)
+                    self.write_signal_pdu_binding_fr_configline(
+                        f_bind_fr,
+                        channel["fr-channel"],
+                        slot_id,
+                        base_cycle,
+                        cycle_rep,
+                        cycle_cnt,
+                        pdu_id,
+                    )
 
     def write_pdus_over_someip_config(self, f_id, f_sig, f_sigv, f_bind, version=2):
         for sid in sorted(self.__services__):
@@ -980,7 +1177,6 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                     self.write_someip_signal_configlines(f_sig, f_sigv, pdu_id, method.name(), method.inparams())
                     # binding
                     self.write_signal_pdu_binding_someip_configline(f_bind, serv, method, 0x00, pdu_id)
-
 
                     # Response:
                     pdu_id = self.next_global_pdu_id()
@@ -1071,11 +1267,21 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
             self.write_signal_pdu_signal_configlines(f_sig, f_sigv, pdu_id, pdu.name(), {0: p})
 
             # binding
-            f_bind.write(f"\"{header_id:08x}\","
-                         f"\"{pdu_id:08x}\"\n")
+            f_bind.write(f'"{header_id:08x}",' f'"{pdu_id:08x}"\n')
 
-    def write_pdu_configs(self, target_dir, fn_id, fn_sig, fn_sigv,
-                          fn_bind_someip, fn_bind_eth_pdus, fn_can_if, fn_bind_can, fn_bind_fr, version=2):
+    def write_pdu_configs(
+        self,
+        target_dir,
+        fn_id,
+        fn_sig,
+        fn_sigv,
+        fn_bind_someip,
+        fn_bind_eth_pdus,
+        fn_can_if,
+        fn_bind_can,
+        fn_bind_fr,
+        version=2,
+    ):
         f_id = open(os.path.join(target_dir, fn_id), "w")
         f_id.write("# This file is automatically generated, DO NOT MODIFY. (LV)\n")
         f_sig = open(os.path.join(target_dir, fn_sig), "w")
@@ -1126,12 +1332,12 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
         for pdu_id in sorted(self.__eth_pdus__):
             pdu = self.__eth_pdus__[pdu_id]
-            pdu_name = pdu['name']
+            pdu_name = pdu["name"]
 
-            f.write(f"\"{pdu_id:08x}\","
-                    f"\"{pdu_name}\"\n")
+            f.write(f'"{pdu_id:08x}",' f'"{pdu_name}"\n')
 
         f.close()
+
 
 class SOMEIPService(SOMEIPBaseService):
     def create_backlinks(self, factory):
@@ -1196,12 +1402,14 @@ class SOMEIPParameter(SOMEIPBaseParameter):
             self.__datatype__ = self.__datatype__.create_backlinks(factory, service, method)
             return self
         else:
-            ret = factory.create_someip_parameter(self.__position__,
-                                                  self.__name__,
-                                                  self.__desc__,
-                                                  self.__mandatory__,
-                                                  self.__datatype__,
-                                                  self.__signal__)
+            ret = factory.create_someip_parameter(
+                self.__position__,
+                self.__name__,
+                self.__desc__,
+                self.__mandatory__,
+                self.__datatype__,
+                self.__signal__,
+            )
             return ret.create_backlinks(factory, service, method)
 
     def parent_service(self):
@@ -1212,9 +1420,16 @@ class SOMEIPParameter(SOMEIPBaseParameter):
 
 
 class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
-    def __init__(self, globalid, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
-        super(SOMEIPParameterBasetype, self).__init__(name, datatype, bigendian, bitlength_basetype,
-                                                      bitlength_encoded_type)
+    def __init__(
+        self,
+        globalid,
+        name,
+        datatype,
+        bigendian,
+        bitlength_basetype,
+        bitlength_encoded_type,
+    ):
+        super(SOMEIPParameterBasetype, self).__init__(name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type)
         self.__globalid__ = int(globalid)
 
     def create_backlinks(self, factory, service, method):
@@ -1232,12 +1447,14 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
 
         if version == 1:
             endianess = 1 if self.bigendian() else 0
-            return "\"%08x\",\"%s\",\"%s\",\"%d\",\"%d\",\"%d\"\n" % (self.globalid(version),
-                                                                      self.name(),
-                                                                      translate_datatype(self.datatype()),
-                                                                      endianess,
-                                                                      self.bitlength_basetype(),
-                                                                      self.bitlength_encoded_type())
+            return '"%08x","%s","%s","%d","%d","%d"\n' % (
+                self.globalid(version),
+                self.name(),
+                translate_datatype(self.datatype()),
+                endianess,
+                self.bitlength_basetype(),
+                self.bitlength_encoded_type(),
+            )
         else:
             # remove non SOME/IP datatypes since they are configured as Signal-PDU configs
             if self.bitlength_basetype() not in (8, 16, 32, 64):
@@ -1246,19 +1463,39 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
                 return ""
 
             endianess = "TRUE" if self.bigendian() else "FALSE"
-            return "\"%08x\",\"%s\",\"%s\",\"%s\",\"%d\",\"%d\"\n" % (self.globalid(version),
-                                                                      self.name(),
-                                                                      translate_datatype(self.datatype()),
-                                                                      endianess,
-                                                                      self.bitlength_basetype(),
-                                                                      self.bitlength_encoded_type())
+            return '"%08x","%s","%s","%s","%d","%d"\n' % (
+                self.globalid(version),
+                self.name(),
+                translate_datatype(self.datatype()),
+                endianess,
+                self.bitlength_basetype(),
+                self.bitlength_encoded_type(),
+            )
 
 
 class SOMEIPParameterString(SOMEIPBaseParameterString):
-    def __init__(self, globalid, name, chartype, bigendian, lowerlimit, upperlimit, termination, length_of_length,
-                 pad_to):
-        super(SOMEIPParameterString, self).__init__(name, chartype, bigendian, lowerlimit, upperlimit, termination,
-                                                    length_of_length, pad_to)
+    def __init__(
+        self,
+        globalid,
+        name,
+        chartype,
+        bigendian,
+        lowerlimit,
+        upperlimit,
+        termination,
+        length_of_length,
+        pad_to,
+    ):
+        super(SOMEIPParameterString, self).__init__(
+            name,
+            chartype,
+            bigendian,
+            lowerlimit,
+            upperlimit,
+            termination,
+            length_of_length,
+            pad_to,
+        )
         self.__globalid__ = int(globalid)
 
     def create_backlinks(self, factory, service, method):
@@ -1276,26 +1513,30 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
             # String-ID,Name,Encoding,Dynamic_Length,Max-Length,Length-Field-Size,Big-Endian,Bit-Alignment
             dynlength = 0 if self.lowerlimit() == self.upperlimit() else 1
             endianess = 1 if self.bigendian() else 0
-            return "\"%08x\",\"%s\",\"%s\",\"%d\",\"%d\",\"%d\",\"%d\",\"%d\"\n" % (self.globalid(version),
-                                                                                    self.name(),
-                                                                                    self.chartype().lower(),
-                                                                                    dynlength,  # self.lowerlimit(),
-                                                                                    self.upperlimit(),
-                                                                                    self.length_of_length(),
-                                                                                    endianess,
-                                                                                    self.pad_to())
+            return '"%08x","%s","%s","%d","%d","%d","%d","%d"\n' % (
+                self.globalid(version),
+                self.name(),
+                self.chartype().lower(),
+                dynlength,  # self.lowerlimit(),
+                self.upperlimit(),
+                self.length_of_length(),
+                endianess,
+                self.pad_to(),
+            )
         else:
             # String-ID,Name,Encoding,Dynamic_Length,Max-Length,Length-Field-Size,Big-Endian,Bit-Alignment
             dynlength = "FALSE" if self.lowerlimit() == self.upperlimit() else "TRUE"
             endianess = "TRUE" if self.bigendian() else "FALSE"
-            return "\"%08x\",\"%s\",\"%s\",\"%s\",\"%d\",\"%d\",\"%s\",\"%d\"\n" % (self.globalid(version),
-                                                                                    self.name(),
-                                                                                    self.chartype().lower(),
-                                                                                    dynlength,  # self.lowerlimit(),
-                                                                                    self.upperlimit(),
-                                                                                    self.length_of_length(),
-                                                                                    endianess,
-                                                                                    self.pad_to())
+            return '"%08x","%s","%s","%s","%d","%d","%s","%d"\n' % (
+                self.globalid(version),
+                self.name(),
+                self.chartype().lower(),
+                dynlength,  # self.lowerlimit(),
+                self.upperlimit(),
+                self.length_of_length(),
+                endianess,
+                self.pad_to(),
+            )
 
 
 class SOMEIPParameterArray(SOMEIPBaseParameterArray):
@@ -1335,22 +1576,26 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
         ret = ""
         for key in self.dims():
             d = self.dims()[key]
-            ret += "\"%08x\",\"%s\",\"%d\",\"%08x\",\"%d\"" % (self.globalid(version),
-                                                               self.name(),
-                                                               self.child().paramtype(version),
-                                                               self.child().globalid(version),
-                                                               len(self.dims()))
+            ret += '"%08x","%s","%d","%08x","%d"' % (
+                self.globalid(version),
+                self.name(),
+                self.child().paramtype(version),
+                self.child().globalid(version),
+                len(self.dims()),
+            )
             if version > 1:
                 if self.__parent_service__ is None or self.__parent_method__ is None:
-                    ret += f",\"invalid.invalid.{self.name()}\""
+                    ret += f',"invalid.invalid.{self.name()}"'
                 else:
-                    ret += f",\"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{self.name()}\""
+                    ret += f',"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{self.name()}"'
 
-            ret += ",\"%d\",\"%d\",\"%d\",\"%d\",\"%d\"\n" % (d.dim() - 1,
-                                                              d.lowerlimit(),
-                                                              d.upperlimit(),
-                                                              d.length_of_length(),
-                                                              d.pad_to())
+            ret += ',"%d","%d","%d","%d","%d"\n' % (
+                d.dim() - 1,
+                d.lowerlimit(),
+                d.upperlimit(),
+                d.length_of_length(),
+                d.pad_to(),
+            )
         return ret
 
 
@@ -1374,8 +1619,13 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
 
             return self
         else:
-            ret = factory.create_someip_parameter_struct(self.__name__, self.__lengthOfLength__, self.__padTo__,
-                                                         self.__members__, self.__tlv__)
+            ret = factory.create_someip_parameter_struct(
+                self.__name__,
+                self.__lengthOfLength__,
+                self.__padTo__,
+                self.__members__,
+                self.__tlv__,
+            )
 
             return ret.create_backlinks(factory, service, method)
 
@@ -1395,7 +1645,9 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
         else:
             if version == 2 and self.__parent_method__.legacy():
                 if DEBUG_LEGACY_STRIPPING:
-                    print(f"--> Skipping struct {self.name()} of Service {self.__parent_service__.name()} and Method {self.__parent_method__.name()}")
+                    print(
+                        f"--> Skipping struct {self.name()} of Service {self.__parent_service__.name()} and Method {self.__parent_method__.name()}"
+                    )
                 return ret
 
         number_of_entries = len(self.members())
@@ -1406,7 +1658,7 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
         for key in sorted(self.members().keys()):
             m = self.members()[key]
 
-            #check position
+            # check position
             if last_pos != -1 and m.position() - last_pos > 1:
                 error_found = True
                 print(f"\nERROR: Position skipped by SOME/IP Struct Member {m.name()} {last_pos} -> {m.position()}")
@@ -1419,8 +1671,10 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
             last_pos = m.position()
 
             if m.position() >= number_of_entries:
-                print(f"\n  ERROR: Position of SOME/IP Struct Member {m.name()} {m.position()} > number_of_entries {number_of_entries}!\n"
-                      f"  Adjusting number_of_entries to {m.position() + 1} [{self.name()}]")
+                print(
+                    f"\n  ERROR: Position of SOME/IP Struct Member {m.name()} {m.position()} > number_of_entries {number_of_entries}!\n"
+                    f"  Adjusting number_of_entries to {m.position() + 1} [{self.name()}]"
+                )
                 number_of_entries = m.position() + 1
                 error_found = True
 
@@ -1433,28 +1687,32 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
 
         for key in sorted(self.members().keys()):
             m = self.members()[key]
-            ret += "\"%08x\",\"%s\",\"%d\",\"%d\"" % (self.globalid(version),
-                                                      self.name(),
-                                                      self.length_of_length(),
-                                                      self.pad_to())
+            ret += '"%08x","%s","%d","%d"' % (
+                self.globalid(version),
+                self.name(),
+                self.length_of_length(),
+                self.pad_to(),
+            )
 
             if version > 1:
                 if self.tlv():
-                    ret += f",\"TRUE\""
+                    ret += ',"TRUE"'
                 else:
-                    ret += f",\"FALSE\""
+                    ret += ',"FALSE"'
 
-            ret += ",\"%d\"" % number_of_entries
+            ret += ',"%d"' % number_of_entries
 
-            ret += ",\"%d\",\"%s\",\"%d\",\"%08x\"" % (m.position(),
-                                                       m.name(),
-                                                       m.child().paramtype(version),
-                                                       m.child().globalid(version))
+            ret += ',"%d","%s","%d","%08x"' % (
+                m.position(),
+                m.name(),
+                m.child().paramtype(version),
+                m.child().globalid(version),
+            )
             if version > 1:
                 if self.__parent_service__ is None or self.__parent_method__ is None:
-                    ret += f",\"invalid.invalid.{m.name()}\""
+                    ret += f',"invalid.invalid.{m.name()}"'
                 else:
-                    ret += f",\"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{m.name()}\""
+                    ret += f',"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{m.name()}"'
 
             ret += "\n"
         return ret
@@ -1477,8 +1735,13 @@ class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
 
             return self
         else:
-            ret = factory.create_someip_parameter_struct_member(self.__position__, self.__name__, self.__mandatory__,
-                                                                self.__child__, self.__signal__)
+            ret = factory.create_someip_parameter_struct_member(
+                self.__position__,
+                self.__name__,
+                self.__mandatory__,
+                self.__child__,
+                self.__signal__,
+            )
 
             return ret.create_backlinks(factory, service, method)
 
@@ -1514,10 +1777,12 @@ class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
     def ws_config_line(self, version=1):
         # Typedef ID,Typedef Name,Data Type,Datatype ID
 
-        ret = "\"%08x\",\"%s\",\"%d\",\"%08x\"\n" % (self.globalid(version),
-                                                     self.name(),
-                                                     self.child().paramtype(version),
-                                                     self.child().globalid(version))
+        ret = '"%08x","%s","%d","%08x"\n' % (
+            self.globalid(version),
+            self.name(),
+            self.child().paramtype(version),
+            self.child().globalid(version),
+        )
         return ret
 
 
@@ -1526,7 +1791,7 @@ class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
         super(SOMEIPParameterEnumeration, self).__init__(name, items, child)
         self.__globalid__ = int(globalid)
 
-        assert (isinstance(child, SOMEIPParameterBasetype))
+        assert isinstance(child, SOMEIPParameterBasetype)
 
     def create_backlinks(self, factory, service, method):
         return self
@@ -1544,13 +1809,15 @@ class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
         # "136c9","Enumeration1","1","12ff6","6","3","Two"
         ret = ""
         for i in self.items():
-            ret += "\"%08x\",\"%s\",\"%d\",\"%08x\",\"%d\",\"%x\",\"%s\"\n" % (self.globalid(version),
-                                                                               self.name(),
-                                                                               self.child().paramtype(version),
-                                                                               self.child().globalid(version),
-                                                                               len(self.items()),
-                                                                               i.value(),
-                                                                               i.name())
+            ret += '"%08x","%s","%d","%08x","%d","%x","%s"\n' % (
+                self.globalid(version),
+                self.name(),
+                self.child().paramtype(version),
+                self.child().globalid(version),
+                len(self.items()),
+                i.value(),
+                i.name(),
+            )
         return ret
 
 
@@ -1574,8 +1841,13 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
 
             return self
         else:
-            ret = factory.create_someip_parameter_union(self.__name__, self.__lengthOfLength__, self.__lengthOfType__,
-                                                        self.__padTo__, self.__members__)
+            ret = factory.create_someip_parameter_union(
+                self.__name__,
+                self.__lengthOfLength__,
+                self.__lengthOfType__,
+                self.__padTo__,
+                self.__members__,
+            )
 
             return ret.create_backlinks(factory, service, method)
 
@@ -1595,21 +1867,25 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
         ret = ""
         for key in self.members():
             m = self.members()[key]
-            ret += "\"%08x\",\"%s\",\"%d\",\"%d\",\"%d\",\"%d\"" % (self.globalid(version),
-                                                                    self.name(),
-                                                                    self.length_of_length(),
-                                                                    self.length_of_type(),
-                                                                    self.pad_to(),
-                                                                    len(self.members()))
-            ret += ",\"%d\",\"%s\",\"%d\",\"%08x\"" % (m.index(),
-                                                       m.name(),
-                                                       m.child().paramtype(version),
-                                                       m.child().globalid(version))
+            ret += '"%08x","%s","%d","%d","%d","%d"' % (
+                self.globalid(version),
+                self.name(),
+                self.length_of_length(),
+                self.length_of_type(),
+                self.pad_to(),
+                len(self.members()),
+            )
+            ret += ',"%d","%s","%d","%08x"' % (
+                m.index(),
+                m.name(),
+                m.child().paramtype(version),
+                m.child().globalid(version),
+            )
             if version > 1:
                 if self.__parent_service__ is None or self.__parent_method__ is None:
-                    ret += f",\"invalid.invalid.{m.name()}\""
+                    ret += f',"invalid.invalid.{m.name()}"'
                 else:
-                    ret += f",\"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{m.name()}\""
+                    ret += f',"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{m.name()}"'
             ret += "\n"
         return ret
 
@@ -1630,8 +1906,7 @@ class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
 
             return self
         else:
-            ret = factory.create_someip_parameter_union_member(self.__index__, self.__name__, self.__mandatory__,
-                                                               self.__child__)
+            ret = factory.create_someip_parameter_union_member(self.__index__, self.__name__, self.__mandatory__, self.__child__)
 
             return ret.create_backlinks(factory, service, method)
 
@@ -1641,7 +1916,7 @@ class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
         super(SOMEIPParameterBitfield, self).__init__(name, items, child)
         self.__globalid__ = int(globalid)
 
-        assert (isinstance(child, SOMEIPParameterBasetype))
+        assert isinstance(child, SOMEIPParameterBasetype)
 
     def create_backlinks(self, factory, service, method):
         return self
@@ -1663,13 +1938,15 @@ class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
         # "0", "BF8", "8", "8", "0", "bit_0", "BF8.bit_0"
         ret = ""
         for i in self.items():
-            ret += "\"%08x\",\"%s\",\"%d\",\"%d\",\"%d\",\"%s\",\"%s\"\n" % (self.globalid(version),
-                                                                               self.name(),
-                                                                               self.child().bitlength_basetype(),
-                                                                               len(self.items()),
-                                                                               i.bit_number(),
-                                                                               i.name(),
-                                                                               f"{self.name()}.{i.name()}")
+            ret += '"%08x","%s","%d","%d","%d","%s","%s"\n' % (
+                self.globalid(version),
+                self.name(),
+                self.child().bitlength_basetype(),
+                len(self.items()),
+                i.bit_number(),
+                i.name(),
+                f"{self.name()}.{i.name()}",
+            )
         return ret
 
 
@@ -1681,13 +1958,26 @@ def help_and_exit():
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Converting configuration to text.')
-    parser.add_argument('type', choices=parser_formats, help='format')
-    parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
-    parser.add_argument('--ecu-name-mapping', type=argparse.FileType('r'), default=None, help='Key/Value CSV file')
-    parser.add_argument('--generate-switch-port-names', action='store_true')
-    parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
-                        default=None)
+    parser = argparse.ArgumentParser(description="Converting configuration to text.")
+    parser.add_argument("type", choices=parser_formats, help="format")
+    parser.add_argument(
+        "filename",
+        help="filename or directory",
+        type=lambda x: is_file_or_dir_valid(parser, x),
+    )
+    parser.add_argument(
+        "--ecu-name-mapping",
+        type=argparse.FileType("r"),
+        default=None,
+        help="Key/Value CSV file",
+    )
+    parser.add_argument("--generate-switch-port-names", action="store_true")
+    parser.add_argument(
+        "--plugin",
+        help="filename of parser plugin",
+        type=lambda x: is_file_valid(parser, x),
+        default=None,
+    )
 
     args = parser.parse_args()
     return args
@@ -1720,8 +2010,13 @@ def main():
     conf_factory.create_someip_parameter_basetype("FLOAT32", "float32", True, 32, 32)
     conf_factory.create_someip_parameter_basetype("FLOAT64", "float64", True, 64, 64)
 
-    output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin,
-                                   ecu_name_replacement=ecu_name_mapping)
+    output_dir = parse_input_files(
+        args.filename,
+        args.type,
+        conf_factory,
+        plugin_file=args.plugin,
+        ecu_name_replacement=ecu_name_mapping,
+    )
 
     if output_dir is None:
         help_and_exit()
@@ -1750,7 +2045,7 @@ def main():
 
     print("Generating configs:")
 
-    print(f"  SOME/IP configs:")
+    print("  SOME/IP configs:")
 
     print("  --> SOMEIP_service_identifiers")
     print("  --> SOMEIP_method_event_identifiers")
@@ -1831,7 +2126,7 @@ def main():
     fn6 = "CAN_interface_mapping"
     fn7 = "Signal_PDU_Binding_CAN"
     fn8 = "Signal_PDU_Binding_FlexRay"
-    print(f"\n  PDUs Configs:")
+    print("\n  PDUs Configs:")
     conf_factory.write_pdu_configs(target_dir2, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, 2)
     conf_factory.write_pdu_configs(target_dir3, fn1, fn2, fn3, fn4, fn5, fn6, fn7, fn8, 3)
 
@@ -1840,7 +2135,7 @@ def main():
     conf_factory.write_transport_pdu_config(os.path.join(target_dir2, fn), 2)
     conf_factory.write_transport_pdu_config(os.path.join(target_dir3, fn), 3)
 
-    print(f"\n  Other Configs:")
+    print("\n  Other Configs:")
 
     fn = "hosts"
     print(f"  --> {fn}")

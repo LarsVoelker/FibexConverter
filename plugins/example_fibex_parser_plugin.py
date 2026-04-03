@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2023  Dr. Lars Voelker
+# Copyright (C) 2015-2026  Dr. Lars Voelker
 # Copyright (C) 2020-2023  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
@@ -18,9 +18,10 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+
 class FibexParserPlugin:
     def __init__(self):
-        print(f"Creating FibexParserPlugin!")
+        print("Creating FibexParserPlugin!")
 
     def parse_file(self, parser, conf_factory, filename, verbose=False):
-        print(f"I should be parsing manufacturer extensions, etc.")
+        print("I should be parsing manufacturer extensions, etc.")

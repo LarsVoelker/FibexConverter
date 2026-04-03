@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2025  Dr. Lars Voelker
+# Copyright (C) 2015-2026  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
 # Copyright (C) 2020-2025  Dr. Lars Voelker, Technica Engineering GmbH
 
@@ -9,7 +9,7 @@
 # modify it under the terms of the GNU General Public License
 # as published by the Free Software Foundation; either version 2
 # of the License, or (at your option) any later version.
-# 
+#
 # This program is distributed in the hope that it will be useful,
 # but WITHOUT ANY WARRANTY; without even the implied warranty of
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
@@ -19,13 +19,26 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import sys
-import time
-import os.path
 import argparse
+import os.path
+import time
 
-from parser_dispatcher import *  # @UnusedWildImport
-from configuration_base_classes import *  # @UnusedWildImport
+from configuration_base_classes import (
+    BaseConfigurationFactory,
+    BaseECU,
+    SOMEIPBaseParameter,
+    SOMEIPBaseParameterArray,
+    SOMEIPBaseParameterBasetype,
+    SOMEIPBaseParameterBitfield,
+    SOMEIPBaseParameterEnumeration,
+    SOMEIPBaseParameterString,
+    SOMEIPBaseParameterStruct,
+    SOMEIPBaseParameterTypedef,
+    SOMEIPBaseParameterUnion,
+    SOMEIPBaseService,
+    read_csv_to_dict,
+)
+from parser_dispatcher import is_file_or_dir_valid, is_file_valid, parse_input_files, parser_formats
 
 
 class PeachConfigurationFactory(BaseConfigurationFactory):
@@ -36,7 +49,7 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
 
     def create_ecu(self, name, controllers):
         ret = BaseECU(name, controllers)
-        assert (name not in self.__ecus__)
+        assert name not in self.__ecus__
         self.__ecus__[name] = ret
         return ret
 
@@ -55,10 +68,27 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
         ret = SOMEIPParameterBasetype(name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type)
         return ret
 
-    def create_someip_parameter_string(self, name, chartype, bigendian, lowerlimit, upperlimit, termination,
-                                       length_of_length, pad_to):
-        ret = SOMEIPParameterString(name, chartype, bigendian, lowerlimit, upperlimit, termination,
-                                    length_of_length, pad_to)
+    def create_someip_parameter_string(
+        self,
+        name,
+        chartype,
+        bigendian,
+        lowerlimit,
+        upperlimit,
+        termination,
+        length_of_length,
+        pad_to,
+    ):
+        ret = SOMEIPParameterString(
+            name,
+            chartype,
+            bigendian,
+            lowerlimit,
+            upperlimit,
+            termination,
+            length_of_length,
+            pad_to,
+        )
         return ret
 
     def create_someip_parameter_array(self, name, dims, child):
@@ -88,15 +118,16 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
     def add_service(self, serviceid, majorver, minorver, service):
         sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
         if sid in self.__services_long__:
-            print("ERROR: Service (SID: 0x%04x, Major-Ver: %d, Minor-Ver: %d) already exists! Not overriding it!" %
-                  (serviceid, majorver, minorver))
+            print("ERROR: Service (SID: 0x%04x, Major-Ver: %d, Minor-Ver: %d) already exists! Not overriding it!" % (serviceid, majorver, minorver))
             return False
         self.__services_long__[sid] = service
 
         sid = "%04x-%02x" % (serviceid, majorver)
         if sid in self.__services__:
-            print("ERROR: Service (SID: 0x%04x, Major-Ver: %d) already exists with a different Minor Version (not %d)!"
-                  " Not overriding it!" % (serviceid, majorver, minorver))
+            print(
+                "ERROR: Service (SID: 0x%04x, Major-Ver: %d) already exists with a different Minor Version (not %d)!"
+                " Not overriding it!" % (serviceid, majorver, minorver)
+            )
             return False
         self.__services__[sid] = service
         return True
@@ -134,25 +165,60 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
                             serv = si.service()
 
                             for m in serv.methods():
-                                self.write_configfile_method_request(target_dir, ecu, vlanid, socket, si,
-                                                                     serv.methods()[m], "-Request")
+                                self.write_configfile_method_request(
+                                    target_dir,
+                                    ecu,
+                                    vlanid,
+                                    socket,
+                                    si,
+                                    serv.methods()[m],
+                                    "-Request",
+                                )
 
                             for e in serv.events():
-                                self.write_configfile_event(target_dir, ecu, vlanid, socket, si,
-                                                            serv.events()[e], "-Event")
+                                self.write_configfile_event(
+                                    target_dir,
+                                    ecu,
+                                    vlanid,
+                                    socket,
+                                    si,
+                                    serv.events()[e],
+                                    "-Event",
+                                )
 
                             for f in serv.fields():
                                 field = serv.fields()[f]
                                 if field.notifier() is not None:
-                                    self.write_configfile_event(target_dir, ecu, vlanid, socket, si,
-                                                                field.notifier(), "")
+                                    self.write_configfile_event(
+                                        target_dir,
+                                        ecu,
+                                        vlanid,
+                                        socket,
+                                        si,
+                                        field.notifier(),
+                                        "",
+                                    )
                                 # getter has empty request anyhow
                                 if field.getter() is not None:
-                                    self.write_configfile_method_request(target_dir, ecu, vlanid, socket, si,
-                                                                         field.getter(), "-Request")
+                                    self.write_configfile_method_request(
+                                        target_dir,
+                                        ecu,
+                                        vlanid,
+                                        socket,
+                                        si,
+                                        field.getter(),
+                                        "-Request",
+                                    )
                                 if field.setter() is not None:
-                                    self.write_configfile_method_request(target_dir, ecu, vlanid, socket, si,
-                                                                         field.setter(), "-Request")
+                                    self.write_configfile_method_request(
+                                        target_dir,
+                                        ecu,
+                                        vlanid,
+                                        socket,
+                                        si,
+                                        field.setter(),
+                                        "-Request",
+                                    )
 
     def write_configfile_method_request(self, target_dir, ecu, vlanid, socket, si, method, postfix):
         if (socket.proto() == "udp" and not method.reliable()) or (socket.proto() == "tcp" and method.reliable()):
@@ -161,12 +227,16 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
             elif method.calltype() == "FIRE_AND_FORGET":
                 msgtype = 0x01
             else:
-                print("ERROR: cannot figure out calltype of Method: %s 0x%04x 0x%04x" %
-                      (method.name(), method.methodid(), si.service().serviceid()))
-                msgtype = 0xff
+                print("ERROR: cannot figure out calltype of Method: %s 0x%04x 0x%04x" % (method.name(), method.methodid(), si.service().serviceid()))
+                msgtype = 0xFF
 
-            filename = "SOMEIP-%s-0x%04x-0x%04x-%s%s.xml" % \
-                       (ecu.name(), si.service().serviceid(), method.methodid(), method.name(), postfix)
+            filename = "SOMEIP-%s-0x%04x-0x%04x-%s%s.xml" % (
+                ecu.name(),
+                si.service().serviceid(),
+                method.methodid(),
+                method.name(),
+                postfix,
+            )
 
             print("  writing file %s" % filename)
             f = open(os.path.join(target_dir, filename), "w")
@@ -174,22 +244,41 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
             msgname = method.name() + postfix
             # peach is somewhat picky about names :-(
             msgname = msgname.replace("-", "").replace("_", "")
-            self.write_header(f, msgname, si.service().serviceid(), method.methodid(), si.protover(),
-                              si.service().majorversion(), msgtype, 0)
+            self.write_header(
+                f,
+                msgname,
+                si.service().serviceid(),
+                method.methodid(),
+                si.protover(),
+                si.service().majorversion(),
+                msgtype,
+                0,
+            )
 
             for param in method.inparams():
                 self.write_parameter(f, param)
 
-            self.write_footer(f, msgname, self.capdevstring(vlanid),
-                              self.filterstring(socket.proto(), socket.portnumber()),
-                              self.publisherstring(socket.proto()), socket.ip(), socket.portnumber())
+            self.write_footer(
+                f,
+                msgname,
+                self.capdevstring(vlanid),
+                self.filterstring(socket.proto(), socket.portnumber()),
+                self.publisherstring(socket.proto()),
+                socket.ip(),
+                socket.portnumber(),
+            )
 
             f.close()
 
     def write_configfile_event(self, target_dir, ecu, vlanid, socket, si, event, postfix):
         if (socket.proto() == "udp" and not event.reliable()) or (socket.proto() == "tcp" and event.reliable()):
-            filename = "SOMEIP-%s-0x%04x-0x%04x-%s%s.xml" % \
-                       (ecu.name(), si.service().serviceid(), event.methodid(), event.name(), postfix)
+            filename = "SOMEIP-%s-0x%04x-0x%04x-%s%s.xml" % (
+                ecu.name(),
+                si.service().serviceid(),
+                event.methodid(),
+                event.name(),
+                postfix,
+            )
 
             print("  writing file %s" % filename)
             f = open(os.path.join(target_dir, filename), "w")
@@ -197,15 +286,29 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
             msgname = event.name() + postfix
             # peach is somewhat picky about names :-(
             msgname = msgname.replace("-", "").replace("_", "")
-            self.write_header(f, msgname, si.service().serviceid(), event.methodid(), si.protover(),
-                              si.service().majorversion(), 0x02, 0)
+            self.write_header(
+                f,
+                msgname,
+                si.service().serviceid(),
+                event.methodid(),
+                si.protover(),
+                si.service().majorversion(),
+                0x02,
+                0,
+            )
 
             for param in event.params():
                 self.write_parameter(f, param)
 
-            self.write_footer(f, msgname, self.capdevstring(vlanid),
-                              self.filterstring(socket.proto(), socket.portnumber()),
-                              self.publisherstring(socket.proto()), socket.ip(), socket.portnumber())
+            self.write_footer(
+                f,
+                msgname,
+                self.capdevstring(vlanid),
+                self.filterstring(socket.proto(), socket.portnumber()),
+                self.publisherstring(socket.proto()),
+                socket.ip(),
+                socket.portnumber(),
+            )
 
             f.close()
 
@@ -221,48 +324,40 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
 """
         # start with SOME/IP Header
         f.write(xml_header + "\n")
-        f.write("	<DataModel name=\"%s\" mutable=\"false\">\n" % msgname)
-        f.write("		<Block name=\"Magic\" mutable=\"false\">\n")
+        f.write('	<DataModel name="%s" mutable="false">\n' % msgname)
+        f.write('		<Block name="Magic" mutable="false">\n')
         # Service ID
-        f.write("			<Number name=\"ServiceId\" size=\"16\" signed=\"false\" value=\"0x%04x\" mutable=\"false\" "
-                "valueType=\"hex\" endian=\"big\" />\n" % serviceid)
+        f.write(
+            '			<Number name="ServiceId" size="16" signed="false" value="0x%04x" mutable="false" ' 'valueType="hex" endian="big" />\n' % serviceid
+        )
         # Method ID
-        f.write("			<Number name=\"MethodId\" size=\"16\" signed=\"false\" value=\"0x%04x\" mutable=\"false\" "
-                "valueType=\"hex\" endian=\"big\" />\n" % methodid)
+        f.write('			<Number name="MethodId" size="16" signed="false" value="0x%04x" mutable="false" ' 'valueType="hex" endian="big" />\n' % methodid)
 
         block = """			<!-- Length of Payload -->
-			<Number name="Len" size="32" mutable="false" endian="big">
-				<Relation type="size" of="Payload" />
-			</Number>
-		</Block>
+            <Number name="Len" size="32" mutable="false" endian="big">
+                <Relation type="size" of="Payload" />
+            </Number>
+        </Block>
 
-		<Block name="Payload">
-			<Block name="Header" mutable="false">
-				<!-- Random RequestId -->
-				<Number name="RequestId" size="32" endian="big">
-					<Fixup class="SequenceRandomFixup" />
-				</Number>
+        <Block name="Payload">
+            <Block name="Header" mutable="false">
+                <!-- Random RequestId -->
+                <Number name="RequestId" size="32" endian="big">
+                    <Fixup class="SequenceRandomFixup" />
+                </Number>
 """
 
         f.write(block)
 
         # last header line
-        f.write(
-            "				<Number name=\"ProtocolVersion\" size=\"8\" value=\"0x%02x\" mutable=\"false\" valueType=\"hex\" endian=\"big\" />\n" % (
-                protover))
-        f.write(
-            "				<Number name=\"InterfaceVersion\" size=\"8\" value=\"0x%02x\" mutable=\"false\" valueType=\"hex\" endian=\"big\" />\n" % (
-                interfacever))
-        f.write(
-            "				<Number name=\"MessageType\" size=\"8\" value=\"0x%02x\" mutable=\"false\" valueType=\"hex\" endian=\"big\" />\n" % (
-                msgtype))
-        f.write(
-            "				<Number name=\"ReturnCode\" size=\"8\" value=\"0x%02x\" mutable=\"false\" valueType=\"hex\" endian=\"big\" />\n" % (
-                returncode))
+        f.write('				<Number name="ProtocolVersion" size="8" value="0x%02x" mutable="false" valueType="hex" endian="big" />\n' % (protover))
+        f.write('				<Number name="InterfaceVersion" size="8" value="0x%02x" mutable="false" valueType="hex" endian="big" />\n' % (interfacever))
+        f.write('				<Number name="MessageType" size="8" value="0x%02x" mutable="false" valueType="hex" endian="big" />\n' % (msgtype))
+        f.write('				<Number name="ReturnCode" size="8" value="0x%02x" mutable="false" valueType="hex" endian="big" />\n' % (returncode))
 
         block = """			</Block>
-		
-			<Block name="DataBytes" minOccurs=\"1\" maxOccurs=\"1\" >
+
+            <Block name="DataBytes" minOccurs=\"1\" maxOccurs=\"1\" >
 """
         f.write(block)
 
@@ -288,56 +383,56 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
     def write_footer(f, msgname, capdev, capfilter, publisher, ip, portnumber):
 
         block = """			</Block>
-			
-		</Block>
-	</DataModel>
 
-	<StateModel name="TestState" initialState="Initial">
-		<State name="Initial">
-			<Action type="output" name="InitialOutput">
+        </Block>
+    </DataModel>
+
+    <StateModel name="TestState" initialState="Initial">
+        <State name="Initial">
+            <Action type="output" name="InitialOutput">
 """
         f.write(block)
 
-        f.write("				<DataModel ref=\"%s\" />\n" % msgname)
+        f.write('				<DataModel ref="%s" />\n' % msgname)
 
         block = """			</Action>
-		</State>
-	</StateModel>
-	
-	<Agent name="Local">
+        </State>
+    </StateModel>
+
+    <Agent name="Local">
         <Monitor class="Pcap">
 """
         f.write(block)
 
-        f.write("			<Param name=\"Device\" value=\"%s\" />\n" % capdev)
-        f.write("			<Param name=\"Filter\" value=\"%s\" />\n" % capfilter)
+        f.write('			<Param name="Device" value="%s" />\n' % capdev)
+        f.write('			<Param name="Filter" value="%s" />\n' % capfilter)
 
         block = """		</Monitor>
-	</Agent>
+    </Agent>
 
-	<Test name="Default">
-		<StateModel ref="TestState" />
-		<Exclude/>
-		<Include xpath="//DataBytes" />
+    <Test name="Default">
+        <StateModel ref="TestState" />
+        <Exclude/>
+        <Include xpath="//DataBytes" />
 
 """
         f.write(block)
 
-        f.write("		<Publisher class=\"%s\">\n" % publisher)
-        f.write("			<Param name=\"Host\" value=\"%s\" />\n" % ip)
-        f.write("			<Param name=\"Port\" value=\"%s\" />\n" % portnumber)
+        f.write('		<Publisher class="%s">\n' % publisher)
+        f.write('			<Param name="Host" value="%s" />\n' % ip)
+        f.write('			<Param name="Port" value="%s" />\n' % portnumber)
 
         block = """		</Publisher>
 
-		<Strategy class="Random">
-			<Param name="MaxFieldsToMutate" value="5" />
-			<Param name="SwitchCount" value="50" />
-		</Strategy>
+        <Strategy class="Random">
+            <Param name="MaxFieldsToMutate" value="5" />
+            <Param name="SwitchCount" value="50" />
+        </Strategy>
 
-		<Logger class="File">
-			<Param name="Path" value="Logs" />
-		</Logger>
-	</Test>	
+        <Logger class="File">
+            <Param name="Path" value="Logs" />
+        </Logger>
+    </Test>
 
 </Peach>
 """
@@ -356,8 +451,17 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
         if self.bigendian():
             endian = "big"
 
-        f.write("%s<Number name=\"%s\" size=\"%d\" endian=\"%s\" minOccurs=\"%d\" maxOccurs=\"%d\" />\n" %
-                (indent * " ", paramname, self.__bitlength_encoded_type__, endian, minnum, maxnum))
+        f.write(
+            '%s<Number name="%s" size="%d" endian="%s" minOccurs="%d" maxOccurs="%d" />\n'
+            % (
+                indent * " ",
+                paramname,
+                self.__bitlength_encoded_type__,
+                endian,
+                minnum,
+                maxnum,
+            )
+        )
 
 
 class SOMEIPParameterString(SOMEIPBaseParameterString):
@@ -366,17 +470,15 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
         t = self.__chartype__
 
         if t.upper() == "UTF-8":
-            f.write("%s<Number name=\"%s_BOM1\" size=\"8\" value=\"0xEF\" minOccurs=\"1\" maxOccurs=\"1\" />\n" %
-                    (identtabs, blockid))
-            f.write("%s<Number name=\"%s_BOM2\" size=\"8\" value=\"0xBB\" minOccurs=\"1\" maxOccurs=\"1\" />\n" %
-                    (identtabs, blockid))
-            f.write("%s<Number name=\"%s_BOM3\" size=\"8\" value=\"0xBF\" minOccurs=\"1\" maxOccurs=\"1\" />\n" %
-                    (identtabs, blockid))
+            f.write('%s<Number name="%s_BOM1" size="8" value="0xEF" minOccurs="1" maxOccurs="1" />\n' % (identtabs, blockid))
+            f.write('%s<Number name="%s_BOM2" size="8" value="0xBB" minOccurs="1" maxOccurs="1" />\n' % (identtabs, blockid))
+            f.write('%s<Number name="%s_BOM3" size="8" value="0xBF" minOccurs="1" maxOccurs="1" />\n' % (identtabs, blockid))
             return 3
         elif t.upper() == "UTF-16":
             endian = "big" if self.__bigendian__ else "little"
-            f.write("%s<Number name=\"%s_BOM\" size=\"16\" value=\"0xFEFF\" endian=\"%s\" minOccurs=\"1\" "
-                    "maxOccurs=\"1\" />\n" % (identtabs, blockid, endian))
+            f.write(
+                '%s<Number name="%s_BOM" size="16" value="0xFEFF" endian="%s" minOccurs="1" ' 'maxOccurs="1" />\n' % (identtabs, blockid, endian)
+            )
             return 2
 
         print("ERROR: Cannot generate BOM for this string %s" % (self.name()))
@@ -404,7 +506,7 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
             pass
 
         if self.__termination__ == "ZERO":
-            term = "nullTerminated=\"true\""
+            term = 'nullTerminated="true"'
         else:
             print("WARNING: unknown termination for string: %s" % self.__termination__)
             term = ""
@@ -412,17 +514,27 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
         blockid = "String_%s_%x" % (paramname, id(self))
 
         if self.__lengthOfLength__ != 0:
-            f.write("%s<Number name=\"%s_Len\" size=\"%d\" endian=\"big\" minOccurs=\"1\" maxOccurs=\"1\" >\n" %
-                    (identtabs, blockid, self.__lengthOfLength__))
-            f.write("%s	<Relation type=\"size\" of=\"%s\" />\n" % (identtabs, blockid))
+            f.write('%s<Number name="%s_Len" size="%d" endian="big" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid, self.__lengthOfLength__))
+            f.write('%s	<Relation type="size" of="%s" />\n' % (identtabs, blockid))
             f.write("%s</Number>\n" % identtabs)
 
-        f.write("%s<Block name=\"%s\" minOccurs=\"1\" maxOccurs=\"1\" >\n" % (identtabs, blockid))
+        f.write('%s<Block name="%s" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid))
 
         if self.__lengthOfLength__ != 0:
-            f.write("%s	<!-- String %s %s %s (%d..%d) len:%d pad:%d %s -->\n" %
-                    (identtabs, self.__name__, self.__chartype__, endian, self.__lowerlimit__, self.__upperlimit__,
-                     self.__lengthOfLength__, self.__padTo__, term))
+            f.write(
+                "%s	<!-- String %s %s %s (%d..%d) len:%d pad:%d %s -->\n"
+                % (
+                    identtabs,
+                    self.__name__,
+                    self.__chartype__,
+                    endian,
+                    self.__lowerlimit__,
+                    self.__upperlimit__,
+                    self.__lengthOfLength__,
+                    self.__padTo__,
+                    term,
+                )
+            )
 
             if self.__padTo__ != 0:
                 print("ERROR: String %s has padto set to %d but we do not support!!" % (self.name(), self.__padTo__))
@@ -438,15 +550,13 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
 
             if upper < 1:
                 print("ERROR: String %s does not have valid length." % (self.name()))
-                f.write("%s	<!-- UPPER LIMIT INCORRECT!!! upper:%d after BOM correction %d -->\n" %
-                        (identtabs, upper, bomlen))
+                f.write("%s	<!-- UPPER LIMIT INCORRECT!!! upper:%d after BOM correction %d -->\n" % (identtabs, upper, bomlen))
 
-            f.write("%s	<String name=\"%s_string\" type=\"%s\" %s minOccurs=\"1\" maxOccurs=\"1\" />\n" %
-                    (identtabs, blockid, t, term))
+            f.write('%s	<String name="%s_string" type="%s" %s minOccurs="1" maxOccurs="1" />\n' % (identtabs, blockid, t, term))
 
         else:
             # fixed length string
-            assert (self.__lowerlimit__ == self.__upperlimit__)
+            assert self.__lowerlimit__ == self.__upperlimit__
             bomlen = self.peachout_bom(f, indent + 1, blockid)
 
             lower = self.__lowerlimit__ - bomlen
@@ -454,8 +564,7 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
             if lower < 1:
                 print("ERROR: String %s does not have valid length." % (self.name()))
 
-            f.write("%s	<String name=\"%s_string\" type=\"%s\" length=\"%d\" %s minOccurs=\"1\" maxOccurs=\"1\" />\n" %
-                    (identtabs, blockid, t, lower, term))
+            f.write('%s	<String name="%s_string" type="%s" length="%d" %s minOccurs="1" maxOccurs="1" />\n' % (identtabs, blockid, t, lower, term))
         f.write("%s</Block>\n" % identtabs)
 
 
@@ -478,14 +587,15 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
             lengthOfLength = dim.length_of_length()
 
             if lengthOfLength != 0:
-                f.write("%s<Number name=\"ArrayLen%s\" size=\"%d\" endian=\"big\" minOccurs=\"1\" maxOccurs=\"1\" >\n" %
-                        (identtabs, blockid, dim.length_of_length()))
-                f.write("%s	<Relation type=\"size\" of=\"%s\" />\n" % (identtabs, blockid))
+                f.write(
+                    '%s<Number name="ArrayLen%s" size="%d" endian="big" minOccurs="1" maxOccurs="1" >\n'
+                    % (identtabs, blockid, dim.length_of_length())
+                )
+                f.write('%s	<Relation type="size" of="%s" />\n' % (identtabs, blockid))
                 f.write("%s</Number>\n" % identtabs)
 
-            f.write("%s<Block name=\"%s\" minOccurs=\"1\" maxOccurs=\"1\" >\n" % (identtabs, blockid))
-            f.write("%s	<Block name=\"%s\" minOccurs=\"%d\" maxOccurs=\"%d\">\n" %
-                    (identtabs, "Data" + blockid, min2, max2))
+            f.write('%s<Block name="%s" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid))
+            f.write('%s	<Block name="%s" minOccurs="%d" maxOccurs="%d">\n' % (identtabs, "Data" + blockid, min2, max2))
             self.child().peachout(f, indent + 2, paramname, 1, 1)
             f.write("%s	</Block>\n" % identtabs)
             f.write("%s</Block>\n" % identtabs)
@@ -497,12 +607,14 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
         blockid = "Struct%s%x" % (self.name(), id(self))
 
         if self.__lengthOfLength__ != 0:
-            f.write("%s<Number name=\"StructLen%x\" size=\"%d\" mutable=\"false\" endian=\"big\" minOccurs=\"1\" "
-                    "maxOccurs=\"1\" >\n" % (identtabs, id(self), self.__lengthOfLength__))
-            f.write("%s	<Relation type=\"size\" of=\"%s\" />\n" % (identtabs, blockid))
+            f.write(
+                '%s<Number name="StructLen%x" size="%d" mutable="false" endian="big" minOccurs="1" '
+                'maxOccurs="1" >\n' % (identtabs, id(self), self.__lengthOfLength__)
+            )
+            f.write('%s	<Relation type="size" of="%s" />\n' % (identtabs, blockid))
             f.write("%s</Number>\n" % identtabs)
 
-        f.write("%s<Block name=\"%s\" minOccurs=\"%d\" maxOccurs=\"%d\">\n" % (identtabs, blockid, minnum, maxnum))
+        f.write('%s<Block name="%s" minOccurs="%d" maxOccurs="%d">\n' % (identtabs, blockid, minnum, maxnum))
         # f.write("%s<!-- Struct %s start -->\n" % (identtabs, self.__name__))
         for m in sorted(self.__members__.keys()):
             member = self.__members__[m]
@@ -532,31 +644,33 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
 
         blockidchoice = "Union%s%x" % (self.name(), id(self))
 
-        f.write(
-            "%s<Choice name=\"%s\" minOccurs=\"%d\" maxOccurs=\"%d\">\n" % (identtabs, blockidchoice, minnum, maxnum))
+        f.write('%s<Choice name="%s" minOccurs="%d" maxOccurs="%d">\n' % (identtabs, blockidchoice, minnum, maxnum))
 
         for m in self.__members__:
             member = self.__members__[m]
             blockid = "Union%s0x%xType0x%04x" % (self.name(), id(self), member.index())
 
-            f.write("%s	<Block name=\"%sWrapper\" minOccurs=\"1\" maxOccurs=\"1\" >\n" % (identtabs, blockid))
+            f.write('%s	<Block name="%sWrapper" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid))
 
             if self.__lengthOfLength__ != 0:
-                f.write("%s		<Number name=\"UnionLen%s\" size=\"%d\" endian=\"big\" minOccurs=\"1\" "
-                        "maxOccurs=\"1\" >\n" % (identtabs, blockid, self.__lengthOfLength__))
-                f.write("%s			<Relation type=\"size\" of=\"%s\" />\n" % (identtabs, blockid))
+                f.write(
+                    '%s		<Number name="UnionLen%s" size="%d" endian="big" minOccurs="1" '
+                    'maxOccurs="1" >\n' % (identtabs, blockid, self.__lengthOfLength__)
+                )
+                f.write('%s			<Relation type="size" of="%s" />\n' % (identtabs, blockid))
                 f.write("%s		</Number>\n" % identtabs)
 
             if self.__lengthOfType__ != 0:
-                f.write("%s		<Number name=\"UnionType%s\" size=\"%d\" value=\"0x%04x\" endian=\"big\" "
-                        "minOccurs=\"1\" maxOccurs=\"1\" />\n" %
-                        (identtabs, blockid, self.__lengthOfType__, member.index()))
+                f.write(
+                    '%s		<Number name="UnionType%s" size="%d" value="0x%04x" endian="big" '
+                    'minOccurs="1" maxOccurs="1" />\n' % (identtabs, blockid, self.__lengthOfType__, member.index())
+                )
             else:
                 print("ERROR: Union %s thinks that typefield can be 0 bytes long!!!!" % (self.name()))
                 f.write("%s		<!-- TypeField with len:0!!! -->\n" % identtabs)
                 return
 
-            f.write("%s		<Block name=\"%s\" minOccurs=\"1\" maxOccurs=\"1\" >\n" % (identtabs, blockid))
+            f.write('%s		<Block name="%s" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid))
             member.child().peachout(f, indent + 3, member.name(), 1, 1)
             f.write("%s		</Block>\n" % identtabs)
 
@@ -572,13 +686,26 @@ class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Converting configuration to peach xml.')
-    parser.add_argument('type', choices=parser_formats, help='format')
-    parser.add_argument('filename', help='filename or directory', type=lambda x: is_file_or_dir_valid(parser, x))
-    parser.add_argument('--ecu-name-mapping', type=argparse.FileType('r'), default=None, help='Key/Value CSV file')
-    parser.add_argument('--generate-switch-port-names', action='store_true')
-    parser.add_argument('--plugin', help='filename of parser plugin', type=lambda x: is_file_valid(parser, x),
-                        default=None)
+    parser = argparse.ArgumentParser(description="Converting configuration to peach xml.")
+    parser.add_argument("type", choices=parser_formats, help="format")
+    parser.add_argument(
+        "filename",
+        help="filename or directory",
+        type=lambda x: is_file_or_dir_valid(parser, x),
+    )
+    parser.add_argument(
+        "--ecu-name-mapping",
+        type=argparse.FileType("r"),
+        default=None,
+        help="Key/Value CSV file",
+    )
+    parser.add_argument("--generate-switch-port-names", action="store_true")
+    parser.add_argument(
+        "--plugin",
+        help="filename of parser plugin",
+        type=lambda x: is_file_valid(parser, x),
+        default=None,
+    )
 
     args = parser.parse_args()
     return args
@@ -597,8 +724,13 @@ def main():
         ecu_name_mapping = read_csv_to_dict(args.ecu_name_mapping)
 
     conf_factory = PeachConfigurationFactory()
-    output_dir = parse_input_files(args.filename, args.type, conf_factory, plugin_file=args.plugin,
-                                   ecu_name_replacement=ecu_name_mapping)
+    output_dir = parse_input_files(
+        args.filename,
+        args.type,
+        conf_factory,
+        plugin_file=args.plugin,
+        ecu_name_replacement=ecu_name_mapping,
+    )
 
     target_dir = os.path.join(output_dir, "peach")
 
