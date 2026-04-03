@@ -31,17 +31,15 @@ parser_formats = ["FIBEX"]
 def is_file_or_dir_valid(parser, arg):
     if not os.path.exists(arg):
         parser.error(f"File or directory does not exist: {arg}")
-        return None
-    else:
-        return arg
+
+    return arg
 
 
 def is_file_valid(parser, arg):
     if not os.path.isfile(arg):
         parser.error(f"File does not exist: {arg}")
-        return None
-    else:
-        return arg
+
+    return arg
 
 
 def parse_input_files(
