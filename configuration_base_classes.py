@@ -21,28 +21,30 @@
 
 import csv
 import ipaddress
+import logging
+from typing import Any, Dict, Optional
 
 import macaddress
 
+# we assume that this is the first time a logger is created
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def bits_to_bytes(bits):
+
+def bits_to_bytes(bits: int) -> int:
+    """Convert bit count to byte count, rounding up."""
     if bits % 8 == 0:
         return bits // 8
-    else:
-        return (bits // 8) + 1
+    return (bits // 8) + 1
 
 
-def is_mcast(addr):
-    if is_ip_mcast(addr):
-        return True
-
-    if is_mac_mcast(addr):
-        return True
-
-    return False
+def is_mcast(addr: Optional[str]) -> bool:
+    """Check if an address is a multicast address (IP or MAC)."""
+    return is_ip_mcast(addr) or is_mac_mcast(addr)
 
 
-def addr_to_key(addr):
+def addr_to_key(addr: Optional[str]) -> str:
+    """Convert an address (IP or MAC) to a normalized key string."""
     if addr is None:
         return "None"
 
@@ -52,106 +54,123 @@ def addr_to_key(addr):
     if is_mac(addr):
         return mac_to_key(addr)
 
-    print(f"Warning: addr_to_key was called with {addr} and this seems to be no IP or MAC Address!")
+    logger.warning("addr_to_key was called with %s and this seems to be no IP or MAC Address!", addr)
     return "None"
 
 
-def is_mac(mac):
+def is_mac(mac: Optional[str]) -> bool:
+    """Check if a string is a valid MAC address."""
     if mac is None:
         return False
 
     try:
         macaddress.EUI48(mac)
+        return True
     except ValueError:
         return False
 
-    return True
 
-
-def is_mac_mcast(mac):
+def is_mac_mcast(mac: Optional[str]) -> bool:
+    """Check if a MAC address is a multicast address."""
     if mac is None:
         return False
 
     try:
         tmp = macaddress.EUI48(mac)
+        return (tmp.__bytes__()[0] & 0x01) == 0x01
     except ValueError:
         return False
 
-    return (tmp.__bytes__()[0] & 0x01) == 0x01
 
-
-def mac_to_key(mac):
+def mac_to_key(mac: Optional[str]) -> str:
+    """Convert a MAC address to a normalized key string."""
     if mac is None:
         return "None"
 
     try:
         tmp = macaddress.EUI48(mac)
+        return f"mac-{str(tmp)}"
     except ValueError:
-        return False
-
-    return f"mac-{str(tmp)}"
+        return "None"
 
 
-def is_ip(ip):
+def is_ip(ip: Optional[str]) -> bool:
+    """Check if a string is a valid IP address."""
     if ip is None:
         return False
 
     try:
-        ip = ipaddress.ip_address(ip)
+        ipaddress.ip_address(ip)
+        return True
     except ValueError:
         return False
 
-    return True
 
+def is_ip_mcast(ip: Optional[str]) -> bool:
+    """Check if an IP address is a multicast address."""
+    if ip is None:
+        return False
 
-def is_ip_mcast(ip):
     try:
-        ip = ipaddress.ip_address(ip)
+        ip_addr = ipaddress.ip_address(ip)
+        return ip_addr.is_multicast
     except ValueError:
         return False
 
-    return ip.is_multicast
 
-
-def ip_to_key(ip):
+def ip_to_key(ip: Optional[str]) -> str:
+    """Convert an IP address to a normalized key string."""
     if ip is None:
         return "None"
 
     try:
         tmp = ipaddress.ip_address(ip)
+        if tmp.version == 4:
+            return f"ipv4-{tmp.packed[0]:03}.{tmp.packed[1]:03}.{tmp.packed[2]:03}.{tmp.packed[3]:03}"
+        elif tmp.version == 6:
+            return f"ipv6-{tmp.exploded}"
+        return f"ipvx-{ip}"
     except ValueError:
         return "None"
 
-    key = f"ipvx-{ip}"
 
-    if tmp.version == 4:
-        key = f"ipv4-{tmp.packed[0]:03}.{tmp.packed[1]:03}.{tmp.packed[2]:03}.{tmp.packed[3]:03}"
-    elif tmp.version == 6:
-        key = f"ipv6-{tmp.exploded}"
-    return key
-
-
-def mcast_addr_to_mac_mcast(addr):
+def mcast_addr_to_mac_mcast(addr: Optional[str]) -> str:
+    """Convert a multicast IP address to its corresponding MAC multicast address."""
     if is_mac_mcast(addr):
         return addr
 
     if is_ip_mcast(addr):
-        ret = ""
-        tmp = ipaddress.ip_address(addr)
-        if tmp.version == 4:
-            ret = f"01-00-5e-{(tmp.packed[1] & 127):02x}-{tmp.packed[2]:02x}-{tmp.packed[3]:02x}"
-        elif tmp.version == 6:
-            ret = f"33-33-{(tmp.packed[12]):02x}-{(tmp.packed[13]):02x}-{(tmp.packed[14]):02x}-{(tmp.packed[15]):02x}"
-        else:
-            print("ERROR: IP Address has to be IPv4 or IPv6 to convert it to Ethernet Multicast!")
-
-        return ret.upper()
+        try:
+            tmp = ipaddress.ip_address(addr)
+            if tmp.version == 4:
+                ret = f"01-00-5e-{(tmp.packed[1] & 127):02x}-{tmp.packed[2]:02x}-{tmp.packed[3]:02x}"
+            elif tmp.version == 6:
+                ret = f"33-33-{(tmp.packed[12]):02x}-{(tmp.packed[13]):02x}-{(tmp.packed[14]):02x}-{(tmp.packed[15]):02x}"
+            else:
+                logger.error("IP Address has to be IPv4 or IPv6 to convert it to Ethernet Multicast!")
+                return ""
+            return ret.upper()
+        except ValueError:
+            return ""
 
     return ""
 
 
-def read_csv_to_dict(f, verbose=False):
-    ret = {}
+def read_csv_to_dict(f: Any, verbose: bool = False) -> Dict[str, str]:
+    """
+    Read a CSV file and convert it to a dictionary.
+
+    The first line is treated as a header and skipped.
+    Each subsequent line should have exactly two columns (key, value).
+
+    Args:
+        f: File-like object to read from
+        verbose: If True, print each row as it's processed
+
+    Returns:
+        Dictionary mapping keys to values
+    """
+    ret: Dict[str, str] = {}
 
     csvreader = csv.reader(f, delimiter=",", quotechar='"')
     skip_first_line = True
@@ -161,20 +180,20 @@ def read_csv_to_dict(f, verbose=False):
             continue
 
         # skip empty lines
-        if len(row) == 0 or row[0] == "" or row[0] == "":
+        if len(row) == 0 or not row[0]:
             continue
 
         if verbose:
-            print("  " + ", ".join(row))
+            logger.debug("  %s", ", ".join(row))
 
         if len(row) != 2:
-            print(f"Error: Line in file too short/long: {', '.join(row)} ({len(row)})")
+            logger.error("Line in file too short/long: %s (%d)", ", ".join(row), len(row))
             continue
 
         key, value = row[:2]
 
-        if key in ret.keys():
-            print(f"Error: key {key} is present multiple times!")
+        if key in ret:
+            logger.error("key %s is present multiple times!", key)
             continue
 
         ret[key] = value
@@ -184,7 +203,9 @@ def read_csv_to_dict(f, verbose=False):
     return ret
 
 
-class BaseConfigurationFactory(object):
+class BaseConfigurationFactory:
+    """Base factory class for creating configuration objects."""
+
     def create_vlan(self, name, vlanid, prio):
         return BaseVLAN(name, vlanid, prio)
 
@@ -510,17 +531,17 @@ class BaseConfigurationFactory(object):
         eth_bus = socket.interface().controller().get_eth_bus()
 
         if eth_bus is None:
-            print(f"WARNING: cannot find sw_port and not eth bus either for eth bus! " f"Ctrl: {socket.interface().controller().name()}")
+            logger.warning("cannot find sw_port and not eth bus either for eth bus! Ctrl: %s", socket.interface().controller().name())
             return None
 
         sw_ports = eth_bus.switch_ports()
 
         if len(sw_ports) == 0:
-            print(f"WARNING: cannot find uplink port to eth bus! " f"Ctrl: {socket.interface().controller().name()}")
+            logger.warning("cannot find uplink port to eth bus! Ctrl: %s", socket.interface().controller().name())
             return None
 
         if len(sw_ports) > 1:
-            print("ERROR: Eth Bus with more than 1 uplink to switch is unsupported!")
+            logger.error("Eth Bus with more than 1 uplink to switch is unsupported!")
 
         return sw_ports[0]
 
@@ -540,8 +561,11 @@ class BaseConfigurationFactory(object):
         pass
 
 
-class BaseItem(object):
+class BaseItem:
+    """Base class for all configuration items."""
+
     def legacy(self):
+        """Check if this item uses legacy PDU format."""
         return False
 
 
@@ -587,8 +611,7 @@ class BaseVLAN(BaseItem):
     def vlanid_str(self):
         if self.vlanid() is None:
             return "untagged"
-        else:
-            return f"0x{int(self.vlanid()):x}"
+        return f"0x{int(self.vlanid()):x}"
 
     def priority(self):
         return self.__priority__
@@ -606,48 +629,48 @@ class BaseMulticastPath(BaseItem):
         comment,
     ):
         if vlanid_tx != vlanid_rx:
-            print(f"Currently only Multicast Path with same VLAN supported Addr:{multicast_addr} vlan_tx:{vlanid_tx} " f"vlan_rx:{vlanid_rx}!")
+            logger.error(
+                "Currently only Multicast Path with same VLAN supported Addr:%s vlan_tx:%s vlan_rx:%s!", multicast_addr, vlanid_tx, vlanid_rx
+            )
             raise ValueError
 
-        self.__vlanid__ = vlanid_tx
-        self.__tx_addr__ = source_addr
-        self.__mc_addr__ = multicast_addr
-        self.__swport_tx__ = switchport_tx
-        self.__swport_rx__ = switchport_rx
-        self.__comment__ = comment
+        self.__vlanid = vlanid_tx
+        self.__tx_addr = source_addr
+        self.__mc_addr = multicast_addr
+        self.__swport_tx = switchport_tx
+        self.__swport_rx = switchport_rx
+        self.__comment = comment
 
     def vlanid(self):
-        return self.__vlanid__
+        return self.__vlanid
 
     def source_addr(self):
-        return self.__tx_addr__
+        return self.__tx_addr
 
     def mc_addr(self):
-        return self.__mc_addr__
+        return self.__mc_addr
 
     def switchport_tx(self):
-        return self.__swport_tx__
+        return self.__swport_tx
 
     def switchport_tx_name(self):
-        if self.__swport_tx__ is None:
+        if self.__swport_tx is None:
             return None
-        else:
-            return self.__swport_tx__.portid()
+        return self.__swport_tx.portid()
 
     def switchport_rx(self):
-        return self.__swport_rx__
+        return self.__swport_rx
 
     def switchport_rx_name(self):
-        if self.__swport_rx__ is None:
+        if self.__swport_rx is None:
             return None
-        else:
-            return self.__swport_rx__.portid()
+        return self.__swport_rx.portid()
 
     def comment(self):
-        return self.__comment__
+        return self.__comment
 
     def __append_to_comment__(self, txt):
-        self.__comment__ += txt
+        self.__comment += txt
 
 
 class BaseSwitchPort(BaseItem):
@@ -709,7 +732,7 @@ class BaseSwitchPort(BaseItem):
         assert self.__port__ is None
 
         if self.__ctrl__ is not None or self.__eth_bus__ is not None:
-            print(f"WARNING: SwitchPort {self.__portid__} adds port but was connected before! Overwritting!")
+            logger.warning("SwitchPort %s adds port but was connected before! Overwriting!", self.__portid__)
 
         self.__port__ = peer_port
 
@@ -721,7 +744,7 @@ class BaseSwitchPort(BaseItem):
         assert self.__eth_bus__ is None
 
         if self.__ctrl__ is not None or self.__eth_bus__ is not None:
-            print(f"WARNING: SwitchPort {self.__portid__} adds eth bus but was connected before! Overwritting!")
+            logger.warning("SwitchPort %s adds eth bus but was connected before! Overwriting!", self.__portid__)
 
         self.__eth_bus__ = eth_bus
 
@@ -733,7 +756,7 @@ class BaseSwitchPort(BaseItem):
         assert self.__ctrl__ is None
 
         if self.__port__ is not None or self.__eth_bus__ is not None:
-            print(f"WARNING: SwitchPort {self.__portid__} adds ctrl to port but was connected before! Overwritting!")
+            logger.warning("SwitchPort %s adds ctrl to port but was connected before! Overwriting!", self.__portid__)
 
         self.__ctrl__ = peer_ctrl
         peer_ctrl.set_switch_port(self)
@@ -1306,7 +1329,7 @@ class SOMEIPBaseService(BaseItem):
 
     def eventgroup(self, egid):
         if egid in self.__eventgroups__:
-            return self.__eventgroups__[id]
+            return self.__eventgroups__[egid]
         return None
 
     def add_instance(self, serviceinstance):
@@ -2359,15 +2382,11 @@ class BasePDU(BaseAbstractPDU):
     def signal_instances_sorted_by_bit_position(self):
         tmp = {}
         for si in self.__signal_instances__.values():
-            if si.bit_position() in tmp.keys():
-                print(f"ERROR: PDU {self.name()} has multiple Signals starting at same position! Overwritting!")
+            if si.bit_position() in tmp:
+                logger.error("PDU %s has multiple Signals starting at same position! Overwriting!", self.name())
             tmp[si.bit_position()] = si
 
-        ret = []
-        for key in sorted(tmp.keys()):
-            ret.append(tmp[key])
-
-        return ret
+        return [tmp[key] for key in sorted(tmp.keys())]
 
 
 class BaseMultiplexPDU(BaseAbstractPDU):
@@ -2386,27 +2405,27 @@ class BaseMultiplexPDU(BaseAbstractPDU):
         super(BaseMultiplexPDU, self).__init__(id, short_name, byte_length, pdu_type)
 
         if switch is None and len(segment_positions) != 0:
-            print(f"ERROR: PDU: {short_name} has Dynamic Segments but no Switch!")
+            logger.error("PDU: %s has Dynamic Segments but no Switch!", short_name)
             raise ValueError
 
         if switch is not None and len(segment_positions) == 0:
-            print(f"ERROR: PDU: {short_name} has a Switch but no Dynamic Segments!")
+            logger.error("PDU: %s has a Switch but no Dynamic Segments!", short_name)
             # raise ValueError
 
         if len(segment_positions) > 1:
-            print(f"ERROR: We only support up to 1 Dynamic Segment per PDU! " f"PDU {short_name} has {len(segment_positions)}")
+            logger.error("We only support up to 1 Dynamic Segment per PDU! PDU %s has %d", short_name, len(segment_positions))
             raise ValueError
 
         if static_pdu is None and len(static_segs) != 0:
-            print(f"ERROR: PDU: {short_name} has Static Segments but no Static PDU!")
+            logger.error("PDU: %s has Static Segments but no Static PDU!", short_name)
             raise ValueError
 
         if static_pdu is not None and len(static_segs) == 0:
-            print(f"ERROR: PDU: {short_name} has a Static PDU but not Static Segments!")
+            logger.error("PDU: %s has a Static PDU but not Static Segments!", short_name)
             raise ValueError
 
         if len(static_segs) > 1:
-            print(f"ERROR: We only support up to 1 Static Segment per PDU. " f"PDU {short_name} has {len(static_segs)}")
+            logger.error("We only support up to 1 Static Segment per PDU. PDU %s has %d", short_name, len(static_segs))
             raise ValueError
 
         self.__switch__ = switch
