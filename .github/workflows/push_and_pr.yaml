@@ -1,0 +1,66 @@
+name: Workflows for push and pull requests
+
+on:
+  push:
+    branches:
+    - master
+  pull_request:
+    branches:
+    - master
+
+jobs:
+  format-check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run black
+        uses: psf/black@26.3.1
+        with:
+          options: "--check --verbose --line-length 149 --diff"
+          src: "."
+
+  isort:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Prepare
+        run: |
+          pip install --upgrade pip
+          pip install isort
+
+      - name: Run isort
+        run: |
+          mkdir format-reports
+          isort --check --diff --color --profile black --line-length 149 *.py > format-reports/isort-report.diff
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: isort-artifacts
+          path: format-reports
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Prepare
+        run: |
+          pip install --upgrade pip
+          pip install flake8 flake8-html
+
+      - name: Run flake8
+        run: |
+          flake8 *.py --max-line-length 149
+          flake8 *.py --max-line-length 149 --format html --htmldir flake8-report
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-artifacts
+          path: flake8-report

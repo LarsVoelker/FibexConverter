@@ -320,7 +320,9 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
     def write_header(f, msgname, serviceid, methodid, protover, interfacever, msgtype, returncode):
 
         xml_header = """<?xml version="1.0" encoding="utf-8"?>
-<Peach xmlns="http://peachfuzzer.com/2012/Peach" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://peachfuzzer.com/2012/Peach ../peach.xsd">
+<Peach xmlns="http://peachfuzzer.com/2012/Peach"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://peachfuzzer.com/2012/Peach /peach/peach.xsd">
 """
         # start with SOME/IP Header
         f.write(xml_header + "\n")
