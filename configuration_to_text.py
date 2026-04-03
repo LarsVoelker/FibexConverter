@@ -848,7 +848,11 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
                     ret += ", "
                 else:
                     first = False
-                ret += f"0x{fid:04x}"
+                if fid is None:
+                    print(f"ERROR: Field is referenced to Eventgroup {self.__name__} but does not have a Notifier!")
+                    ret += "None"
+                else:
+                    ret += f"0x{fid:04x}"
             ret += "\n"
 
         return ret

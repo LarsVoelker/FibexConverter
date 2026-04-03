@@ -1148,8 +1148,18 @@ class FibexParser(AbstractParser):
         sid = self.get_id(service)
         name = self.get_child_text(service, "./ho:SHORT-NAME")
         service_id = int(self.get_child_text(service, "./fx:SERVICE-IDENTIFIER"))
-        major_version = int(self.get_child_text(service, "./service:API-VERSION/service:MAJOR"))
-        minor_version = int(self.get_child_text(service, "./service:API-VERSION/service:MINOR"))
+
+        try:
+            major_version = int(self.get_child_text(service, "./service:API-VERSION/service:MAJOR"))
+        except TypeError:
+            print(f"ERROR: Service {name} does not have a major version! Using 1!")
+            major_version = 1
+
+        try:
+            minor_version = int(self.get_child_text(service, "./service:API-VERSION/service:MINOR"))
+        except TypeError:
+            print(f"ERROR: Service {name} does not have a minor version! Using 0!")
+            minor_version = 0
 
         methods = dict()
         for method in service.findall("./service:METHODS/service:METHOD", self.__ns__):
