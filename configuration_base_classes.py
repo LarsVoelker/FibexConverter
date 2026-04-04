@@ -2521,7 +2521,7 @@ class BasePDUInstance(BaseItem):
 
 
 class BaseFrame(BaseItem):
-    def __init__(self, id, short_name, frame_type, byte_length, pdu_instances):
+    def __init__(self, id, short_name, byte_length, frame_type, pdu_instances):
         self.__id__ = id
         self.__short_name__ = short_name
         self.__byte_length__ = byte_length
