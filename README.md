@@ -33,3 +33,7 @@ Just call it like this:
 The result will be:
 
     example-file/reports/
+
+## Project Structure
+* Project is written in python3.
+* Pytest test cases are in tests/
