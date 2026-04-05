@@ -64,3 +64,25 @@ jobs:
         with:
           name: lint-artifacts
           path: flake8-report
+
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Prepare
+        run: |
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r tests/requirements.txt
+
+      - name: Run pytest
+        run: |
+          pytest tests/ --cov=. --cov-report=html
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: pytest-coverage
+          path: htmlcov

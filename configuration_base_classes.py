@@ -87,7 +87,7 @@ def mac_to_key(mac):
     try:
         tmp = macaddress.EUI48(mac)
     except ValueError:
-        return False
+        return "None"
 
     return f"mac-{str(tmp)}"
 
@@ -133,7 +133,7 @@ def ip_to_key(ip):
 
 def mcast_addr_to_mac_mcast(addr):
     if is_mac_mcast(addr):
-        return addr
+        return str(macaddress.EUI48(addr))
 
     if is_ip_mcast(addr):
         ret = ""
@@ -1306,7 +1306,7 @@ class SOMEIPBaseService(BaseItem):
 
     def eventgroup(self, egid):
         if egid in self.__eventgroups__:
-            return self.__eventgroups__[id]
+            return self.__eventgroups__[egid]
         return None
 
     def add_instance(self, serviceinstance):
@@ -1996,7 +1996,7 @@ class SOMEIPBaseParameterStructMember(BaseItem):
             and self.position() == other.position()
             and self.mandatory() == other.mandatory()
             and self.child() == other.child()
-            and self.signal() == self.signal()
+            and self.signal() == other.signal()
         )
 
     def legacy(self):
