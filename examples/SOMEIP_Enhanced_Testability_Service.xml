@@ -1,0 +1,1628 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Enhanced Testability Service (ETS) FIBEX fixture.
+    Modelled after local/flync_ets/ets.flync.yaml.
+
+    Service: SVC_ETS  (ID=0x0101=257, major=1, minor=1)
+    Methods: 34 (including duplicate ID 0x32)
+    Events:  5  (0x8001..0x8004, 0x800B)
+    Fields:  4  (InterfaceVersion, TestFieldUINT8, TestFieldUINT8Array, TestFieldUINT8Reliable)
+    Eventgroups: 3 (eg2_all id=2, eg5 id=5, eg6 id=6)
+-->
+<fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx"
+          xmlns:ho="http://www.asam.net/xml"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:ethernet="http://www.asam.net/xml/fbx/ethernet"
+          xmlns:service="http://www.asam.net/xml/fbx/services"
+          xmlns:it="http://www.asam.net/xml/fbx/it"
+          VERSION="4.1.2">
+
+    <fx:PROJECT ID="PROJ_ETS">
+        <ho:SHORT-NAME>ETS</ho:SHORT-NAME>
+    </fx:PROJECT>
+
+    <fx:ELEMENTS>
+
+        <!-- ================================================================
+             CHANNEL
+             ================================================================ -->
+        <fx:CHANNELS>
+            <fx:CHANNEL ID="CHAN_ETS_VLAN" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>ETS_VLAN</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN_ETS">
+                    <ho:SHORT-NAME>ETS_VLAN</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>200</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+        </fx:CHANNELS>
+
+
+
+        <!-- ================================================================
+             ECU
+             ================================================================ -->
+        <fx:ECUS>
+
+            <fx:ECU ID="ECU_ETS_PROVIDER">
+                <ho:SHORT-NAME>ECU_ETS_PROVIDER</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_ETS">
+                        <ho:SHORT-NAME>ETS_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_ETS" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_ETS_VLAN"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ETS"/>
+
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_ETS">
+                                <ho:SHORT-NAME>ETS_NEP</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.200.1</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+
+                        <it:APPLICATION-ENDPOINTS>
+                            <it:APPLICATION-ENDPOINT ID="AEP_ETS">
+                                <ho:SHORT-NAME>ETS_AEP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30490</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_ETS"/>
+                                <it:PROVIDED-SERVICE-INSTANCES>
+                                    <it:PROVIDED-SERVICE-INSTANCE ID="PSI_ETS">
+                                        <it:INSTANCE-IDENTIFIER>1</it:INSTANCE-IDENTIFIER>
+                                        <service:SERVICE-INTERFACE-REF ID-REF="SVC_ETS"/>
+                                    </it:PROVIDED-SERVICE-INSTANCE>
+                                </it:PROVIDED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                        </it:APPLICATION-ENDPOINTS>
+
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+        </fx:ECUS>
+
+        <fx:SERVICE-INTERFACES>
+        <!-- ================================================================
+             SERVICE INTERFACE
+             ================================================================ -->
+        <fx:SERVICE-INTERFACE ID="SVC_ETS" xsi:type="service:SERVICE-INTERFACE-TYPE">
+            <ho:SHORT-NAME>EnhancedTestabilityService</ho:SHORT-NAME>
+            <fx:SERVICE-IDENTIFIER>257</fx:SERVICE-IDENTIFIER>
+            <service:API-VERSION>
+                <service:MAJOR>1</service:MAJOR>
+                <service:MINOR>0</service:MINOR>
+            </service:API-VERSION>
+
+            <!-- ============================================================
+                 METHODS
+                 ============================================================ -->
+            <service:METHODS>
+
+                <!-- resetInterface 0x01 - FAF, no params -->
+                <service:METHOD ID="M_RESET">
+                    <ho:SHORT-NAME>resetInterface</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>1</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>FIRE_AND_FORGET</service:CALL-SEMANTIC>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- suspendInterface 0x02 - FAF -->
+                <service:METHOD ID="M_SUSPEND">
+                    <ho:SHORT-NAME>suspendInterface</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>2</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>FIRE_AND_FORGET</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_SUSPEND_I0">
+                            <ho:SHORT-NAME>delay</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_SUSPEND_I1">
+                            <ho:SHORT-NAME>duration</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- triggerEventUINT8 0x03 - FAF -->
+                <service:METHOD ID="M_TRIG8">
+                    <ho:SHORT-NAME>triggerEventUINT8</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>3</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>FIRE_AND_FORGET</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_TRIG8_I0">
+                            <ho:SHORT-NAME>delay</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_TRIG8_I1">
+                            <ho:SHORT-NAME>duration</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_TRIG8_I2">
+                            <ho:SHORT-NAME>debounceTime</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- triggerEventUINT8Array 0x04 - FAF -->
+                <service:METHOD ID="M_TRIG8ARR">
+                    <ho:SHORT-NAME>triggerEventUINT8Array</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>4</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>FIRE_AND_FORGET</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_TRIG8ARR_I0">
+                            <ho:SHORT-NAME>delay</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_TRIG8ARR_I1">
+                            <ho:SHORT-NAME>duration</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_TRIG8ARR_I2">
+                            <ho:SHORT-NAME>debounceTime</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- triggerEventUINT8Reliable 0x05 - FAF -->
+                <service:METHOD ID="M_TRIG8REL">
+                    <ho:SHORT-NAME>triggerEventUINT8Reliable</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>5</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>FIRE_AND_FORGET</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_TRIG8REL_I0">
+                            <ho:SHORT-NAME>delay</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_TRIG8REL_I1">
+                            <ho:SHORT-NAME>duration</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_TRIG8REL_I2">
+                            <ho:SHORT-NAME>debounceTime</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- triggerEventUINT8E2E 0x06 - FAF -->
+                <service:METHOD ID="M_TRIG8E2E">
+                    <ho:SHORT-NAME>triggerEventUINT8E2E</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>6</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>FIRE_AND_FORGET</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_TRIG8E2E_I0">
+                            <ho:SHORT-NAME>delay</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_TRIG8E2E_I1">
+                            <ho:SHORT-NAME>duration</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_TRIG8E2E_I2">
+                            <ho:SHORT-NAME>debounceTime</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUINT8 0x08 - R/R -->
+                <service:METHOD ID="M_ECHO_U8">
+                    <ho:SHORT-NAME>echoUINT8</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>8</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_ECHO_U8_I0">
+                            <ho:SHORT-NAME>uint8_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_ECHO_U8_O0">
+                            <ho:SHORT-NAME>uint8_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUINT8Array 0x09 - R/R - dynamic array uint8, 32-bit length -->
+                <service:METHOD ID="M_ECHO_U8ARR">
+                    <ho:SHORT-NAME>echoUINT8Array</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>9</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_ECHO_U8ARR_I0">
+                            <ho:SHORT-NAME>uint8array_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_ECHO_U8ARR_O0">
+                            <ho:SHORT-NAME>uint8array_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUINT8RELIABLE 0x0A - R/R -->
+                <service:METHOD ID="M_ECHO_U8REL">
+                    <ho:SHORT-NAME>echoUINT8RELIABLE</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>10</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_ECHO_U8REL_I0">
+                            <ho:SHORT-NAME>uint8_value</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_ECHO_U8REL_O0">
+                            <ho:SHORT-NAME>uint8_value</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUINT8E2E 0x0B - R/R -->
+                <service:METHOD ID="M_ECHO_U8E2E">
+                    <ho:SHORT-NAME>echoUINT8E2E</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>11</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_U8E2E_I0">
+                            <ho:SHORT-NAME>length</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_U8E2E_I1">
+                            <ho:SHORT-NAME>counter</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_U8E2E_I2">
+                            <ho:SHORT-NAME>dataID</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_U8E2E_I3">
+                            <ho:SHORT-NAME>crc</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>3</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_U8E2E_I4">
+                            <ho:SHORT-NAME>uint8_value</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>4</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_U8E2E_O0">
+                            <ho:SHORT-NAME>length</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_U8E2E_O1">
+                            <ho:SHORT-NAME>counter</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_U8E2E_O2">
+                            <ho:SHORT-NAME>dataID</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_U8E2E_O3">
+                            <ho:SHORT-NAME>crc</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>3</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_U8E2E_O4">
+                            <ho:SHORT-NAME>uint8_value</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>4</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoINT8 0x0E - R/R -->
+                <service:METHOD ID="M_ECHO_I8">
+                    <ho:SHORT-NAME>echoINT8</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>14</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_ECHO_I8_I0">
+                            <ho:SHORT-NAME>int8_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_INT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_ECHO_I8_O0">
+                            <ho:SHORT-NAME>int8_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_INT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoFLOAT64 0x12 - R/R -->
+                <service:METHOD ID="M_ECHO_F64">
+                    <ho:SHORT-NAME>echoFLOAT64</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>18</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_ECHO_F64_I0">
+                            <ho:SHORT-NAME>float64_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_FLOAT64"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_ECHO_F64_O0">
+                            <ho:SHORT-NAME>float64_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_FLOAT64"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUTF8FIXED 0x13 - R/R - fixed UTF-8 string (512 bits = 64 bytes) -->
+                <service:METHOD ID="M_ECHO_UTF8FIX">
+                    <ho:SHORT-NAME>echoUTF8FIXED</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>19</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_UTF8FIX_I0">
+                            <ho:SHORT-NAME>echoUTF8FIXED_ReqArg1</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_STR_UTF8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_UTF8FIX_O0">
+                            <ho:SHORT-NAME>echoUTF8FIXED_ResArg1</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_STR_UTF8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUTF16FIXED 0x14 - R/R - fixed UTF-16 string -->
+                <service:METHOD ID="M_ECHO_UTF16FIX">
+                    <ho:SHORT-NAME>echoUTF16FIXED</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>20</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_UTF16FIX_I0">
+                            <ho:SHORT-NAME>echoUTF16FIXED_ReqArg1</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_STR_UTF16"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_UTF16FIX_O0">
+                            <ho:SHORT-NAME>echoUTF16FIXED_ResArg1</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_STR_UTF16"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUTF8DYNAMIC 0x15 - R/R - dynamic UTF-8 string -->
+                <service:METHOD ID="M_ECHO_UTF8DYN">
+                    <ho:SHORT-NAME>echoUTF8DYNAMIC</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>21</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_UTF8DYN_I0">
+                            <ho:SHORT-NAME>echoUTF8DYNAMIC_ReqArg1</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_STR_UTF8_DYN"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_UTF8DYN_O0">
+                            <ho:SHORT-NAME>echoUTF8DYNAMIC_ResArg1</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_STR_UTF8_DYN"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUTF16DYNAMIC 0x16 - R/R - dynamic UTF-16 string -->
+                <service:METHOD ID="M_ECHO_UTF16DYN">
+                    <ho:SHORT-NAME>echoUTF16DYNAMIC</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>22</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_UTF16DYN_I0">
+                            <ho:SHORT-NAME>utf16_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_STR_UTF16_DYN"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_UTF16DYN_O0">
+                            <ho:SHORT-NAME>utf16_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_STR_UTF16_DYN"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoENUM 0x17 - R/R -->
+                <service:METHOD ID="M_ECHO_ENUM">
+                    <ho:SHORT-NAME>echoENUM</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>23</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_ECHO_ENUM_I0">
+                            <ho:SHORT-NAME>enum_value_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_ENUM_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_ECHO_ENUM_O0">
+                            <ho:SHORT-NAME>enum_value_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_ENUM_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUNION 0x19 - R/R -->
+                <service:METHOD ID="M_ECHO_UNION">
+                    <ho:SHORT-NAME>echoUNION</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>25</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_ECHO_UNION_I0">
+                            <ho:SHORT-NAME>union_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UNION"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_ECHO_UNION_O0">
+                            <ho:SHORT-NAME>echoUNION_ResArg3</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UNION"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- checkByteOrder 0x1F - R/R -->
+                <service:METHOD ID="M_BYTEORDER">
+                    <ho:SHORT-NAME>checkByteOrder</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>31</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_BO_I0">
+                            <ho:SHORT-NAME>arg1</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_BO_I1">
+                            <ho:SHORT-NAME>arg2</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_BO_O0">
+                            <ho:SHORT-NAME>sum</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- clientServiceActivate 0x2F - FAF -->
+                <service:METHOD ID="M_SVC_ACT">
+                    <ho:SHORT-NAME>clientServiceActivate</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>47</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>FIRE_AND_FORGET</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_SVC_ACT_I0">
+                            <ho:SHORT-NAME>delay</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- clientServiceDeactivate 0x30 - FAF -->
+                <service:METHOD ID="M_SVC_DEACT">
+                    <ho:SHORT-NAME>clientServiceDeactivate</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>48</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>FIRE_AND_FORGET</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_SVC_DEACT_I0">
+                            <ho:SHORT-NAME>delay</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- clientServiceSubscribeEventgroup 0x32 - FAF (duplicate ID with echoCommonDatatypes) -->
+                <service:METHOD ID="M_SVC_SUB_EG">
+                    <ho:SHORT-NAME>clientServiceSubscribeEventgroup</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>50</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>FIRE_AND_FORGET</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_SUB_EG_I0">
+                            <ho:SHORT-NAME>delay</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_SUB_EG_I1">
+                            <ho:SHORT-NAME>duration</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoCommonDatatypes 0x23 - R/R -->
+                <service:METHOD ID="M_ECHO_COMMON">
+                    <ho:SHORT-NAME>echoCommonDatatypes</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>35</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_CD_I0">
+                            <ho:SHORT-NAME>boolean_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_BOOL"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_CD_I1">
+                            <ho:SHORT-NAME>uint8_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_CD_I2">
+                            <ho:SHORT-NAME>uint16_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_CD_I3">
+                            <ho:SHORT-NAME>uint32_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>3</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_CD_I4">
+                            <ho:SHORT-NAME>int8_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_INT8"/>
+                            <service:POSITION>4</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_CD_I5">
+                            <ho:SHORT-NAME>int16_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_INT16"/>
+                            <service:POSITION>5</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_CD_I6">
+                            <ho:SHORT-NAME>int32_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_INT32"/>
+                            <service:POSITION>6</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_CD_I7">
+                            <ho:SHORT-NAME>float32_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_FLOAT32"/>
+                            <service:POSITION>7</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_CD_I8">
+                            <ho:SHORT-NAME>float64_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_FLOAT64"/>
+                            <service:POSITION>8</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_CD_O0">
+                            <ho:SHORT-NAME>float64_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_FLOAT64"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_CD_O1">
+                            <ho:SHORT-NAME>float32_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_FLOAT32"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_CD_O2">
+                            <ho:SHORT-NAME>int32_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_INT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_CD_O3">
+                            <ho:SHORT-NAME>int16_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_INT16"/>
+                            <service:POSITION>3</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_CD_O4">
+                            <ho:SHORT-NAME>int8_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_INT8"/>
+                            <service:POSITION>4</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_CD_O5">
+                            <ho:SHORT-NAME>uint32_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>5</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_CD_O6">
+                            <ho:SHORT-NAME>uint16_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>6</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_CD_O7">
+                            <ho:SHORT-NAME>uint8_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>7</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_CD_O8">
+                            <ho:SHORT-NAME>boolean_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_BOOL"/>
+                            <service:POSITION>8</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoINT64 0x34 - R/R -->
+                <service:METHOD ID="M_ECHO_I64">
+                    <ho:SHORT-NAME>echoINT64</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>52</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_ECHO_I64_I0">
+                            <ho:SHORT-NAME>int64_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_INT64"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_ECHO_I64_O0">
+                            <ho:SHORT-NAME>int64_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_INT64"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUINT8Array2Dim 0x35 - R/R - 2D dynamic array uint8 -->
+                <service:METHOD ID="M_ECHO_U8ARR2D">
+                    <ho:SHORT-NAME>echoUINT8Array2Dim</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>53</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_U8ARR2D_I0">
+                            <ho:SHORT-NAME>uint8array_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_U8ARR2D_O0">
+                            <ho:SHORT-NAME>uint8array_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoStaticUINT8Array 0x36 - R/R - fixed array[5] uint8 -->
+                <service:METHOD ID="M_ECHO_U8STATIC">
+                    <ho:SHORT-NAME>echoStaticUINT8Array</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>54</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_U8STATIC_I0">
+                            <ho:SHORT-NAME>uint8array_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_U8STATIC_O0">
+                            <ho:SHORT-NAME>uint8array_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUINT8ArrayMinSize 0x37 - R/R - dynamic array uint8, min=3, max=5 -->
+                <service:METHOD ID="M_ECHO_U8ARRMIN">
+                    <ho:SHORT-NAME>echoUINT8ArrayMinSize</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>55</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_U8ARRMIN_I0">
+                            <ho:SHORT-NAME>uint8array_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_U8ARRMIN_O0">
+                            <ho:SHORT-NAME>uint8array_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- triggerEventUINT8Multicast 0x3A - FAF -->
+                <service:METHOD ID="M_TRIG8MC">
+                    <ho:SHORT-NAME>triggerEventUINT8Multicast</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>58</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>FIRE_AND_FORGET</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_TRIG8MC_I0">
+                            <ho:SHORT-NAME>delay</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_TRIG8MC_I1">
+                            <ho:SHORT-NAME>duration</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_TRIG8MC_I2">
+                            <ho:SHORT-NAME>debounceTime</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- clientServiceGetLastValueOfEventTCP 0x3B - R/R, no input -->
+                <service:METHOD ID="M_GET_TCP">
+                    <ho:SHORT-NAME>clientServiceGetLastValueOfEventTCP</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>59</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_GET_TCP_O0">
+                            <ho:SHORT-NAME>uint8_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- clientServiceGetLastValueOfEventUDPUnicast 0x3C - R/R, no input -->
+                <service:METHOD ID="M_GET_UDPUC">
+                    <ho:SHORT-NAME>clientServiceGetLastValueOfEventUDPUnicast</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>60</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_GET_UDPUC_O0">
+                            <ho:SHORT-NAME>uint8_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- clientServiceGetLastValueOfEventUDPMulticast 0x3D - R/R, no input -->
+                <service:METHOD ID="M_GET_UDPMC">
+                    <ho:SHORT-NAME>clientServiceGetLastValueOfEventUDPMulticast</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>61</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_GET_UDPMC_O0">
+                            <ho:SHORT-NAME>uint8_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUINT8Array8BitLength 0x3E - R/R - dynamic array uint8, 8-bit length -->
+                <service:METHOD ID="M_ECHO_U8ARR8">
+                    <ho:SHORT-NAME>echoUINT8Array8BitLength</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>62</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_U8ARR8_I0">
+                            <ho:SHORT-NAME>uint8array_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_U8ARR8_O0">
+                            <ho:SHORT-NAME>uint8array_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoUINT8Array16BitLength 0x3F - R/R - dynamic array uint8, 16-bit length -->
+                <service:METHOD ID="M_ECHO_U8ARR16">
+                    <ho:SHORT-NAME>echoUINT8Array16BitLength</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>63</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_U8ARR16_I0">
+                            <ho:SHORT-NAME>uint8array_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_U8ARR16_O0">
+                            <ho:SHORT-NAME>uint8array_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+                <!-- echoBitfields 0x41 - R/R - modelled as uint8/16/32 (bitfields are integer-backed) -->
+                <service:METHOD ID="M_ECHO_BF">
+                    <ho:SHORT-NAME>echoBitfields</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>65</service:METHOD-IDENTIFIER>
+                    <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_BF_I0">
+                            <ho:SHORT-NAME>bitfield8_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_BF_I1">
+                            <ho:SHORT-NAME>bitfield16_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_BF_I2">
+                            <ho:SHORT-NAME>bitfield32_in</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RETURN-PARAMETERS>
+                        <service:RETURN-PARAMETER ID="P_BF_O0">
+                            <ho:SHORT-NAME>bitfield8_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_BF_O1">
+                            <ho:SHORT-NAME>bitfield16_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                        <service:RETURN-PARAMETER ID="P_BF_O2">
+                            <ho:SHORT-NAME>bitfield32_out</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:RETURN-PARAMETER>
+                    </service:RETURN-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:METHOD>
+
+            </service:METHODS>
+
+            <!-- ============================================================
+                 EVENTS
+                 ============================================================ -->
+            <service:EVENTS>
+
+                <!-- TestEventUINT8 0x8001 -->
+                <service:EVENT ID="EVT_8001">
+                    <ho:SHORT-NAME>TestEventUINT8</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>32769</service:METHOD-IDENTIFIER>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_EVT8001_I0">
+                            <ho:SHORT-NAME>uint8_value</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:EVENT>
+
+                <!-- TestEventUINT8Array 0x8002 - dynamic array -->
+                <service:EVENT ID="EVT_8002">
+                    <ho:SHORT-NAME>TestEventUINT8Array</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>32770</service:METHOD-IDENTIFIER>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_EVT8002_I0">
+                            <ho:SHORT-NAME>uint8_array_value</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:EVENT>
+
+                <!-- TestEventUINT8Reliable 0x8003 - RELIABLE -->
+                <service:EVENT ID="EVT_8003">
+                    <ho:SHORT-NAME>TestEventUINT8Reliable</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>32771</service:METHOD-IDENTIFIER>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_EVT8003_I0">
+                            <ho:SHORT-NAME>uint8_value</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>true</service:RELIABLE>
+                </service:EVENT>
+
+                <!-- TestEventUINT8E2E 0x8004 -->
+                <service:EVENT ID="EVT_8004">
+                    <ho:SHORT-NAME>TestEventUINT8E2E</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>32772</service:METHOD-IDENTIFIER>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_EVT8004_I0">
+                            <ho:SHORT-NAME>length</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_EVT8004_I1">
+                            <ho:SHORT-NAME>counter</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                            <service:POSITION>1</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_EVT8004_I2">
+                            <ho:SHORT-NAME>dataID</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>2</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_EVT8004_I3">
+                            <ho:SHORT-NAME>crc</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                            <service:POSITION>3</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                        <service:INPUT-PARAMETER ID="P_EVT8004_I4">
+                            <ho:SHORT-NAME>uint8_value</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>4</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:EVENT>
+
+                <!-- TestEventUINT8Multicast 0x800B -->
+                <service:EVENT ID="EVT_800B">
+                    <ho:SHORT-NAME>TestEventUINT8Multicast</ho:SHORT-NAME>
+                    <service:METHOD-IDENTIFIER>32779</service:METHOD-IDENTIFIER>
+                    <service:INPUT-PARAMETERS>
+                        <service:INPUT-PARAMETER ID="P_EVT800B_I0">
+                            <ho:SHORT-NAME>uint8_value</ho:SHORT-NAME>
+                            <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                            <service:POSITION>0</service:POSITION>
+                            <service:MANDATORY>true</service:MANDATORY>
+                        </service:INPUT-PARAMETER>
+                    </service:INPUT-PARAMETERS>
+                    <service:RELIABLE>false</service:RELIABLE>
+                </service:EVENT>
+
+            </service:EVENTS>
+
+            <!-- ============================================================
+                 FIELDS
+                 ============================================================ -->
+            <service:FIELDS>
+
+                <!-- InterfaceVersion: getter=0x25, notifier=0x8005, struct type -->
+                <service:FIELD ID="FLD_IF_VER">
+                    <ho:SHORT-NAME>InterfaceVersion</ho:SHORT-NAME>
+                    <fx:DATATYPE-REF ID-REF="DT_IF_VERSION"/>
+                    <service:ACCESS-PERMISSION>NOTIFY_READ_ONLY</service:ACCESS-PERMISSION>
+                    <service:GETTER>
+                        <service:METHOD-IDENTIFIER>37</service:METHOD-IDENTIFIER>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:GETTER>
+                    <service:NOTIFIER>
+                        <service:NOTIFICATION-IDENTIFIER>32773</service:NOTIFICATION-IDENTIFIER>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:NOTIFIER>
+                </service:FIELD>
+
+                <!-- TestFieldUINT8: setter=0x26, getter=0x27, notifier=0x8006 -->
+                <service:FIELD ID="FLD_UINT8">
+                    <ho:SHORT-NAME>TestFieldUINT8</ho:SHORT-NAME>
+                    <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                    <service:ACCESS-PERMISSION>NOTIFY_READ_WRITE</service:ACCESS-PERMISSION>
+                    <service:GETTER>
+                        <service:METHOD-IDENTIFIER>39</service:METHOD-IDENTIFIER>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:GETTER>
+                    <service:SETTER>
+                        <service:METHOD-IDENTIFIER>38</service:METHOD-IDENTIFIER>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:SETTER>
+                    <service:NOTIFIER>
+                        <service:NOTIFICATION-IDENTIFIER>32774</service:NOTIFICATION-IDENTIFIER>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:NOTIFIER>
+                </service:FIELD>
+
+                <!-- TestFieldUINT8Array: setter=0x28, getter=0x29, notifier=0x8007, dynamic array -->
+                <service:FIELD ID="FLD_UINT8_ARR">
+                    <ho:SHORT-NAME>TestFieldUINT8Array</ho:SHORT-NAME>
+                    <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                    <fx:ARRAY-DECLARATION>
+                        <fx:ARRAY-DIMENSION>
+                            <fx:DIMENSION>1</fx:DIMENSION>
+                            <fx:MINIMUM-SIZE>0</fx:MINIMUM-SIZE>
+                            <fx:MAXIMUM-SIZE>5</fx:MAXIMUM-SIZE>
+                        </fx:ARRAY-DIMENSION>
+                    </fx:ARRAY-DECLARATION>
+                    <fx:UTILIZATION>
+                        <fx:SERIALIZATION-ATTRIBUTES>
+                            <fx:ARRAY-LENGTH-FIELD-SIZE>32</fx:ARRAY-LENGTH-FIELD-SIZE>
+                        </fx:SERIALIZATION-ATTRIBUTES>
+                    </fx:UTILIZATION>
+                    <service:ACCESS-PERMISSION>NOTIFY_READ_WRITE</service:ACCESS-PERMISSION>
+                    <service:GETTER>
+                        <service:METHOD-IDENTIFIER>41</service:METHOD-IDENTIFIER>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:GETTER>
+                    <service:SETTER>
+                        <service:METHOD-IDENTIFIER>40</service:METHOD-IDENTIFIER>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:SETTER>
+                    <service:NOTIFIER>
+                        <service:NOTIFICATION-IDENTIFIER>32775</service:NOTIFICATION-IDENTIFIER>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:NOTIFIER>
+                </service:FIELD>
+
+                <!-- TestFieldUINT8Reliable: setter=0x2A, getter=0x2B, notifier=0x8008, reliable -->
+                <service:FIELD ID="FLD_UINT8_REL">
+                    <ho:SHORT-NAME>TestFieldUINT8Reliable</ho:SHORT-NAME>
+                    <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                    <service:ACCESS-PERMISSION>NOTIFY_READ_WRITE</service:ACCESS-PERMISSION>
+                    <service:GETTER>
+                        <service:METHOD-IDENTIFIER>43</service:METHOD-IDENTIFIER>
+                        <service:RELIABLE>true</service:RELIABLE>
+                    </service:GETTER>
+                    <service:SETTER>
+                        <service:METHOD-IDENTIFIER>42</service:METHOD-IDENTIFIER>
+                        <service:RELIABLE>true</service:RELIABLE>
+                    </service:SETTER>
+                    <service:NOTIFIER>
+                        <service:NOTIFICATION-IDENTIFIER>32776</service:NOTIFICATION-IDENTIFIER>
+                        <service:RELIABLE>true</service:RELIABLE>
+                    </service:NOTIFIER>
+                </service:FIELD>
+
+            </service:FIELDS>
+
+            <!-- ============================================================
+                 EVENTGROUPS
+                 ============================================================ -->
+            <service:EVENT-GROUPS>
+
+                <!-- eg2_all id=2: all events + all field notifiers -->
+                <service:EVENT-GROUP ID="EG_ALL">
+                    <ho:SHORT-NAME>eg2_all</ho:SHORT-NAME>
+                    <fx:SERVICE-IDENTIFIER>2</fx:SERVICE-IDENTIFIER>
+                    <service:EVENT-REFS>
+                        <service:EVENT-REF ID-REF="EVT_8001"/>
+                        <service:EVENT-REF ID-REF="EVT_8002"/>
+                        <service:EVENT-REF ID-REF="EVT_8003"/>
+                        <service:EVENT-REF ID-REF="EVT_8004"/>
+                        <service:EVENT-REF ID-REF="EVT_800B"/>
+                    </service:EVENT-REFS>
+                    <service:FIELD-REFS>
+                        <service:FIELD-REF ID-REF="FLD_IF_VER"/>
+                        <service:FIELD-REF ID-REF="FLD_UINT8"/>
+                        <service:FIELD-REF ID-REF="FLD_UINT8_ARR"/>
+                        <service:FIELD-REF ID-REF="FLD_UINT8_REL"/>
+                    </service:FIELD-REFS>
+                </service:EVENT-GROUP>
+
+                <!-- eg5_events_and_fields_unreliable id=5 -->
+                <service:EVENT-GROUP ID="EG_UNRELIABLE">
+                    <ho:SHORT-NAME>eg5_events_and_fields_unreliable</ho:SHORT-NAME>
+                    <fx:SERVICE-IDENTIFIER>5</fx:SERVICE-IDENTIFIER>
+                    <service:EVENT-REFS>
+                        <service:EVENT-REF ID-REF="EVT_8001"/>
+                        <service:EVENT-REF ID-REF="EVT_8002"/>
+                        <service:EVENT-REF ID-REF="EVT_8004"/>
+                        <service:EVENT-REF ID-REF="EVT_800B"/>
+                    </service:EVENT-REFS>
+                    <service:FIELD-REFS>
+                        <service:FIELD-REF ID-REF="FLD_IF_VER"/>
+                        <service:FIELD-REF ID-REF="FLD_UINT8"/>
+                        <service:FIELD-REF ID-REF="FLD_UINT8_ARR"/>
+                    </service:FIELD-REFS>
+                </service:EVENT-GROUP>
+
+                <!-- eg6_events_multicast id=6 -->
+                <service:EVENT-GROUP ID="EG_MULTICAST">
+                    <ho:SHORT-NAME>eg6_events_multicast</ho:SHORT-NAME>
+                    <fx:SERVICE-IDENTIFIER>6</fx:SERVICE-IDENTIFIER>
+                    <service:EVENT-REFS>
+                        <service:EVENT-REF ID-REF="EVT_800B"/>
+                    </service:EVENT-REFS>
+                </service:EVENT-GROUP>
+
+            </service:EVENT-GROUPS>
+
+        </fx:SERVICE-INTERFACE>
+
+        </fx:SERVICE-INTERFACES>
+
+        <!-- ================================================================
+             DATATYPES
+             ================================================================ -->
+        <fx:DATATYPES>
+
+            <!-- Scalar base types -->
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_UINT8">
+                <ho:SHORT-NAME>UINT8</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_UINT8"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_UINT16">
+                <ho:SHORT-NAME>UINT16</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_UINT16"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_UINT32">
+                <ho:SHORT-NAME>UINT32</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_UINT32"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_INT8">
+                <ho:SHORT-NAME>INT8</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_INT8"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_INT16">
+                <ho:SHORT-NAME>INT16</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_INT16"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_INT32">
+                <ho:SHORT-NAME>INT32</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_INT32"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_INT64">
+                <ho:SHORT-NAME>INT64</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_INT64"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_FLOAT32">
+                <ho:SHORT-NAME>FLOAT32</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_FLOAT32"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_FLOAT64">
+                <ho:SHORT-NAME>FLOAT64</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_FLOAT64"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_BOOL">
+                <ho:SHORT-NAME>BOOLEAN</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_BOOL"/>
+            </fx:DATATYPE>
+
+            <!-- String types -->
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_STR_UTF8">
+                <ho:SHORT-NAME>STR_UTF8_Fixed</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_STR_UTF8"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_STR_UTF8_DYN">
+                <ho:SHORT-NAME>STR_UTF8_Dyn</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_STR_UTF8_DYN"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_STR_UTF16">
+                <ho:SHORT-NAME>STR_UTF16_Fixed</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_STR_UTF16"/>
+            </fx:DATATYPE>
+
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_STR_UTF16_DYN">
+                <ho:SHORT-NAME>STR_UTF16_Dyn</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_STR_UTF16_DYN"/>
+            </fx:DATATYPE>
+
+            <!-- Enum type: uint8 base, 4 values -->
+            <fx:DATATYPE xsi:type="fx:ENUM-DATATYPE-TYPE" ID="DT_ENUM_UINT8">
+                <ho:SHORT-NAME>EnumUINT8</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_UINT8"/>
+                <fx:ENUMERATION-ELEMENTS>
+                    <fx:ENUM-ELEMENT>
+                        <fx:VALUE>0</fx:VALUE>
+                        <fx:SYNONYM>enum_zero</fx:SYNONYM>
+                    </fx:ENUM-ELEMENT>
+                    <fx:ENUM-ELEMENT>
+                        <fx:VALUE>1</fx:VALUE>
+                        <fx:SYNONYM>enum_one</fx:SYNONYM>
+                    </fx:ENUM-ELEMENT>
+                    <fx:ENUM-ELEMENT>
+                        <fx:VALUE>2</fx:VALUE>
+                        <fx:SYNONYM>enum_two</fx:SYNONYM>
+                    </fx:ENUM-ELEMENT>
+                    <fx:ENUM-ELEMENT>
+                        <fx:VALUE>3</fx:VALUE>
+                        <fx:SYNONYM>enum_three</fx:SYNONYM>
+                    </fx:ENUM-ELEMENT>
+                </fx:ENUMERATION-ELEMENTS>
+            </fx:DATATYPE>
+
+            <!-- Union type: 8 members (bool, uint8..uint32, int8..int32, float32) -->
+            <fx:DATATYPE xsi:type="fx:COMPLEX-DATATYPE-TYPE" ID="DT_UNION">
+                <ho:SHORT-NAME>Union8Members</ho:SHORT-NAME>
+                <fx:COMPLEX-DATATYPE-CLASS>UNION</fx:COMPLEX-DATATYPE-CLASS>
+                <fx:MEMBERS>
+                    <fx:MEMBER ID="UNION_MBR_1">
+                        <ho:SHORT-NAME>boolean</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_BOOL"/>
+                        <fx:POSITION>1</fx:POSITION>
+                        <fx:INDEX>1</fx:INDEX>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="UNION_MBR_2">
+                        <ho:SHORT-NAME>uint8</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                        <fx:POSITION>2</fx:POSITION>
+                        <fx:INDEX>2</fx:INDEX>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="UNION_MBR_3">
+                        <ho:SHORT-NAME>uint16</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_UINT16"/>
+                        <fx:POSITION>3</fx:POSITION>
+                        <fx:INDEX>3</fx:INDEX>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="UNION_MBR_4">
+                        <ho:SHORT-NAME>uint32</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                        <fx:POSITION>4</fx:POSITION>
+                        <fx:INDEX>4</fx:INDEX>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="UNION_MBR_5">
+                        <ho:SHORT-NAME>int8</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_INT8"/>
+                        <fx:POSITION>5</fx:POSITION>
+                        <fx:INDEX>5</fx:INDEX>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="UNION_MBR_6">
+                        <ho:SHORT-NAME>int16</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_INT16"/>
+                        <fx:POSITION>6</fx:POSITION>
+                        <fx:INDEX>6</fx:INDEX>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="UNION_MBR_7">
+                        <ho:SHORT-NAME>int32</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_INT32"/>
+                        <fx:POSITION>7</fx:POSITION>
+                        <fx:INDEX>7</fx:INDEX>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="UNION_MBR_8">
+                        <ho:SHORT-NAME>float32</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_FLOAT32"/>
+                        <fx:POSITION>8</fx:POSITION>
+                        <fx:INDEX>8</fx:INDEX>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                </fx:MEMBERS>
+            </fx:DATATYPE>
+
+            <!-- Structure type: InterfaceVersion (MajorVersion=uint8, MinorVersion=uint32) -->
+            <fx:DATATYPE xsi:type="fx:COMPLEX-DATATYPE-TYPE" ID="DT_IF_VERSION">
+                <ho:SHORT-NAME>InterfaceVersionStruct</ho:SHORT-NAME>
+                <fx:COMPLEX-DATATYPE-CLASS>STRUCTURE</fx:COMPLEX-DATATYPE-CLASS>
+                <fx:MEMBERS>
+                    <fx:MEMBER ID="STRUCT_MBR_MAJOR">
+                        <ho:SHORT-NAME>MajorVersion</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                        <fx:POSITION>0</fx:POSITION>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="STRUCT_MBR_MINOR">
+                        <ho:SHORT-NAME>MinorVersion</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_UINT32"/>
+                        <fx:POSITION>1</fx:POSITION>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                </fx:MEMBERS>
+            </fx:DATATYPE>
+
+        </fx:DATATYPES>
+
+
+    </fx:ELEMENTS>
+
+    <!-- ================================================================
+         PROCESSING-INFORMATION
+         ================================================================ -->
+    <fx:PROCESSING-INFORMATION>
+    <!-- ================================================================
+             CODINGS
+             ================================================================ -->
+        <fx:CODINGS>
+
+            <fx:CODING ID="COD_UINT8">
+                <ho:SHORT-NAME>UINT8Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT8">
+                    <ho:BIT-LENGTH>8</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <fx:CODING ID="COD_UINT16">
+                <ho:SHORT-NAME>UINT16Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT16">
+                    <ho:BIT-LENGTH>16</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <fx:CODING ID="COD_UINT32">
+                <ho:SHORT-NAME>UINT32Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT32">
+                    <ho:BIT-LENGTH>32</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <fx:CODING ID="COD_INT8">
+                <ho:SHORT-NAME>INT8Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_INT8">
+                    <ho:BIT-LENGTH>8</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <fx:CODING ID="COD_INT16">
+                <ho:SHORT-NAME>INT16Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_INT16">
+                    <ho:BIT-LENGTH>16</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <fx:CODING ID="COD_INT32">
+                <ho:SHORT-NAME>INT32Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_INT32">
+                    <ho:BIT-LENGTH>32</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <fx:CODING ID="COD_INT64">
+                <ho:SHORT-NAME>INT64Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_INT64">
+                    <ho:BIT-LENGTH>64</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <fx:CODING ID="COD_FLOAT32">
+                <ho:SHORT-NAME>FLOAT32Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_FLOAT32">
+                    <ho:BIT-LENGTH>32</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <fx:CODING ID="COD_FLOAT64">
+                <ho:SHORT-NAME>FLOAT64Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_FLOAT64">
+                    <ho:BIT-LENGTH>64</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <!-- Boolean is modelled as UINT8 since the parser only recognises integer/float/string types -->
+            <fx:CODING ID="COD_BOOL">
+                <ho:SHORT-NAME>BOOLCoding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT8">
+                    <ho:BIT-LENGTH>8</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <!-- Fixed-length UTF-8 string: 64 bytes = 512 bits -->
+            <fx:CODING ID="COD_STR_UTF8">
+                <ho:SHORT-NAME>STR_UTF8_FixedCoding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_ASCIISTRING">
+                    <ho:BIT-LENGTH>512</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <!-- Dynamic-length UTF-8 string -->
+            <fx:CODING ID="COD_STR_UTF8_DYN">
+                <ho:SHORT-NAME>STR_UTF8_DynCoding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="LEADING-LENGTH-INFO-TYPE" ho:BASE-DATA-TYPE="A_ASCIISTRING">
+                    <ho:MIN-LENGTH>0</ho:MIN-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <!-- Fixed-length UTF-16 string: 64 chars x 16 bits = 1024 bits -->
+            <fx:CODING ID="COD_STR_UTF16">
+                <ho:SHORT-NAME>STR_UTF16_FixedCoding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UNICODE2STRING"
+                               ENCODING="UTF-16">
+                    <ho:BIT-LENGTH>1024</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <!-- Dynamic-length UTF-16 string -->
+            <fx:CODING ID="COD_STR_UTF16_DYN">
+                <ho:SHORT-NAME>STR_UTF16_DynCoding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="LEADING-LENGTH-INFO-TYPE" ho:BASE-DATA-TYPE="A_UNICODE2STRING"
+                               ENCODING="UTF-16">
+                    <ho:MIN-LENGTH>0</ho:MIN-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+        </fx:CODINGS>
+    </fx:PROCESSING-INFORMATION>
+
+</fx:FIBEX>
