@@ -1,39 +1,147 @@
 # FibexConverter
-Convert SOME/IP config in FIBEX 4 to different configuration formats (e.g. Wireshark).
 
-## Convert a FIBEX4 file to text:
-Just call it like this:
-    
+Convert SOME/IP configuration from FIBEX 4 XML files (ASAM standard) to various output formats, including human-readable text, Wireshark dissector configs, CSV/XLSX reports, network topology visualizations, and Peach fuzzing definitions.
+
+## Installation
+
+Install dependencies with:
+
+    pip install -r requirements.txt
+
+Dependencies: `isodate`, `graphviz`, `macaddress`, `xlsxwriter`
+
+## Usage
+
+All tools share the same basic invocation pattern:
+
+    python3 <script>.py FIBEX <file-or-directory> [options]
+
+You can pass either a single XML file or a directory containing multiple FIBEX files.
+
+**Common options (available in most tools):**
+
+| Option | Description |
+|--------|-------------|
+| `--ecu-name-mapping FILE` | CSV file for ECU name replacements |
+| `--generate-switch-port-names` | Auto-generate switch port names |
+| `--plugin FILE` | Custom parser plugin file |
+
+---
+
+### Convert to text
+
     python3 configuration_to_text.py FIBEX example-file.xml
 
-The result will be:
-    
+Output:
+
     example-file/text/example-file.txt
 
-## Convert a FIBEX4 file to wireshark configs:
-Just call it like this:
-    
+---
+
+### Convert to Wireshark configs
+
     python3 configuration_to_wireshark_config.py FIBEX example-file.xml
 
-The results (hosts, vlanids, SOMEIP...) will be in:
-    
-    example-file/wireshark/
+Output (three version-specific directories):
 
-Copy the result files to your wireshark configuration directory (e.g. ~/.config/wireshark for MacOS X or %appdata%\Wireshark for Windows).
+    example-file/wireshark_3.4_and_earlier/
+    example-file/wireshark_3.5_to_4.4/
+    example-file/wireshark_4.5_and_later/
 
-Important:
-* SOME/IP support was added to Wireshark 3.2, you need a custom plugin before.
-* Wireshark loads the config on start. So you better stop Wireshark while copying the configs in.
+Each directory contains hosts, VLAN IDs, and SOME/IP service/method/event/eventgroup configs. Copy the contents of the appropriate directory to your Wireshark configuration folder:
+- Linux/macOS: `~/.config/wireshark/`
+- Windows: `%APPDATA%\Wireshark\`
 
-## Convert a FIBEX4 file to CSV reports:
-Just call it like this:
+**Notes:**
+- SOME/IP dissector support was added in Wireshark 3.2; a custom plugin is needed for older versions.
+- Stop Wireshark before copying config files — it only loads them on startup.
+
+---
+
+### Convert to CSV reports
 
     python3 configuration_to_reports.py FIBEX example-file.xml
 
-The result will be:
+Output:
 
     example-file/reports/
 
+Generates service instance matrices, statistics, and size reports.
+
+**Additional options:**
+
+| Option | Description |
+|--------|-------------|
+| `--ignore-ecus FILE` | File listing ECU names to exclude |
+| `--ignore-services FILE` | File listing service IDs to exclude (hex format) |
+| `--ecu-order FILE` | File specifying ECU ordering in reports |
+
+---
+
+### Convert to topology
+
+    python3 configuration_to_topology.py FIBEX example-file.xml
+
+Output:
+
+    example-file/topology/
+
+Generates topology tables (CSV and XLSX), endpoint lists, forwarding tables for switches, multicast route mappings, and Graphviz PDF network diagrams per VLAN.
+
+**Additional options:**
+
+| Option | Description |
+|--------|-------------|
+| `--mcast-list FILE` | Multicast entries (semicolon-separated) |
+| `--metadata FILE` | CSV metadata file |
+| `--multicast-names FILE` | CSV file mapping multicast addresses to names |
+| `--generate-vlan-names` | Auto-generate VLAN names |
+
+---
+
+### Convert to Peach fuzzing definitions
+
+    python3 configuration_to_peach.py FIBEX example-file.xml
+
+Output:
+
+    example-file/peach/
+
+Generates Peach framework XML files for SOME/IP fuzzing.
+
+---
+
+## Examples
+
+The `examples/` directory contains ready-to-use FIBEX XML files:
+
+| File | Description |
+|------|-------------|
+| `examples/SOMEIP_simple_service.xml` | Minimal SOME/IP service definition |
+| `examples/SOMEIP_Enhanced_Testability_Service.xml` | SOME/IP Enhanced Testability Service |
+| `examples/Ethernet_Topology_with_Switches.xml` | Ethernet network with switches and VLANs |
+
+Pre-generated outputs for `Ethernet_Topology_with_Switches.xml` are included in `examples/Ethernet_Topology_with_Switches/`.
+
+---
+
 ## Project Structure
-* Project is written in python3.
-* Pytest test cases are in tests/
+
+| File | Description |
+|------|-------------|
+| `configuration_to_text.py` | Convert to human-readable text |
+| `configuration_to_wireshark_config.py` | Generate Wireshark dissector configs |
+| `configuration_to_reports.py` | Generate CSV/XLSX statistical reports |
+| `configuration_to_topology.py` | Generate network topology visualizations |
+| `configuration_to_peach.py` | Generate Peach fuzzing XML definitions |
+| `fibex_parser.py` | FIBEX 4 XML parser |
+| `configuration_base_classes.py` | Shared data model and base classes |
+| `parser_dispatcher.py` | Routes input files to the appropriate parser |
+| `abstract_parser.py` | Abstract base class for XML parsing |
+| `examples/` | Example FIBEX files with pre-generated outputs |
+| `tests/` | pytest test suite |
+
+## Running Tests
+
+    source venv_brew/bin/activate
+    pytest tests/ -v
