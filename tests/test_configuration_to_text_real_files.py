@@ -10,9 +10,8 @@ from fibex_parser import FibexParser
 # g_gen_portid is only initialized inside main(); set it here for test use.
 configuration_to_text.g_gen_portid = False
 
-FIXTURES_DIR = Path(__file__).parent / "fibex_files"
-TOPOLOGY_FILE = str(FIXTURES_DIR / "ethernet_topology.xml")
-SOMEIP_FILE = str(FIXTURES_DIR / "someip_service.xml")
+TOPOLOGY_FILE = str(Path(__file__).parent.parent / "examples" / "Ethernet_Topology_with_Switches.xml")
+SOMEIP_FILE = str(Path(__file__).parent.parent / "examples" / "SOMEIP_simple_service.xml")
 
 
 def _parse(filepath):
@@ -43,7 +42,10 @@ class TestEthernetTopologyTextOutput:
         assert "ECU_C" in self.text
 
     def test_ecu_switch_in_output(self):
-        assert "ECU_SWITCH" in self.text
+        """Switch hosting ECUs must appear in the output."""
+        assert "ECU_SW1" in self.text
+        assert "ECU_SW2" in self.text
+        assert "ECU_SW3" in self.text
 
     def test_ecus_section_present(self):
         assert "ECUs:" in self.text
@@ -52,21 +54,20 @@ class TestEthernetTopologyTextOutput:
         assert "Ethernet Topology:" in self.text
 
     def test_switch_in_topology_section(self):
-        """MainSwitch must appear inside the Ethernet Topology section.
-
-        MainSwitch also appears earlier under ECU_SWITCH in the ECUs section,
-        so search for it starting from the Ethernet Topology header position.
-        """
+        """All switches must appear inside the Ethernet Topology section."""
         topology_idx = self.text.index("Ethernet Topology:")
-        assert "MainSwitch" in self.text[topology_idx:]
+        section = self.text[topology_idx:]
+        assert "Switch1" in section
+        assert "Switch2" in section
+        assert "Switch3" in section
 
     def test_vlan10_in_output(self):
         """VLAN10 channel name must appear in the Channels section."""
         assert "VLAN10" in self.text
 
-    def test_vlan20_in_output(self):
-        """VLAN20 channel name must appear in the Channels section."""
-        assert "VLAN20" in self.text
+    def test_vlan18_in_output(self):
+        """VLAN18 channel name must appear in the Channels section."""
+        assert "VLAN18" in self.text
 
     def test_channels_section_present(self):
         assert "Channels/Busses/VLANs:" in self.text

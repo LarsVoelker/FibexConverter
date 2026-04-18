@@ -1,0 +1,664 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Complex Ethernet topology with 6 ECUs and 3 switches.
+    Network layout:
+               Switch1 (on ECU_SW1)
+              / |    |      \
+             /  |    |       \
+        ECU_A ECU_B ECU_C   Switch2 (on ECU_SW2)
+                           /    |  \
+                          /     |   \
+                        ECU_D ECU_E  \
+                                      Switch3 (on ECU_SW3)
+                                        |
+                                        |
+                                      ECU_F
+-->
+<fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx"
+          xmlns:ho="http://www.asam.net/xml"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:ethernet="http://www.asam.net/xml/fbx/ethernet"
+          VERSION="4.1.2">
+
+    <fx:PROJECT ID="PROJ_TOPOLOGY">
+        <ho:SHORT-NAME>ComplexEthernetTopologyTest</ho:SHORT-NAME>
+    </fx:PROJECT>
+
+    <fx:ELEMENTS>
+
+        <fx:CHANNELS>
+            <fx:CHANNEL ID="CHAN_VLAN10" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN10</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN10">
+                    <ho:SHORT-NAME>VLAN10</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>10</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+            <fx:CHANNEL ID="CHAN_VLAN20" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN20</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN20">
+                    <ho:SHORT-NAME>VLAN20</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>20</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+            <fx:CHANNEL ID="CHAN_VLAN30" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN30</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN30">
+                    <ho:SHORT-NAME>VLAN30</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>30</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+            <fx:CHANNEL ID="CHAN_VLAN40" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN40</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN40">
+                    <ho:SHORT-NAME>VLAN40</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>40</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+            <fx:CHANNEL ID="CHAN_VLAN18" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN18</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN18">
+                    <ho:SHORT-NAME>VLAN18</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>18</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+        </fx:CHANNELS>
+
+        <fx:COUPLING-ELEMENTS>
+            <!-- Switch1 hosted on ECU_SW1 -->
+            <fx:COUPLING-ELEMENT ID="CE_SWITCH1" xsi:type="ethernet:COUPLING-ELEMENT-TYPE">
+                <ho:SHORT-NAME>Switch1</ho:SHORT-NAME>
+                <fx:CLUSTER-REF ID-REF="CLUSTER_ETH"/>
+                <fx:ECU-REF ID-REF="ECU_SW1"/>
+                <fx:COUPLING-PORTS>
+
+                    <!-- Port 1: connected to ECU_A on VLAN10,20,30,18 -->
+                    <fx:COUPLING-PORT ID="SW1_PORT1" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_A"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN30"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 2: connected to ECU_B on VLAN10,20,30,18 -->
+                    <fx:COUPLING-PORT ID="SW1_PORT2" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_B"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN30"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 3: connected to Switch2 Port1 on VLAN10,20,30,18 -->
+                    <fx:COUPLING-PORT ID="SW1_PORT3" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:COUPLING-PORT-REF ID-REF="SW2_PORT1"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN30"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 4: connected to ECU_C on VLAN10,20,18 (untagged) -->
+                    <fx:COUPLING-PORT ID="SW1_PORT4" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_C"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 5: connected to Switch1_Mgmt on VLAN18 -->
+                    <fx:COUPLING-PORT ID="SW1_PORT5" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_SW1"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                </fx:COUPLING-PORTS>
+                <ethernet:COUPLING-ELEMENT-TYPE>SWITCH</ethernet:COUPLING-ELEMENT-TYPE>
+            </fx:COUPLING-ELEMENT>
+
+            <!-- Switch2 hosted on ECU_SW2 -->
+            <fx:COUPLING-ELEMENT ID="CE_SWITCH2" xsi:type="ethernet:COUPLING-ELEMENT-TYPE">
+                <ho:SHORT-NAME>Switch2</ho:SHORT-NAME>
+                <fx:CLUSTER-REF ID-REF="CLUSTER_ETH"/>
+                <fx:ECU-REF ID-REF="ECU_SW2"/>
+                <fx:COUPLING-PORTS>
+
+                    <!-- Port 1: connected to Switch1 Port3 on VLAN10,20,30,18 -->
+                    <fx:COUPLING-PORT ID="SW2_PORT1" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:COUPLING-PORT-REF ID-REF="SW1_PORT3"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN30"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 2: connected to ECU_D on VLAN10,20,30,40,18 -->
+                    <fx:COUPLING-PORT ID="SW2_PORT2" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_D"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN30"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN40"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 3: connected to ECU_E on VLAN10,20,30,40,18 -->
+                    <fx:COUPLING-PORT ID="SW2_PORT3" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_E"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN30"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN40"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 4: connected to Switch3 Port1 on VLAN10,20,40,18 -->
+                    <fx:COUPLING-PORT ID="SW2_PORT4" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:COUPLING-PORT-REF ID-REF="SW3_PORT1"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN40"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 5: connected to Switch2_Mgmt on VLAN18 -->
+                    <fx:COUPLING-PORT ID="SW2_PORT5" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_SW2"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                </fx:COUPLING-PORTS>
+                <ethernet:COUPLING-ELEMENT-TYPE>SWITCH</ethernet:COUPLING-ELEMENT-TYPE>
+            </fx:COUPLING-ELEMENT>
+
+            <!-- Switch3 hosted on ECU_SW3 -->
+            <fx:COUPLING-ELEMENT ID="CE_SWITCH3" xsi:type="ethernet:COUPLING-ELEMENT-TYPE">
+                <ho:SHORT-NAME>Switch3</ho:SHORT-NAME>
+                <fx:CLUSTER-REF ID-REF="CLUSTER_ETH"/>
+                <fx:ECU-REF ID-REF="ECU_SW3"/>
+                <fx:COUPLING-PORTS>
+
+                    <!-- Port 1: connected to Switch2 Port4 on VLAN10,20,40,18 -->
+                    <fx:COUPLING-PORT ID="SW3_PORT1" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:COUPLING-PORT-REF ID-REF="SW2_PORT4"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN40"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 2: connected to ECU_F on VLAN10,20,40,18 -->
+                    <fx:COUPLING-PORT ID="SW3_PORT2" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_F"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN40"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 3: connected to Switch3_Mgmt on VLAN18 -->
+                    <fx:COUPLING-PORT ID="SW3_PORT3" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_SW3"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                </fx:COUPLING-PORTS>
+                <ethernet:COUPLING-ELEMENT-TYPE>SWITCH</ethernet:COUPLING-ELEMENT-TYPE>
+            </fx:COUPLING-ELEMENT>
+
+        </fx:COUPLING-ELEMENTS>
+
+        <fx:ECUS>
+
+            <!-- Switch-hosting ECUs (no connectors, only controllers) -->
+            <fx:ECU ID="ECU_SW1">
+                <ho:SHORT-NAME>ECU_SW1</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_SW1">
+                        <ho:SHORT-NAME>Switch1_Mgmt</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_SW1_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_SW1"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <fx:ECU ID="ECU_SW2">
+                <ho:SHORT-NAME>ECU_SW2</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_SW2">
+                        <ho:SHORT-NAME>Switch2_Mgmt</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_SW2_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_SW2"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <fx:ECU ID="ECU_SW3">
+                <ho:SHORT-NAME>ECU_SW3</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_SW3">
+                        <ho:SHORT-NAME>Switch3_Mgmt</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_SW3_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_SW3"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <!-- Endpoint ECUs -->
+            <fx:ECU ID="ECU_A">
+                <ho:SHORT-NAME>ECU_A</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_ECU_A">
+                        <ho:SHORT-NAME>ECU_A_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_ECU_A">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_A"/>
+                    </fx:CONNECTOR>
+                    <fx:CONNECTOR ID="CONN_ECU_A_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_A"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <fx:ECU ID="ECU_B">
+                <ho:SHORT-NAME>ECU_B</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_ECU_B">
+                        <ho:SHORT-NAME>ECU_B_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_ECU_B">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_B"/>
+                    </fx:CONNECTOR>
+                    <fx:CONNECTOR ID="CONN_ECU_B_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_B"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <fx:ECU ID="ECU_C">
+                <ho:SHORT-NAME>ECU_C</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_ECU_C">
+                        <ho:SHORT-NAME>ECU_C_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_ECU_C">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_C"/>
+                    </fx:CONNECTOR>
+                    <fx:CONNECTOR ID="CONN_ECU_C_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_C"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <fx:ECU ID="ECU_D">
+                <ho:SHORT-NAME>ECU_D</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_ECU_D">
+                        <ho:SHORT-NAME>ECU_D_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_ECU_D">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_D"/>
+                    </fx:CONNECTOR>
+                    <fx:CONNECTOR ID="CONN_ECU_D_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_D"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <fx:ECU ID="ECU_E">
+                <ho:SHORT-NAME>ECU_E</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_ECU_E">
+                        <ho:SHORT-NAME>ECU_E_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_ECU_E">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_E"/>
+                    </fx:CONNECTOR>
+                    <fx:CONNECTOR ID="CONN_ECU_E_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_E"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <fx:ECU ID="ECU_F">
+                <ho:SHORT-NAME>ECU_F</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_ECU_F">
+                        <ho:SHORT-NAME>ECU_F_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_ECU_F">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_F"/>
+                    </fx:CONNECTOR>
+                    <fx:CONNECTOR ID="CONN_ECU_F_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_F"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+        </fx:ECUS>
+
+    </fx:ELEMENTS>
+
+</fx:FIBEX>
