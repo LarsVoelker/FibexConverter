@@ -7,6 +7,7 @@ Convert SOME/IP configuration from FIBEX 4 XML files (ASAM standard) to various 
 Install dependencies with:
 
     pip install -r requirements.txt
+    pip install -r tests/requirements.txt
 
 Dependencies: `isodate`, `graphviz`, `macaddress`, `xlsxwriter`
 
@@ -143,5 +144,4 @@ Pre-generated outputs for `Ethernet_Topology_with_Switches.xml` are included in 
 
 ## Running Tests
 
-    source venv_brew/bin/activate
     pytest tests/ -v
