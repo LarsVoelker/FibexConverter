@@ -861,7 +861,7 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
 class SOMEIPParameter(SOMEIPBaseParameter):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Parameter {self.__position__:d} {self.__name__} (mandatory: {self.__mandatory__})\n"
+        ret += f"Parameter {self.__position__:d} {self.__name__} (mandatory: {str(self.__mandatory__).lower()})\n"
         if self.__datatype__ is None:
             ret += f"{(indent + 2) * ' '}None\n"
         else:
