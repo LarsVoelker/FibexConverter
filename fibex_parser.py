@@ -178,6 +178,10 @@ class FibexParser(AbstractParser):
             high_low_byte_order = element.find("fx:UTILIZATION/fx:IS-HIGH-LOW-BYTE-ORDER", self.__ns__)
             if high_low_byte_order is not None:
                 high_low_byte_order = "true" == high_low_byte_order.text.lower()
+            else:
+                # set True as default as SOME/IP states that BigEndian is default
+                high_low_byte_order = True
+
             ret["HighLowByteOrder"] = high_low_byte_order
 
             ret["BitLength"] = self.element_text_to_int(element.find("fx:UTILIZATION/fx:BIT-LENGTH", self.__ns__), -1)
