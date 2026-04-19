@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
     Enhanced Testability Service (ETS) FIBEX fixture.
-    Modelled after local/flync_ets/ets.flync.yaml.
+    Modeled after local/flync_ets/ets.flync.yaml.
 
     Service: SVC_ETS  (ID=0x0101=257, major=1, minor=1)
     Methods: 34 (including duplicate ID 0x32)
@@ -456,6 +456,10 @@
                         <service:INPUT-PARAMETER ID="P_UTF8FIX_I0">
                             <ho:SHORT-NAME>echoUTF8FIXED_ReqArg1</ho:SHORT-NAME>
                             <fx:DATATYPE-REF ID-REF="DT_STR_UTF8"/>
+                            <fx:UTILIZATION>
+                                <fx:BIT-LENGTH>512</fx:BIT-LENGTH>
+                                <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                            </fx:UTILIZATION>
                             <service:POSITION>0</service:POSITION>
                             <service:MANDATORY>true</service:MANDATORY>
                         </service:INPUT-PARAMETER>
@@ -464,6 +468,10 @@
                         <service:RETURN-PARAMETER ID="P_UTF8FIX_O0">
                             <ho:SHORT-NAME>echoUTF8FIXED_ResArg1</ho:SHORT-NAME>
                             <fx:DATATYPE-REF ID-REF="DT_STR_UTF8"/>
+                            <fx:UTILIZATION>
+                                <fx:BIT-LENGTH>512</fx:BIT-LENGTH>
+                                <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                            </fx:UTILIZATION>
                             <service:POSITION>0</service:POSITION>
                             <service:MANDATORY>true</service:MANDATORY>
                         </service:RETURN-PARAMETER>
@@ -480,6 +488,10 @@
                         <service:INPUT-PARAMETER ID="P_UTF16FIX_I0">
                             <ho:SHORT-NAME>echoUTF16FIXED_ReqArg1</ho:SHORT-NAME>
                             <fx:DATATYPE-REF ID-REF="DT_STR_UTF16"/>
+                            <fx:UTILIZATION>
+                                <fx:BIT-LENGTH>1024</fx:BIT-LENGTH>
+                                <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                            </fx:UTILIZATION>
                             <service:POSITION>0</service:POSITION>
                             <service:MANDATORY>true</service:MANDATORY>
                         </service:INPUT-PARAMETER>
@@ -488,6 +500,10 @@
                         <service:RETURN-PARAMETER ID="P_UTF16FIX_O0">
                             <ho:SHORT-NAME>echoUTF16FIXED_ResArg1</ho:SHORT-NAME>
                             <fx:DATATYPE-REF ID-REF="DT_STR_UTF16"/>
+                            <fx:UTILIZATION>
+                                <fx:BIT-LENGTH>1024</fx:BIT-LENGTH>
+                                <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                            </fx:UTILIZATION>
                             <service:POSITION>0</service:POSITION>
                             <service:MANDATORY>true</service:MANDATORY>
                         </service:RETURN-PARAMETER>
@@ -504,6 +520,10 @@
                         <service:INPUT-PARAMETER ID="P_UTF8DYN_I0">
                             <ho:SHORT-NAME>echoUTF8DYNAMIC_ReqArg1</ho:SHORT-NAME>
                             <fx:DATATYPE-REF ID-REF="DT_STR_UTF8_DYN"/>
+                            <fx:UTILIZATION>
+                                <fx:MAX-BIT-LENGTH>512</fx:MAX-BIT-LENGTH>
+                                <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                            </fx:UTILIZATION>
                             <service:POSITION>0</service:POSITION>
                             <service:MANDATORY>true</service:MANDATORY>
                         </service:INPUT-PARAMETER>
@@ -512,6 +532,10 @@
                         <service:RETURN-PARAMETER ID="P_UTF8DYN_O0">
                             <ho:SHORT-NAME>echoUTF8DYNAMIC_ResArg1</ho:SHORT-NAME>
                             <fx:DATATYPE-REF ID-REF="DT_STR_UTF8_DYN"/>
+                            <fx:UTILIZATION>
+                                <fx:MAX-BIT-LENGTH>512</fx:MAX-BIT-LENGTH>
+                                <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                            </fx:UTILIZATION>
                             <service:POSITION>0</service:POSITION>
                             <service:MANDATORY>true</service:MANDATORY>
                         </service:RETURN-PARAMETER>
@@ -528,6 +552,10 @@
                         <service:INPUT-PARAMETER ID="P_UTF16DYN_I0">
                             <ho:SHORT-NAME>utf16_in</ho:SHORT-NAME>
                             <fx:DATATYPE-REF ID-REF="DT_STR_UTF16_DYN"/>
+                            <fx:UTILIZATION>
+                                <fx:MAX-BIT-LENGTH>1024</fx:MAX-BIT-LENGTH>
+                                <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                            </fx:UTILIZATION>
                             <service:POSITION>0</service:POSITION>
                             <service:MANDATORY>true</service:MANDATORY>
                         </service:INPUT-PARAMETER>
@@ -536,6 +564,10 @@
                         <service:RETURN-PARAMETER ID="P_UTF16DYN_O0">
                             <ho:SHORT-NAME>utf16_out</ho:SHORT-NAME>
                             <fx:DATATYPE-REF ID-REF="DT_STR_UTF16_DYN"/>
+                            <fx:UTILIZATION>
+                                <fx:MAX-BIT-LENGTH>1024</fx:MAX-BIT-LENGTH>
+                                <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                            </fx:UTILIZATION>
                             <service:POSITION>0</service:POSITION>
                             <service:MANDATORY>true</service:MANDATORY>
                         </service:RETURN-PARAMETER>
@@ -1015,7 +1047,7 @@
                     <service:RELIABLE>false</service:RELIABLE>
                 </service:METHOD>
 
-                <!-- echoBitfields 0x41 - R/R - modelled as uint8/16/32 (bitfields are integer-backed) -->
+                <!-- echoBitfields 0x41 - R/R - modeled as uint8/16/32 (bitfields are integer-backed) -->
                 <service:METHOD ID="M_ECHO_BF">
                     <ho:SHORT-NAME>echoBitfields</ho:SHORT-NAME>
                     <service:METHOD-IDENTIFIER>65</service:METHOD-IDENTIFIER>
@@ -1580,7 +1612,7 @@
                 </ho:CODED-TYPE>
             </fx:CODING>
 
-            <!-- Boolean is modelled as UINT8 since the parser only recognises integer/float/string types -->
+            <!-- Boolean is modeled as UINT8 since the parser only recognizes integer/float/string types -->
             <fx:CODING ID="COD_BOOL">
                 <ho:SHORT-NAME>BOOLCoding</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT8">
@@ -1591,15 +1623,17 @@
             <!-- Fixed-length UTF-8 string: 64 bytes = 512 bits -->
             <fx:CODING ID="COD_STR_UTF8">
                 <ho:SHORT-NAME>STR_UTF8_FixedCoding</ho:SHORT-NAME>
-                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_ASCIISTRING">
-                    <ho:BIT-LENGTH>512</ho:BIT-LENGTH>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UNICODE2STRING"
+                               ENCODING="UTF-8" TERMINATION="ZERO">
+                    <ho:MIN-LENGTH>512</ho:MIN-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
 
             <!-- Dynamic-length UTF-8 string -->
             <fx:CODING ID="COD_STR_UTF8_DYN">
                 <ho:SHORT-NAME>STR_UTF8_DynCoding</ho:SHORT-NAME>
-                <ho:CODED-TYPE CATEGORY="LEADING-LENGTH-INFO-TYPE" ho:BASE-DATA-TYPE="A_ASCIISTRING">
+                <ho:CODED-TYPE CATEGORY="LEADING-LENGTH-INFO-TYPE" ho:BASE-DATA-TYPE="A_UNICODE2STRING"
+                               ENCODING="UTF-8" TERMINATION="ZERO">
                     <ho:MIN-LENGTH>0</ho:MIN-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
@@ -1608,8 +1642,8 @@
             <fx:CODING ID="COD_STR_UTF16">
                 <ho:SHORT-NAME>STR_UTF16_FixedCoding</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UNICODE2STRING"
-                               ENCODING="UTF-16">
-                    <ho:BIT-LENGTH>1024</ho:BIT-LENGTH>
+                               ENCODING="UTF-16" TERMINATION="ZERO">
+                    <ho:MIN-LENGTH>1024</ho:MIN-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
 
@@ -1617,7 +1651,7 @@
             <fx:CODING ID="COD_STR_UTF16_DYN">
                 <ho:SHORT-NAME>STR_UTF16_DynCoding</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="LEADING-LENGTH-INFO-TYPE" ho:BASE-DATA-TYPE="A_UNICODE2STRING"
-                               ENCODING="UTF-16">
+                               ENCODING="UTF-16" TERMINATION="ZERO">
                     <ho:MIN-LENGTH>0</ho:MIN-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>

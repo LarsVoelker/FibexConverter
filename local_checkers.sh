@@ -9,8 +9,10 @@ if [ "$1" != "" ] ; then
 fi
 
 for i in ${params} ; do
-	isort --profile black --check --diff --color --line-length ${LINE_LENGTH} $i
-	flake8 --max-line-length=${LINE_LENGTH} $i
-	black --line-length ${LINE_LENGTH} --check --diff --color $i
+	echo "--> $i"
+	isort --check --diff --color $i
+	flake8 $i
+	black --check --diff --color $i
+	echo ""
 done
 

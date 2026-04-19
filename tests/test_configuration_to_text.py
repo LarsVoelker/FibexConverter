@@ -1077,7 +1077,7 @@ class TestSOMEIPParameters:
         )
         text = param.str(0)
         assert "TestParam" in text
-        assert "mandatory: True" in text
+        assert "mandatory: true" in text
 
     def test_parameter_str_with_datatype(self):
         bt = self._make_basetype()

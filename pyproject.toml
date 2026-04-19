@@ -1,0 +1,9 @@
+[tool.black]
+line-length = 149
+
+[tool.isort]
+profile = "black"
+line_length = 149
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
