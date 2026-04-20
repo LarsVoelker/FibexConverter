@@ -78,6 +78,9 @@ from parser_dispatcher import (
     parser_formats,
 )
 
+g_gen_portid = False
+g_show_datatype = False
+
 
 class SimpleConfigurationFactory(BaseConfigurationFactory):
 
@@ -831,7 +834,7 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
             ret += (2 + indent) * " "
             ret += "Events: "
             first = True
-            for eid in self.__eventids__:
+            for eid in sorted(self.__eventids__):
                 if not first:
                     ret += ", "
                 else:
@@ -843,7 +846,7 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
             ret += (2 + indent) * " "
             ret += "Notifiers: "
             first = True
-            for fid in self.__fieldids__:
+            for fid in sorted(self.__fieldids__):
                 if not first:
                     ret += ", "
                 else:
@@ -878,7 +881,10 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
             endian = "LE"
 
         ret = indent * " "
-        ret += f"{self.__name__} {self.__datatype__} {endian} ({self.__bitlength_basetype__:d};" + f"{self.__bitlength_encoded_type__:d})\n"
+        if g_show_datatype:
+            ret += f"{self.__name__} {self.__datatype__} {endian} ({self.__bitlength_basetype__:d};" + f"{self.__bitlength_encoded_type__:d})\n"
+        else:
+            ret += f"{self.__name__} {endian} ({self.__bitlength_basetype__:d};" + f"{self.__bitlength_encoded_type__:d})\n"
         return ret
 
 
@@ -954,7 +960,10 @@ class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
 class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Typedef: {self.__name__} {self.__name2__}\n"
+        if g_show_datatype:
+            ret += f"Typedef: {self.__name__} {self.__name2__}\n"
+        else:
+            ret += f"Typedef: {self.__name__}\n"
         if self.__child__ is not None:
             ret += self.__child__.str(indent + 2)
         return ret
@@ -1234,6 +1243,7 @@ def parse_arguments():
         type=lambda x: is_file_valid(parser, x),
         default=None,
     )
+    parser.add_argument("--show-original-datatype", action="store_true")
 
     args = parser.parse_args()
     return args
@@ -1241,11 +1251,13 @@ def parse_arguments():
 
 def main():
     global g_gen_portid
+    global g_show_datatype
 
     print("Converting configuration to text")
     args = parse_arguments()
 
     g_gen_portid = args.generate_switch_port_names
+    g_show_datatype = args.show_original_datatype
 
     ecu_name_mapping = {}
     if args.ecu_name_mapping is not None:

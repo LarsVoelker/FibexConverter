@@ -1080,6 +1080,7 @@ class TestSOMEIPParameters:
         assert "mandatory: true" in text
 
     def test_parameter_str_with_datatype(self):
+        configuration_to_text.g_show_datatype = True
         bt = self._make_basetype()
         param = self.factory.create_someip_parameter(
             position=0,
@@ -1092,6 +1093,7 @@ class TestSOMEIPParameters:
         text = param.str(0)
         assert "TypedParam" in text
         assert "UINT32" in text
+        configuration_to_text.g_show_datatype = False
 
     def test_parameter_str_with_signal(self):
         """Parameter with a signal reference renders the signal."""
@@ -1108,11 +1110,13 @@ class TestSOMEIPParameters:
         assert "SigParam" in text
         assert "ParamSig" in text
 
-    def test_basetype_str_big_endian(self):
+    def test_basetype_str_big_endian_with_datatype(self):
+        configuration_to_text.g_show_datatype = True
         bt = self._make_basetype(datatype="UINT32", bigendian=True)
         text = bt.str(0)
         assert "UINT32" in text
         assert "BE" in text
+        configuration_to_text.g_show_datatype = False
 
     def test_basetype_str_little_endian(self):
         bt = self._make_basetype(datatype="UINT16", bigendian=False, bits=16)
