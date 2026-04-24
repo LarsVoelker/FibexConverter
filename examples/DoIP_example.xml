@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    DoIP Example: Single ECU with untagged Ethernet and TCP port 13400.
+
+    DoIP (Diagnostics over IP, ISO 13400) uses TCP port 13400 for
+    diagnostic connections.  This example shows the minimal FIBEX topology:
+      - No VLAN tagging (untagged Ethernet channel)
+      - One ECU (ECU_DOIP) at 192.168.0.1/24
+      - One Application Endpoint on TCP:13400 with no SOME/IP service instances
+-->
+<fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx"
+          xmlns:ho="http://www.asam.net/xml"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:ethernet="http://www.asam.net/xml/fbx/ethernet"
+          xmlns:it="http://www.asam.net/xml/fbx/it"
+          VERSION="4.1.2">
+
+    <fx:PROJECT ID="PROJ_DOIP">
+        <ho:SHORT-NAME>DoIPExample</ho:SHORT-NAME>
+    </fx:PROJECT>
+
+    <fx:ELEMENTS>
+
+        <fx:CHANNELS>
+            <!-- Untagged Ethernet channel — no VIRTUAL-LAN element -->
+            <fx:CHANNEL ID="CHAN_ETH" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>Ethernet</ho:SHORT-NAME>
+            </fx:CHANNEL>
+        </fx:CHANNELS>
+
+        <fx:ECUS>
+
+            <fx:ECU ID="ECU_DOIP">
+                <ho:SHORT-NAME>ECU_DOIP</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_DOIP">
+                        <ho:SHORT-NAME>DoIP_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_DOIP" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_ETH"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_DOIP"/>
+
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_DOIP">
+                                <ho:SHORT-NAME>DoIP_NEP</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.0.1</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+
+                        <it:APPLICATION-ENDPOINTS>
+                            <it:APPLICATION-ENDPOINT ID="AEP_DOIP">
+                                <ho:SHORT-NAME>DoIP_AEP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:TCP-TP>
+                                        <it:TCP-PORT>
+                                            <it:PORT-NUMBER>13400</it:PORT-NUMBER>
+                                        </it:TCP-PORT>
+                                    </it:TCP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_DOIP"/>
+                            </it:APPLICATION-ENDPOINT>
+                        </it:APPLICATION-ENDPOINTS>
+
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+        </fx:ECUS>
+
+    </fx:ELEMENTS>
+
+</fx:FIBEX>

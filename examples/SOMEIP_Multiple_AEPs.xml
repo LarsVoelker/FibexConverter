@@ -1,15 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    Scenario 2: Single SOME/IP service with provider and consumer.
+    Scenario: Multiple AEPs on one connector — including a "bad" AEP that
+    references a non-existent NETWORK-ENDPOINT.
 
     Service:  SVC_ECHO  (ID=0x1234, version 1.0)
-      Method: GetValue  (method_id=1,  REQUEST_RESPONSE, uint8 in/out)
+      Method: GetValue  (method_id=1, REQUEST_RESPONSE, uint8 in/out)
       Event:  StatusEvent (method_id=0x8001, uint8 payload)
       Eventgroup: EG1   (eventgroup_id=1, contains StatusEvent)
 
     Topology:
-      ECU_PROVIDER (192.168.1.1) provides SVC_ECHO (instance 1) on UDP:30000
-      ECU_CONSUMER (192.168.1.2) consumes SVC_ECHO (instance 1) on UDP:30001
+      ECU_PROVIDER (192.168.1.1) — one connector with three AEPs:
+        AEP_BAD   : NETWORK-ENDPOINT-REF → NEP_NONEXISTENT (does not exist!)
+                    UDP port 30002, no services
+        AEP_VALID : NETWORK-ENDPOINT-REF → NEP_PROVIDER (valid)
+                    UDP port 30000, provides SVC_ECHO instance 1
+        AEP_EMPTY : NETWORK-ENDPOINT-REF → NEP_PROVIDER (valid)
+                    UDP port 30001, no services (empty deployments)
+
+      ECU_CONSUMER (192.168.1.2) consumes SVC_ECHO (instance 1) on UDP:30003
 -->
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx"
           xmlns:ho="http://www.asam.net/xml"
@@ -19,8 +27,8 @@
           xmlns:it="http://www.asam.net/xml/fbx/it"
           VERSION="4.1.2">
 
-    <fx:PROJECT ID="PROJ_SOMEIP">
-        <ho:SHORT-NAME>SomeIPServiceTest</ho:SHORT-NAME>
+    <fx:PROJECT ID="PROJ_MULTI_AEP">
+        <ho:SHORT-NAME>MultipleAEPTest</ho:SHORT-NAME>
     </fx:PROJECT>
 
     <fx:ELEMENTS>
@@ -37,12 +45,6 @@
 
         <fx:ECUS>
 
-            <!--
-                Provider ECU: hosts the SOME/IP service instance.
-                The APPLICATION-ENDPOINT (AEP) is searched globally by parse_psis()
-                using ".//it:APPLICATION-ENDPOINT". The NETWORK-ENDPOINT (NEP) is
-                searched within the connector by parse_neps().
-            -->
             <fx:ECU ID="ECU_PROVIDER">
                 <ho:SHORT-NAME>ECU_PROVIDER</ho:SHORT-NAME>
                 <fx:CONTROLLERS>
@@ -71,8 +73,31 @@
                         </it:NETWORK-ENDPOINTS>
 
                         <it:APPLICATION-ENDPOINTS>
-                            <it:APPLICATION-ENDPOINT ID="AEP_PROVIDER">
-                                <ho:SHORT-NAME>Provider_AEP</ho:SHORT-NAME>
+
+                            <!--
+                                AEP_BAD: references a NEP that does NOT exist in
+                                this connector.  Before the fix this caused a
+                                TypeError crash, preventing AEP_VALID and AEP_EMPTY
+                                from ever being processed.
+                            -->
+                            <it:APPLICATION-ENDPOINT ID="AEP_BAD">
+                                <ho:SHORT-NAME>Bad_AEP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30002</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_NONEXISTENT"/>
+                            </it:APPLICATION-ENDPOINT>
+
+                            <!--
+                                AEP_VALID: valid NEP-REF, valid port, and a PSI.
+                                After the fix this AEP MUST be processed normally.
+                            -->
+                            <it:APPLICATION-ENDPOINT ID="AEP_VALID">
+                                <ho:SHORT-NAME>Valid_AEP</ho:SHORT-NAME>
                                 <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
                                     <it:UDP-TP>
                                         <it:UDP-PORT>
@@ -90,22 +115,36 @@
                                                 <it:CONSUMED-EVENT-GROUP-REFS>
                                                     <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_EG1"/>
                                                 </it:CONSUMED-EVENT-GROUP-REFS>
-                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_PROVIDER"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_VALID"/>
                                             </it:EVENT-HANDLER>
                                         </it:EVENT-HANDLERS>
                                     </it:PROVIDED-SERVICE-INSTANCE>
                                 </it:PROVIDED-SERVICE-INSTANCES>
                             </it:APPLICATION-ENDPOINT>
+
+                            <!--
+                                AEP_EMPTY: valid NEP-REF and port, but NO service
+                                instances attached.  Should produce a socket with
+                                empty deployments ([]) in the FLYNC output.
+                            -->
+                            <it:APPLICATION-ENDPOINT ID="AEP_EMPTY">
+                                <ho:SHORT-NAME>Empty_AEP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30001</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_PROVIDER"/>
+                            </it:APPLICATION-ENDPOINT>
+
                         </it:APPLICATION-ENDPOINTS>
 
                     </fx:CONNECTOR>
                 </fx:CONNECTORS>
             </fx:ECU>
 
-            <!--
-                Consumer ECU: consumes the SOME/IP service instance.
-                CSI references the PSI by XML ID (PSI_ECHO).
-            -->
             <fx:ECU ID="ECU_CONSUMER">
                 <ho:SHORT-NAME>ECU_CONSUMER</ho:SHORT-NAME>
                 <fx:CONTROLLERS>
@@ -139,7 +178,7 @@
                                 <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
                                     <it:UDP-TP>
                                         <it:UDP-PORT>
-                                            <it:PORT-NUMBER>30001</it:PORT-NUMBER>
+                                            <it:PORT-NUMBER>30003</it:PORT-NUMBER>
                                         </it:UDP-PORT>
                                     </it:UDP-TP>
                                 </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
@@ -164,11 +203,6 @@
 
         </fx:ECUS>
 
-        <!--
-            SOME/IP service interface definition.
-            fx:SERVICE-INTERFACE and fx:SERVICE-IDENTIFIER are in the fx namespace.
-            service:API-VERSION, service:METHODS etc. are in the service namespace.
-        -->
         <fx:SERVICE-INTERFACES>
             <fx:SERVICE-INTERFACE ID="SVC_ECHO" xsi:type="service:SERVICE-INTERFACE-TYPE">
                 <ho:SHORT-NAME>SVC_ECHO</ho:SHORT-NAME>
@@ -232,11 +266,6 @@
             </fx:SERVICE-INTERFACE>
         </fx:SERVICE-INTERFACES>
 
-        <!--
-            Datatype used by service method/event parameters.
-            xsi:type="fx:COMMON-DATATYPE-TYPE" with CODING-REF → COD_UINT8
-            is interpreted as a basic integer type by interpret_datatype().
-        -->
         <fx:DATATYPES>
             <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_UINT8">
                 <ho:SHORT-NAME>UINT8</ho:SHORT-NAME>
@@ -247,11 +276,6 @@
     </fx:ELEMENTS>
 
     <fx:PROCESSING-INFORMATION>
-        <!--
-            Coding and datatype definitions for SOME/IP parameters.
-            ho:BASE-DATA-TYPE uses the ho: namespace prefix as expected by
-            parse_coding() which calls get_attribute(ct, "ho:BASE-DATA-TYPE").
-        -->
         <fx:CODINGS>
             <fx:CODING ID="COD_UINT8">
                 <ho:SHORT-NAME>UINT8Coding</ho:SHORT-NAME>

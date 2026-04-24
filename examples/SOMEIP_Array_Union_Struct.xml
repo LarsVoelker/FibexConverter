@@ -1,0 +1,420 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Service TestArrayUnionStruct (ID=0x4321=17185, version 4.18)
+
+    Field: basicField
+      Getter(id:0x0001, reliable:True)
+      Notifier(id:0x8001, reliable:True)
+      Type: Array[1-5] (lengthOfLength=32) of Union TestUnion
+        Union TestUnion:
+          1: testStructure -> Struct TestStructure
+            0: one (mandatory) -> Union OneUnion
+              1: oneStruct -> Struct OneStruct
+                0: a (mandatory) -> FLOAT64 BE
+                1: b (mandatory) -> FLOAT64 BE
+            1: two (mandatory) -> Union TwoUnion
+              1: extStruct -> Struct ExtStruct
+                0: x (mandatory) -> FLOAT32 BE
+                1: y (mandatory) -> FLOAT32 BE
+
+    Eventgroup EG_Test (id: 0x0001)
+      Notifiers: 0x8001 (basicField notifier)
+
+    Topology:
+      ECU_PROVIDER (192.168.1.1) provides TestArrayUnionStruct (instance 1) on TCP:30000
+      ECU_CONSUMER (192.168.1.2) consumes TestArrayUnionStruct (instance 1) on TCP:30001
+-->
+<fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx"
+          xmlns:ho="http://www.asam.net/xml"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:ethernet="http://www.asam.net/xml/fbx/ethernet"
+          xmlns:service="http://www.asam.net/xml/fbx/services"
+          xmlns:it="http://www.asam.net/xml/fbx/it"
+          VERSION="4.1.2">
+
+    <fx:PROJECT ID="PROJ_ARRAY_UNION_STRUCT">
+        <ho:SHORT-NAME>TestArrayUnionStruct</ho:SHORT-NAME>
+    </fx:PROJECT>
+
+    <fx:ELEMENTS>
+
+        <fx:CHANNELS>
+            <fx:CHANNEL ID="CHAN_VLAN100" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN100</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN100">
+                    <ho:SHORT-NAME>VLAN100</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>100</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+        </fx:CHANNELS>
+
+        <fx:ECUS>
+
+            <fx:ECU ID="ECU_PROVIDER">
+                <ho:SHORT-NAME>ECU_PROVIDER</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_PROVIDER">
+                        <ho:SHORT-NAME>Provider_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_PROVIDER" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN100"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_PROVIDER"/>
+
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_PROVIDER">
+                                <ho:SHORT-NAME>Provider_NEP</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.1.1</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+
+                        <it:APPLICATION-ENDPOINTS>
+                            <it:APPLICATION-ENDPOINT ID="AEP_PROVIDER">
+                                <ho:SHORT-NAME>Provider_AEP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:TCP-TP>
+                                        <it:TCP-PORT>
+                                            <it:PORT-NUMBER>30000</it:PORT-NUMBER>
+                                        </it:TCP-PORT>
+                                    </it:TCP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_PROVIDER"/>
+                                <it:PROVIDED-SERVICE-INSTANCES>
+                                    <it:PROVIDED-SERVICE-INSTANCE ID="PSI_AUS">
+                                        <it:INSTANCE-IDENTIFIER>1</it:INSTANCE-IDENTIFIER>
+                                        <service:SERVICE-INTERFACE-REF ID-REF="SVC_AUS"/>
+                                        <it:EVENT-HANDLERS>
+                                            <it:EVENT-HANDLER>
+                                                <it:CONSUMED-EVENT-GROUP-REFS>
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_EG_TEST"/>
+                                                </it:CONSUMED-EVENT-GROUP-REFS>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_PROVIDER"/>
+                                            </it:EVENT-HANDLER>
+                                        </it:EVENT-HANDLERS>
+                                    </it:PROVIDED-SERVICE-INSTANCE>
+                                </it:PROVIDED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                        </it:APPLICATION-ENDPOINTS>
+
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <fx:ECU ID="ECU_CONSUMER">
+                <ho:SHORT-NAME>ECU_CONSUMER</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_CONSUMER">
+                        <ho:SHORT-NAME>Consumer_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_CONSUMER" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN100"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_CONSUMER"/>
+
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_CONSUMER">
+                                <ho:SHORT-NAME>Consumer_NEP</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.1.2</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+
+                        <it:APPLICATION-ENDPOINTS>
+                            <it:APPLICATION-ENDPOINT ID="AEP_CONSUMER">
+                                <ho:SHORT-NAME>Consumer_AEP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:TCP-TP>
+                                        <it:TCP-PORT>
+                                            <it:PORT-NUMBER>30001</it:PORT-NUMBER>
+                                        </it:TCP-PORT>
+                                    </it:TCP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_CONSUMER"/>
+                                <it:CONSUMED-SERVICE-INSTANCES>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_AUS">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_AUS"/>
+                                        <it:CONSUMED-EVENT-GROUPS>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_EG_TEST">
+                                                <service:EVENT-GROUP-REF ID-REF="EG_TEST"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_CONSUMER"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                        </it:CONSUMED-EVENT-GROUPS>
+                                    </it:CONSUMED-SERVICE-INSTANCE>
+                                </it:CONSUMED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                        </it:APPLICATION-ENDPOINTS>
+
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+        </fx:ECUS>
+
+        <fx:SERVICE-INTERFACES>
+            <!--
+                Service TestArrayUnionStruct
+                ID=0x4321=17185, major=4, minor=18
+            -->
+            <fx:SERVICE-INTERFACE ID="SVC_AUS" xsi:type="service:SERVICE-INTERFACE-TYPE">
+                <ho:SHORT-NAME>TestArrayUnionStruct</ho:SHORT-NAME>
+                <fx:SERVICE-IDENTIFIER>17185</fx:SERVICE-IDENTIFIER>
+                <service:API-VERSION>
+                    <service:MAJOR>4</service:MAJOR>
+                    <service:MINOR>18</service:MINOR>
+                </service:API-VERSION>
+
+                <!--
+                    Field basicField:
+                      Getter id=0x0001=1, reliable=true
+                      Notifier id=0x8001=32769, reliable=true
+                      Type: Array[1-5] (lengthOfLength=32) of Union TestUnion
+                -->
+                <service:FIELDS>
+                    <service:FIELD ID="FIELD_BASICFIELD">
+                        <ho:SHORT-NAME>basicField</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_TestUnion"/>
+                        <fx:ARRAY-DECLARATION>
+                            <fx:ARRAY-DIMENSION>
+                                <fx:DIMENSION>1</fx:DIMENSION>
+                                <fx:MINIMUM-SIZE>1</fx:MINIMUM-SIZE>
+                                <fx:MAXIMUM-SIZE>5</fx:MAXIMUM-SIZE>
+                            </fx:ARRAY-DIMENSION>
+                        </fx:ARRAY-DECLARATION>
+                        <fx:UTILIZATION>
+                            <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                            <fx:SERIALIZATION-ATTRIBUTES>
+                                <fx:ARRAY-LENGTH-FIELD-SIZE>32</fx:ARRAY-LENGTH-FIELD-SIZE>
+                            </fx:SERIALIZATION-ATTRIBUTES>
+                        </fx:UTILIZATION>
+                        <service:ACCESS-PERMISSION>NOTIFY_READ_ONLY</service:ACCESS-PERMISSION>
+                        <service:GETTER>
+                            <service:METHOD-IDENTIFIER>1</service:METHOD-IDENTIFIER>
+                            <service:RELIABLE>true</service:RELIABLE>
+                        </service:GETTER>
+                        <service:NOTIFIER>
+                            <service:NOTIFICATION-IDENTIFIER>32769</service:NOTIFICATION-IDENTIFIER>
+                            <service:RELIABLE>true</service:RELIABLE>
+                        </service:NOTIFIER>
+                    </service:FIELD>
+                </service:FIELDS>
+
+                <service:EVENT-GROUPS>
+                    <service:EVENT-GROUP ID="EG_TEST">
+                        <ho:SHORT-NAME>EG_Test</ho:SHORT-NAME>
+                        <fx:SERVICE-IDENTIFIER>1</fx:SERVICE-IDENTIFIER>
+                        <service:FIELD-REFS>
+                            <service:FIELD-REF ID-REF="FIELD_BASICFIELD"/>
+                        </service:FIELD-REFS>
+                    </service:EVENT-GROUP>
+                </service:EVENT-GROUPS>
+
+            </fx:SERVICE-INTERFACE>
+        </fx:SERVICE-INTERFACES>
+
+        <!--
+            Datatypes (bottom-up: leaves first, then composites)
+
+            Leaf types:
+              DT_FLOAT64  -> COD_FLOAT64 (A_FLOAT64, 64-bit)
+              DT_FLOAT32  -> COD_FLOAT32 (A_FLOAT32, 32-bit)
+
+            Structs:
+              DT_OneStruct  = { 0:a FLOAT64, 1:b FLOAT64 }
+              DT_ExtStruct  = { 0:x FLOAT32, 1:y FLOAT32 }
+              DT_TestStructure = { 0:one OneUnion, 1:two TwoUnion }
+
+            Unions:
+              DT_OneUnion  = { 1:oneStruct -> DT_OneStruct }
+              DT_TwoUnion  = { 1:extStruct -> DT_ExtStruct }
+              DT_TestUnion = { 1:testStructure -> DT_TestStructure }
+        -->
+        <fx:DATATYPES>
+
+            <!-- Leaf: FLOAT64 -->
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_FLOAT64">
+                <ho:SHORT-NAME>FLOAT64</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_FLOAT64"/>
+            </fx:DATATYPE>
+
+            <!-- Leaf: FLOAT32 -->
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_FLOAT32">
+                <ho:SHORT-NAME>FLOAT32</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_FLOAT32"/>
+            </fx:DATATYPE>
+
+            <!--
+                Struct OneStruct: { 0:a FLOAT64, 1:b FLOAT64 }
+                (used inside OneUnion)
+            -->
+            <fx:DATATYPE xsi:type="fx:COMPLEX-DATATYPE-TYPE" ID="DT_OneStruct">
+                <ho:SHORT-NAME>OneStruct</ho:SHORT-NAME>
+                <fx:COMPLEX-DATATYPE-CLASS>STRUCTURE</fx:COMPLEX-DATATYPE-CLASS>
+                <fx:MEMBERS>
+                    <fx:MEMBER ID="MBR_OneStruct_a">
+                        <ho:SHORT-NAME>a</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_FLOAT64"/>
+                        <fx:UTILIZATION>
+                            <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                        </fx:UTILIZATION>
+                        <fx:POSITION>0</fx:POSITION>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="MBR_OneStruct_b">
+                        <ho:SHORT-NAME>b</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_FLOAT64"/>
+                        <fx:UTILIZATION>
+                            <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                        </fx:UTILIZATION>
+                        <fx:POSITION>1</fx:POSITION>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                </fx:MEMBERS>
+            </fx:DATATYPE>
+
+            <!--
+                Struct ExtStruct: { 0:x FLOAT32, 1:y FLOAT32 }
+                (used inside TwoUnion)
+            -->
+            <fx:DATATYPE xsi:type="fx:COMPLEX-DATATYPE-TYPE" ID="DT_ExtStruct">
+                <ho:SHORT-NAME>ExtStruct</ho:SHORT-NAME>
+                <fx:COMPLEX-DATATYPE-CLASS>STRUCTURE</fx:COMPLEX-DATATYPE-CLASS>
+                <fx:MEMBERS>
+                    <fx:MEMBER ID="MBR_ExtStruct_x">
+                        <ho:SHORT-NAME>x</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_FLOAT32"/>
+                        <fx:UTILIZATION>
+                            <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                        </fx:UTILIZATION>
+                        <fx:POSITION>0</fx:POSITION>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="MBR_ExtStruct_y">
+                        <ho:SHORT-NAME>y</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_FLOAT32"/>
+                        <fx:UTILIZATION>
+                            <fx:IS-HIGH-LOW-BYTE-ORDER>true</fx:IS-HIGH-LOW-BYTE-ORDER>
+                        </fx:UTILIZATION>
+                        <fx:POSITION>1</fx:POSITION>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                </fx:MEMBERS>
+            </fx:DATATYPE>
+
+            <!--
+                Union OneUnion: { 1:oneStruct -> DT_OneStruct }
+                (used as type of member 'one' in TestStructure)
+            -->
+            <fx:DATATYPE xsi:type="fx:COMPLEX-DATATYPE-TYPE" ID="DT_OneUnion">
+                <ho:SHORT-NAME>OneUnion</ho:SHORT-NAME>
+                <fx:COMPLEX-DATATYPE-CLASS>UNION</fx:COMPLEX-DATATYPE-CLASS>
+                <fx:MEMBERS>
+                    <fx:MEMBER ID="MBR_OneUnion_oneStruct">
+                        <ho:SHORT-NAME>oneStruct</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_OneStruct"/>
+                        <fx:POSITION>0</fx:POSITION>
+                        <fx:INDEX>1</fx:INDEX>
+                    </fx:MEMBER>
+                </fx:MEMBERS>
+            </fx:DATATYPE>
+
+            <!--
+                Union TwoUnion: { 1:extStruct -> DT_ExtStruct }
+                (used as type of member 'two' in TestStructure)
+            -->
+            <fx:DATATYPE xsi:type="fx:COMPLEX-DATATYPE-TYPE" ID="DT_TwoUnion">
+                <ho:SHORT-NAME>TwoUnion</ho:SHORT-NAME>
+                <fx:COMPLEX-DATATYPE-CLASS>UNION</fx:COMPLEX-DATATYPE-CLASS>
+                <fx:MEMBERS>
+                    <fx:MEMBER ID="MBR_TwoUnion_extStruct">
+                        <ho:SHORT-NAME>extStruct</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_ExtStruct"/>
+                        <fx:POSITION>0</fx:POSITION>
+                        <fx:INDEX>1</fx:INDEX>
+                    </fx:MEMBER>
+                </fx:MEMBERS>
+            </fx:DATATYPE>
+
+            <!--
+                Struct TestStructure: { 0:one OneUnion, 1:two TwoUnion }
+                (used inside TestUnion)
+            -->
+            <fx:DATATYPE xsi:type="fx:COMPLEX-DATATYPE-TYPE" ID="DT_TestStructure">
+                <ho:SHORT-NAME>TestStructure</ho:SHORT-NAME>
+                <fx:COMPLEX-DATATYPE-CLASS>STRUCTURE</fx:COMPLEX-DATATYPE-CLASS>
+                <fx:MEMBERS>
+                    <fx:MEMBER ID="MBR_TestStructure_one">
+                        <ho:SHORT-NAME>one</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_OneUnion"/>
+                        <fx:POSITION>0</fx:POSITION>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                    <fx:MEMBER ID="MBR_TestStructure_two">
+                        <ho:SHORT-NAME>two</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_TwoUnion"/>
+                        <fx:POSITION>1</fx:POSITION>
+                        <fx:MANDATORY>true</fx:MANDATORY>
+                    </fx:MEMBER>
+                </fx:MEMBERS>
+            </fx:DATATYPE>
+
+            <!--
+                Union TestUnion: { 1:testStructure -> DT_TestStructure }
+                (used as element type of the basicField array)
+            -->
+            <fx:DATATYPE xsi:type="fx:COMPLEX-DATATYPE-TYPE" ID="DT_TestUnion">
+                <ho:SHORT-NAME>TestUnion</ho:SHORT-NAME>
+                <fx:COMPLEX-DATATYPE-CLASS>UNION</fx:COMPLEX-DATATYPE-CLASS>
+                <fx:MEMBERS>
+                    <fx:MEMBER ID="MBR_TestUnion_testStructure">
+                        <ho:SHORT-NAME>testStructure</ho:SHORT-NAME>
+                        <fx:DATATYPE-REF ID-REF="DT_TestStructure"/>
+                        <fx:POSITION>0</fx:POSITION>
+                        <fx:INDEX>1</fx:INDEX>
+                    </fx:MEMBER>
+                </fx:MEMBERS>
+            </fx:DATATYPE>
+
+        </fx:DATATYPES>
+
+    </fx:ELEMENTS>
+
+    <fx:PROCESSING-INFORMATION>
+        <fx:CODINGS>
+
+            <!-- FLOAT64: A_FLOAT64, 64-bit, big-endian -->
+            <fx:CODING ID="COD_FLOAT64">
+                <ho:SHORT-NAME>FLOAT64Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_FLOAT64">
+                    <ho:BIT-LENGTH>64</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+            <!-- FLOAT32: A_FLOAT32, 32-bit, big-endian -->
+            <fx:CODING ID="COD_FLOAT32">
+                <ho:SHORT-NAME>FLOAT32Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_FLOAT32">
+                    <ho:BIT-LENGTH>32</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+
+        </fx:CODINGS>
+    </fx:PROCESSING-INFORMATION>
+
+</fx:FIBEX>

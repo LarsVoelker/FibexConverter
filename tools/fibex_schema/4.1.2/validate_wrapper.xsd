@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema">
+  <xs:import namespace="http://www.asam.net/xml/fbx"           schemaLocation="fibex.xsd"/>
+  <xs:import namespace="http://www.asam.net/xml"               schemaLocation="harmonizedObjects.xsd"/>
+  <xs:import namespace="http://www.asam.net/xml/fbx/ethernet"  schemaLocation="fibex4ethernet.xsd"/>
+  <xs:import namespace="http://www.asam.net/xml/fbx/services"  schemaLocation="fibex4services.xsd"/>
+  <xs:import namespace="http://www.asam.net/xml/fbx/it"        schemaLocation="fibex4it.xsd"/>
+  <xs:import namespace="http://www.w3.org/XML/1998/namespace"  schemaLocation="xml.xsd"/>
+</xs:schema>

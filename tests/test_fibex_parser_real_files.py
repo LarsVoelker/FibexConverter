@@ -3,8 +3,6 @@
 
 from pathlib import Path
 
-import pytest
-
 from configuration_to_text import SimpleConfigurationFactory
 from fibex_parser import FibexParser
 
