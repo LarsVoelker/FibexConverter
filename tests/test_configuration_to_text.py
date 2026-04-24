@@ -1,14 +1,13 @@
 #!/usr/bin/python
 """Unit tests for configuration_to_text module."""
 
-import pytest
+import configuration_to_text
 from configuration_base_classes import BaseVLAN
 from configuration_to_text import (
     SimpleConfigurationFactory,
     Switch,
     SwitchPort,
 )
-import configuration_to_text
 
 
 class TestECUAndController:
@@ -72,7 +71,7 @@ class TestSwitchAndPort:
         """SwitchPort connected to a controller."""
         configuration_to_text.g_gen_portid = False
         controller = self.factory.create_controller("TestCtrl", [])
-        ecu = self.factory.create_ecu("TestECU", [controller])
+        self.factory.create_ecu("TestECU", [controller])
         port = SwitchPort("port1", controller, None, 0, [])
         text = port.str(0, self.factory)
         assert "TestCtrl" in text
@@ -1077,7 +1076,7 @@ class TestSOMEIPParameters:
         )
         text = param.str(0)
         assert "TestParam" in text
-        assert "mandatory: true" in text
+        assert "mandatory: True" in text
 
     def test_parameter_str_with_datatype(self):
         configuration_to_text.g_show_datatype = True
