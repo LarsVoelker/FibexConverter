@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    Scenario 2: Single SOME/IP service with provider and consumer.
+    Scenario: Single SOME/IP service over IPv6 with provider and consumer.
 
-    Service:  SVC_ECHO  (ID=0x1234, version 1.0)
+    Service:  SVC_ECHO6  (ID=0x1235, version 1.0)
       Method: GetValue  (method_id=1,  REQUEST_RESPONSE, uint8 in/out)
       Event:  StatusEvent (method_id=0x8001, uint8 payload)
       Eventgroup: EG1   (eventgroup_id=1, contains StatusEvent)
 
     Topology:
-      ECU_PROVIDER (192.168.1.1) provides SVC_ECHO (instance 1) on UDP:30000
-      ECU_CONSUMER (192.168.1.2) consumes SVC_ECHO (instance 1) on UDP:30001
+      ECU_PROVIDER6 (2001:db8::1/64) provides SVC_ECHO6 (instance 1) on UDP:30000
+      ECU_CONSUMER6 (2001:db8::2/64) consumes SVC_ECHO6 (instance 1) on UDP:30001
 -->
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx"
           xmlns:ho="http://www.asam.net/xml"
@@ -19,17 +19,17 @@
           xmlns:it="http://www.asam.net/xml/fbx/it"
           VERSION="4.1.2">
 
-    <fx:PROJECT ID="PROJ_SOMEIP">
-        <ho:SHORT-NAME>SomeIPServiceTest</ho:SHORT-NAME>
+    <fx:PROJECT ID="PROJ_SOMEIP6">
+        <ho:SHORT-NAME>SomeIPIPv6ServiceTest</ho:SHORT-NAME>
     </fx:PROJECT>
 
     <fx:ELEMENTS>
 
         <fx:CHANNELS>
-            <fx:CHANNEL ID="CHAN_VLAN100" xsi:type="ethernet:CHANNEL-TYPE">
-                <ho:SHORT-NAME>VLAN100</ho:SHORT-NAME>
-                <ethernet:VIRTUAL-LAN ID="VLAN100">
-                    <ho:SHORT-NAME>VLAN100</ho:SHORT-NAME>
+            <fx:CHANNEL ID="CHAN6_VLAN100" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN100_IPv6</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN100_IPv6">
+                    <ho:SHORT-NAME>VLAN100_IPv6</ho:SHORT-NAME>
                     <ethernet:VLAN-IDENTIFIER>100</ethernet:VLAN-IDENTIFIER>
                 </ethernet:VIRTUAL-LAN>
             </fx:CHANNEL>
@@ -37,42 +37,36 @@
 
         <fx:ECUS>
 
-            <!--
-                Provider ECU: hosts the SOME/IP service instance.
-                The APPLICATION-ENDPOINT (AEP) is searched globally by parse_psis()
-                using ".//it:APPLICATION-ENDPOINT". The NETWORK-ENDPOINT (NEP) is
-                searched within the connector by parse_neps().
-            -->
-            <fx:ECU ID="ECU_PROVIDER">
-                <ho:SHORT-NAME>ECU_PROVIDER</ho:SHORT-NAME>
+            <fx:ECU ID="ECU_PROVIDER6">
+                <ho:SHORT-NAME>ECU_PROVIDER6</ho:SHORT-NAME>
                 <fx:CONTROLLERS>
-                    <fx:CONTROLLER ID="CTRL_PROVIDER">
-                        <ho:SHORT-NAME>Provider_Ctrl</ho:SHORT-NAME>
+                    <fx:CONTROLLER ID="CTRL_PROVIDER6">
+                        <ho:SHORT-NAME>Provider6_Ctrl</ho:SHORT-NAME>
                     </fx:CONTROLLER>
                 </fx:CONTROLLERS>
                 <fx:CONNECTORS>
-                    <fx:CONNECTOR ID="CONN_PROVIDER" xsi:type="it:CONNECTOR-TYPE">
-                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN100"/>
-                        <fx:CONTROLLER-REF ID-REF="CTRL_PROVIDER"/>
+                    <fx:CONNECTOR ID="CONN_PROVIDER6" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN6_VLAN100"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_PROVIDER6"/>
 
                         <it:NETWORK-ENDPOINTS>
-                            <it:NETWORK-ENDPOINT ID="NEP_PROVIDER">
-                                <ho:SHORT-NAME>Provider_NEP</ho:SHORT-NAME>
+                            <it:NETWORK-ENDPOINT ID="NEP_PROVIDER6">
+                                <ho:SHORT-NAME>Provider6_NEP</ho:SHORT-NAME>
                                 <it:NETWORK-ENDPOINT-ADDRESSES>
                                     <it:NETWORK-ENDPOINT-ADDRESS>
-                                        <it:IPV4>
-                                            <it:IP-ADDRESS>192.168.1.1</it:IP-ADDRESS>
-                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
-                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
-                                        </it:IPV4>
+                                        <it:IPV6>
+                                            <it:IPV6-ADDRESS>2001:db8::1</it:IPV6-ADDRESS>
+                                            <it:IP-ADDRESS-PREFIX-LENGTH>64</it:IP-ADDRESS-PREFIX-LENGTH>
+                                            <it:IPV6-ADDRESS-SOURCE>FIXED</it:IPV6-ADDRESS-SOURCE>
+                                        </it:IPV6>
                                     </it:NETWORK-ENDPOINT-ADDRESS>
                                 </it:NETWORK-ENDPOINT-ADDRESSES>
                             </it:NETWORK-ENDPOINT>
                         </it:NETWORK-ENDPOINTS>
 
                         <it:APPLICATION-ENDPOINTS>
-                            <it:APPLICATION-ENDPOINT ID="AEP_PROVIDER">
-                                <ho:SHORT-NAME>Provider_AEP</ho:SHORT-NAME>
+                            <it:APPLICATION-ENDPOINT ID="AEP_PROVIDER6">
+                                <ho:SHORT-NAME>Provider6_AEP</ho:SHORT-NAME>
                                 <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
                                     <it:UDP-TP>
                                         <it:UDP-PORT>
@@ -80,17 +74,17 @@
                                         </it:UDP-PORT>
                                     </it:UDP-TP>
                                 </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
-                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_PROVIDER"/>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_PROVIDER6"/>
                                 <it:PROVIDED-SERVICE-INSTANCES>
-                                    <it:PROVIDED-SERVICE-INSTANCE ID="PSI_ECHO">
+                                    <it:PROVIDED-SERVICE-INSTANCE ID="PSI_ECHO6">
                                         <it:INSTANCE-IDENTIFIER>1</it:INSTANCE-IDENTIFIER>
-                                        <service:SERVICE-INTERFACE-REF ID-REF="SVC_ECHO"/>
+                                        <service:SERVICE-INTERFACE-REF ID-REF="SVC_ECHO6"/>
                                         <it:EVENT-HANDLERS>
                                             <it:EVENT-HANDLER>
                                                 <it:CONSUMED-EVENT-GROUP-REFS>
-                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_EG1"/>
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG6_EG1"/>
                                                 </it:CONSUMED-EVENT-GROUP-REFS>
-                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_PROVIDER"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_PROVIDER6"/>
                                             </it:EVENT-HANDLER>
                                         </it:EVENT-HANDLERS>
                                     </it:PROVIDED-SERVICE-INSTANCE>
@@ -102,40 +96,36 @@
                 </fx:CONNECTORS>
             </fx:ECU>
 
-            <!--
-                Consumer ECU: consumes the SOME/IP service instance.
-                CSI references the PSI by XML ID (PSI_ECHO).
-            -->
-            <fx:ECU ID="ECU_CONSUMER">
-                <ho:SHORT-NAME>ECU_CONSUMER</ho:SHORT-NAME>
+            <fx:ECU ID="ECU_CONSUMER6">
+                <ho:SHORT-NAME>ECU_CONSUMER6</ho:SHORT-NAME>
                 <fx:CONTROLLERS>
-                    <fx:CONTROLLER ID="CTRL_CONSUMER">
-                        <ho:SHORT-NAME>Consumer_Ctrl</ho:SHORT-NAME>
+                    <fx:CONTROLLER ID="CTRL_CONSUMER6">
+                        <ho:SHORT-NAME>Consumer6_Ctrl</ho:SHORT-NAME>
                     </fx:CONTROLLER>
                 </fx:CONTROLLERS>
                 <fx:CONNECTORS>
-                    <fx:CONNECTOR ID="CONN_CONSUMER" xsi:type="it:CONNECTOR-TYPE">
-                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN100"/>
-                        <fx:CONTROLLER-REF ID-REF="CTRL_CONSUMER"/>
+                    <fx:CONNECTOR ID="CONN_CONSUMER6" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN6_VLAN100"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_CONSUMER6"/>
 
                         <it:NETWORK-ENDPOINTS>
-                            <it:NETWORK-ENDPOINT ID="NEP_CONSUMER">
-                                <ho:SHORT-NAME>Consumer_NEP</ho:SHORT-NAME>
+                            <it:NETWORK-ENDPOINT ID="NEP_CONSUMER6">
+                                <ho:SHORT-NAME>Consumer6_NEP</ho:SHORT-NAME>
                                 <it:NETWORK-ENDPOINT-ADDRESSES>
                                     <it:NETWORK-ENDPOINT-ADDRESS>
-                                        <it:IPV4>
-                                            <it:IP-ADDRESS>192.168.1.2</it:IP-ADDRESS>
-                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
-                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
-                                        </it:IPV4>
+                                        <it:IPV6>
+                                            <it:IPV6-ADDRESS>2001:db8::2</it:IPV6-ADDRESS>
+                                            <it:IP-ADDRESS-PREFIX-LENGTH>64</it:IP-ADDRESS-PREFIX-LENGTH>
+                                            <it:IPV6-ADDRESS-SOURCE>FIXED</it:IPV6-ADDRESS-SOURCE>
+                                        </it:IPV6>
                                     </it:NETWORK-ENDPOINT-ADDRESS>
                                 </it:NETWORK-ENDPOINT-ADDRESSES>
                             </it:NETWORK-ENDPOINT>
                         </it:NETWORK-ENDPOINTS>
 
                         <it:APPLICATION-ENDPOINTS>
-                            <it:APPLICATION-ENDPOINT ID="AEP_CONSUMER">
-                                <ho:SHORT-NAME>Consumer_AEP</ho:SHORT-NAME>
+                            <it:APPLICATION-ENDPOINT ID="AEP_CONSUMER6">
+                                <ho:SHORT-NAME>Consumer6_AEP</ho:SHORT-NAME>
                                 <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
                                     <it:UDP-TP>
                                         <it:UDP-PORT>
@@ -143,14 +133,14 @@
                                         </it:UDP-PORT>
                                     </it:UDP-TP>
                                 </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
-                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_CONSUMER"/>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_CONSUMER6"/>
                                 <it:CONSUMED-SERVICE-INSTANCES>
-                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_ECHO">
-                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_ECHO"/>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_ECHO6">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_ECHO6"/>
                                         <it:CONSUMED-EVENT-GROUPS>
-                                            <it:CONSUMED-EVENT-GROUP ID="CEG_EG1">
-                                                <service:EVENT-GROUP-REF ID-REF="EG1"/>
-                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_CONSUMER"/>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG6_EG1">
+                                                <service:EVENT-GROUP-REF ID-REF="EG6_1"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_CONSUMER6"/>
                                             </it:CONSUMED-EVENT-GROUP>
                                         </it:CONSUMED-EVENT-GROUPS>
                                     </it:CONSUMED-SERVICE-INSTANCE>
@@ -164,37 +154,32 @@
 
         </fx:ECUS>
 
-        <!--
-            SOME/IP service interface definition.
-            fx:SERVICE-INTERFACE and fx:SERVICE-IDENTIFIER are in the fx namespace.
-            service:API-VERSION, service:METHODS etc. are in the service namespace.
-        -->
         <fx:SERVICE-INTERFACES>
-            <fx:SERVICE-INTERFACE ID="SVC_ECHO" xsi:type="service:SERVICE-INTERFACE-TYPE">
-                <ho:SHORT-NAME>SVC_ECHO</ho:SHORT-NAME>
-                <fx:SERVICE-IDENTIFIER>4660</fx:SERVICE-IDENTIFIER>
+            <fx:SERVICE-INTERFACE ID="SVC_ECHO6" xsi:type="service:SERVICE-INTERFACE-TYPE">
+                <ho:SHORT-NAME>SVC_ECHO6</ho:SHORT-NAME>
+                <fx:SERVICE-IDENTIFIER>4661</fx:SERVICE-IDENTIFIER>
                 <service:API-VERSION>
                     <service:MAJOR>1</service:MAJOR>
                     <service:MINOR>0</service:MINOR>
                 </service:API-VERSION>
 
                 <service:METHODS>
-                    <service:METHOD ID="METHOD_GETVALUE">
+                    <service:METHOD ID="METHOD6_GETVALUE">
                         <ho:SHORT-NAME>GetValue</ho:SHORT-NAME>
                         <service:METHOD-IDENTIFIER>1</service:METHOD-IDENTIFIER>
                         <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
                         <service:INPUT-PARAMETERS>
-                            <service:INPUT-PARAMETER ID="PARAM_IN1">
+                            <service:INPUT-PARAMETER ID="PARAM6_IN1">
                                 <ho:SHORT-NAME>requestValue</ho:SHORT-NAME>
-                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <fx:DATATYPE-REF ID-REF="DT6_UINT8"/>
                                 <service:POSITION>0</service:POSITION>
                                 <service:MANDATORY>true</service:MANDATORY>
                             </service:INPUT-PARAMETER>
                         </service:INPUT-PARAMETERS>
                         <service:RETURN-PARAMETERS>
-                            <service:RETURN-PARAMETER ID="PARAM_OUT1">
+                            <service:RETURN-PARAMETER ID="PARAM6_OUT1">
                                 <ho:SHORT-NAME>responseValue</ho:SHORT-NAME>
-                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <fx:DATATYPE-REF ID-REF="DT6_UINT8"/>
                                 <service:POSITION>0</service:POSITION>
                                 <service:MANDATORY>true</service:MANDATORY>
                             </service:RETURN-PARAMETER>
@@ -204,13 +189,13 @@
                 </service:METHODS>
 
                 <service:EVENTS>
-                    <service:EVENT ID="EVENT_STATUS">
+                    <service:EVENT ID="EVENT6_STATUS">
                         <ho:SHORT-NAME>StatusEvent</ho:SHORT-NAME>
                         <service:METHOD-IDENTIFIER>32769</service:METHOD-IDENTIFIER>
                         <service:INPUT-PARAMETERS>
-                            <service:INPUT-PARAMETER ID="PARAM_EVT1">
+                            <service:INPUT-PARAMETER ID="PARAM6_EVT1">
                                 <ho:SHORT-NAME>statusValue</ho:SHORT-NAME>
-                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <fx:DATATYPE-REF ID-REF="DT6_UINT8"/>
                                 <service:POSITION>0</service:POSITION>
                                 <service:MANDATORY>true</service:MANDATORY>
                             </service:INPUT-PARAMETER>
@@ -220,11 +205,11 @@
                 </service:EVENTS>
 
                 <service:EVENT-GROUPS>
-                    <service:EVENT-GROUP ID="EG1">
+                    <service:EVENT-GROUP ID="EG6_1">
                         <ho:SHORT-NAME>EG1</ho:SHORT-NAME>
                         <fx:SERVICE-IDENTIFIER>1</fx:SERVICE-IDENTIFIER>
                         <service:EVENT-REFS>
-                            <service:EVENT-REF ID-REF="EVENT_STATUS"/>
+                            <service:EVENT-REF ID-REF="EVENT6_STATUS"/>
                         </service:EVENT-REFS>
                     </service:EVENT-GROUP>
                 </service:EVENT-GROUPS>
@@ -232,28 +217,18 @@
             </fx:SERVICE-INTERFACE>
         </fx:SERVICE-INTERFACES>
 
-        <!--
-            Datatype used by service method/event parameters.
-            xsi:type="fx:COMMON-DATATYPE-TYPE" with CODING-REF → COD_UINT8
-            is interpreted as a basic integer type by interpret_datatype().
-        -->
         <fx:DATATYPES>
-            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_UINT8">
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT6_UINT8">
                 <ho:SHORT-NAME>UINT8</ho:SHORT-NAME>
-                <fx:CODING-REF ID-REF="COD_UINT8"/>
+                <fx:CODING-REF ID-REF="COD6_UINT8"/>
             </fx:DATATYPE>
         </fx:DATATYPES>
 
     </fx:ELEMENTS>
 
     <fx:PROCESSING-INFORMATION>
-        <!--
-            Coding and datatype definitions for SOME/IP parameters.
-            ho:BASE-DATA-TYPE uses the ho: namespace prefix as expected by
-            parse_coding() which calls get_attribute(ct, "ho:BASE-DATA-TYPE").
-        -->
         <fx:CODINGS>
-            <fx:CODING ID="COD_UINT8">
+            <fx:CODING ID="COD6_UINT8">
                 <ho:SHORT-NAME>UINT8Coding</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT8">
                     <ho:BIT-LENGTH>8</ho:BIT-LENGTH>

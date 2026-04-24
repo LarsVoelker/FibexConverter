@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-    Scenario 2: Single SOME/IP service with provider and consumer.
+    Scenario: SOME/IP service with non-standard IPv4 netmask.
+
+    Purpose: Verify that non-standard netmasks are correctly preserved and
+    converted to output format.
 
     Service:  SVC_ECHO  (ID=0x1234, version 1.0)
-      Method: GetValue  (method_id=1,  REQUEST_RESPONSE, uint8 in/out)
-      Event:  StatusEvent (method_id=0x8001, uint8 payload)
-      Eventgroup: EG1   (eventgroup_id=1, contains StatusEvent)
 
     Topology:
-      ECU_PROVIDER (192.168.1.1) provides SVC_ECHO (instance 1) on UDP:30000
-      ECU_CONSUMER (192.168.1.2) consumes SVC_ECHO (instance 1) on UDP:30001
+      ECU_PROVIDER (10.10.10.10 / 255.255.255.128 = /25) on UDP:30000
+      ECU_CONSUMER (10.10.10.11 / 255.255.255.128 = /25) on UDP:30001
+
+    The /25 netmask (255.255.255.128) is non-standard. It would be /8 in
+    general or some code might uses /24 as default.
 -->
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx"
           xmlns:ho="http://www.asam.net/xml"
@@ -19,30 +22,24 @@
           xmlns:it="http://www.asam.net/xml/fbx/it"
           VERSION="4.1.2">
 
-    <fx:PROJECT ID="PROJ_SOMEIP">
-        <ho:SHORT-NAME>SomeIPServiceTest</ho:SHORT-NAME>
+    <fx:PROJECT ID="PROJ_NONSTANDARD_NETMASK">
+        <ho:SHORT-NAME>NonstandardNetmaskTest</ho:SHORT-NAME>
     </fx:PROJECT>
 
     <fx:ELEMENTS>
 
         <fx:CHANNELS>
-            <fx:CHANNEL ID="CHAN_VLAN100" xsi:type="ethernet:CHANNEL-TYPE">
-                <ho:SHORT-NAME>VLAN100</ho:SHORT-NAME>
-                <ethernet:VIRTUAL-LAN ID="VLAN100">
-                    <ho:SHORT-NAME>VLAN100</ho:SHORT-NAME>
-                    <ethernet:VLAN-IDENTIFIER>100</ethernet:VLAN-IDENTIFIER>
+            <fx:CHANNEL ID="CHAN_VLAN200" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN200</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN200">
+                    <ho:SHORT-NAME>VLAN200</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>200</ethernet:VLAN-IDENTIFIER>
                 </ethernet:VIRTUAL-LAN>
             </fx:CHANNEL>
         </fx:CHANNELS>
 
         <fx:ECUS>
 
-            <!--
-                Provider ECU: hosts the SOME/IP service instance.
-                The APPLICATION-ENDPOINT (AEP) is searched globally by parse_psis()
-                using ".//it:APPLICATION-ENDPOINT". The NETWORK-ENDPOINT (NEP) is
-                searched within the connector by parse_neps().
-            -->
             <fx:ECU ID="ECU_PROVIDER">
                 <ho:SHORT-NAME>ECU_PROVIDER</ho:SHORT-NAME>
                 <fx:CONTROLLERS>
@@ -52,7 +49,7 @@
                 </fx:CONTROLLERS>
                 <fx:CONNECTORS>
                     <fx:CONNECTOR ID="CONN_PROVIDER" xsi:type="it:CONNECTOR-TYPE">
-                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN100"/>
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN200"/>
                         <fx:CONTROLLER-REF ID-REF="CTRL_PROVIDER"/>
 
                         <it:NETWORK-ENDPOINTS>
@@ -61,9 +58,9 @@
                                 <it:NETWORK-ENDPOINT-ADDRESSES>
                                     <it:NETWORK-ENDPOINT-ADDRESS>
                                         <it:IPV4>
-                                            <it:IP-ADDRESS>192.168.1.1</it:IP-ADDRESS>
+                                            <it:IP-ADDRESS>10.10.10.10</it:IP-ADDRESS>
                                             <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
-                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                            <it:NETWORKMASK>255.255.255.128</it:NETWORKMASK>
                                         </it:IPV4>
                                     </it:NETWORK-ENDPOINT-ADDRESS>
                                 </it:NETWORK-ENDPOINT-ADDRESSES>
@@ -102,10 +99,6 @@
                 </fx:CONNECTORS>
             </fx:ECU>
 
-            <!--
-                Consumer ECU: consumes the SOME/IP service instance.
-                CSI references the PSI by XML ID (PSI_ECHO).
-            -->
             <fx:ECU ID="ECU_CONSUMER">
                 <ho:SHORT-NAME>ECU_CONSUMER</ho:SHORT-NAME>
                 <fx:CONTROLLERS>
@@ -115,7 +108,7 @@
                 </fx:CONTROLLERS>
                 <fx:CONNECTORS>
                     <fx:CONNECTOR ID="CONN_CONSUMER" xsi:type="it:CONNECTOR-TYPE">
-                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN100"/>
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN200"/>
                         <fx:CONTROLLER-REF ID-REF="CTRL_CONSUMER"/>
 
                         <it:NETWORK-ENDPOINTS>
@@ -124,9 +117,9 @@
                                 <it:NETWORK-ENDPOINT-ADDRESSES>
                                     <it:NETWORK-ENDPOINT-ADDRESS>
                                         <it:IPV4>
-                                            <it:IP-ADDRESS>192.168.1.2</it:IP-ADDRESS>
+                                            <it:IP-ADDRESS>10.10.10.11</it:IP-ADDRESS>
                                             <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
-                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                            <it:NETWORKMASK>255.255.255.128</it:NETWORKMASK>
                                         </it:IPV4>
                                     </it:NETWORK-ENDPOINT-ADDRESS>
                                 </it:NETWORK-ENDPOINT-ADDRESSES>
@@ -164,11 +157,6 @@
 
         </fx:ECUS>
 
-        <!--
-            SOME/IP service interface definition.
-            fx:SERVICE-INTERFACE and fx:SERVICE-IDENTIFIER are in the fx namespace.
-            service:API-VERSION, service:METHODS etc. are in the service namespace.
-        -->
         <fx:SERVICE-INTERFACES>
             <fx:SERVICE-INTERFACE ID="SVC_ECHO" xsi:type="service:SERVICE-INTERFACE-TYPE">
                 <ho:SHORT-NAME>SVC_ECHO</ho:SHORT-NAME>
@@ -232,11 +220,6 @@
             </fx:SERVICE-INTERFACE>
         </fx:SERVICE-INTERFACES>
 
-        <!--
-            Datatype used by service method/event parameters.
-            xsi:type="fx:COMMON-DATATYPE-TYPE" with CODING-REF → COD_UINT8
-            is interpreted as a basic integer type by interpret_datatype().
-        -->
         <fx:DATATYPES>
             <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_UINT8">
                 <ho:SHORT-NAME>UINT8</ho:SHORT-NAME>
@@ -247,11 +230,6 @@
     </fx:ELEMENTS>
 
     <fx:PROCESSING-INFORMATION>
-        <!--
-            Coding and datatype definitions for SOME/IP parameters.
-            ho:BASE-DATA-TYPE uses the ho: namespace prefix as expected by
-            parse_coding() which calls get_attribute(ct, "ho:BASE-DATA-TYPE").
-        -->
         <fx:CODINGS>
             <fx:CODING ID="COD_UINT8">
                 <ho:SHORT-NAME>UINT8Coding</ho:SHORT-NAME>

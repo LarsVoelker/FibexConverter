@@ -40,7 +40,7 @@ class TestIsFileOrDirValid:
         mp = MockParser()
 
         path = str(tmpdir.join("nonexistent"))
-        result = is_file_or_dir_valid(mp, str(path))
+        is_file_or_dir_valid(mp, str(path))
         assert mp.msg is not None
 
 

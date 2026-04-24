@@ -76,7 +76,7 @@
                                 <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
                                     <it:UDP-TP>
                                         <it:UDP-PORT>
-                                            <it:PORT-NUMBER>30490</it:PORT-NUMBER>
+                                            <it:PORT-NUMBER>30500</it:PORT-NUMBER>
                                         </it:UDP-PORT>
                                     </it:UDP-TP>
                                 </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
@@ -85,8 +85,175 @@
                                     <it:PROVIDED-SERVICE-INSTANCE ID="PSI_ETS">
                                         <it:INSTANCE-IDENTIFIER>1</it:INSTANCE-IDENTIFIER>
                                         <service:SERVICE-INTERFACE-REF ID-REF="SVC_ETS"/>
+                                        <it:EVENT-HANDLERS>
+                                            <it:EVENT-HANDLER>
+                                                <it:CONSUMED-EVENT-GROUP-REFS>
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_EG_ALL"/>
+                                                </it:CONSUMED-EVENT-GROUP-REFS>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_ETS"/>
+                                            </it:EVENT-HANDLER>
+                                            <it:EVENT-HANDLER>
+                                                <it:CONSUMED-EVENT-GROUP-REFS>
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_EG_UNRELIABLE"/>
+                                                </it:CONSUMED-EVENT-GROUP-REFS>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_ETS"/>
+                                            </it:EVENT-HANDLER>
+                                            <it:EVENT-HANDLER>
+                                                <it:CONSUMED-EVENT-GROUP-REFS>
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_EG_MULTICAST"/>
+                                                </it:CONSUMED-EVENT-GROUP-REFS>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_ETS"/>
+                                                <it:MULTICAST-ADDRESS>
+                                                    <it:IPV4>
+                                                        <it:IP-ADDRESS>224.1.2.3</it:IP-ADDRESS>
+                                                    </it:IPV4>
+                                                </it:MULTICAST-ADDRESS>
+                                            </it:EVENT-HANDLER>
+                                        </it:EVENT-HANDLERS>
                                     </it:PROVIDED-SERVICE-INSTANCE>
                                 </it:PROVIDED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                            <it:APPLICATION-ENDPOINT ID="AEP_ETS_TCP">
+                                <ho:SHORT-NAME>ETS_AEP_TCP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:TCP-TP>
+                                        <it:TCP-PORT>
+                                            <it:PORT-NUMBER>30500</it:PORT-NUMBER>
+                                        </it:TCP-PORT>
+                                    </it:TCP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_ETS"/>
+                                <it:PROVIDED-SERVICE-INSTANCES>
+                                    <it:PROVIDED-SERVICE-INSTANCE ID="PSI_ETS_TCP">
+                                        <it:INSTANCE-IDENTIFIER>1</it:INSTANCE-IDENTIFIER>
+                                        <service:SERVICE-INTERFACE-REF ID-REF="SVC_ETS"/>
+                                        <it:EVENT-HANDLERS>
+                                            <it:EVENT-HANDLER>
+                                                <it:CONSUMED-EVENT-GROUP-REFS>
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_EG_ALL_TCP"/>
+                                                </it:CONSUMED-EVENT-GROUP-REFS>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_ETS_TCP"/>
+                                            </it:EVENT-HANDLER>
+                                        </it:EVENT-HANDLERS>
+                                    </it:PROVIDED-SERVICE-INSTANCE>
+                                </it:PROVIDED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                        </it:APPLICATION-ENDPOINTS>
+
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <!-- Consumer ECU subscribing to all 3 eventgroups of ETS -->
+            <fx:ECU ID="ECU_ETS_CONSUMER">
+                <ho:SHORT-NAME>ECU_ETS_CONSUMER</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_ETS_CONSUMER">
+                        <ho:SHORT-NAME>ETS_Consumer_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_ETS_CONSUMER" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_ETS_VLAN"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ETS_CONSUMER"/>
+
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_ETS_CONSUMER">
+                                <ho:SHORT-NAME>ETS_Consumer_NEP</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.200.2</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                            <it:NETWORK-ENDPOINT ID="NEP_ETS_CONSUMER_MCAST">
+                                <ho:SHORT-NAME>ETS_Consumer_NEP_Mcast</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>224.1.2.3</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+
+                        <it:APPLICATION-ENDPOINTS>
+                            <it:APPLICATION-ENDPOINT ID="AEP_ETS_CONSUMER">
+                                <ho:SHORT-NAME>ETS_Consumer_AEP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30491</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_ETS_CONSUMER"/>
+                                <it:CONSUMED-SERVICE-INSTANCES>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_ETS">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_ETS"/>
+                                        <it:CONSUMED-EVENT-GROUPS>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_EG_ALL">
+                                                <service:EVENT-GROUP-REF ID-REF="EG_ALL"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_ETS_CONSUMER"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_EG_UNRELIABLE">
+                                                <service:EVENT-GROUP-REF ID-REF="EG_UNRELIABLE"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_ETS_CONSUMER"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                        </it:CONSUMED-EVENT-GROUPS>
+                                    </it:CONSUMED-SERVICE-INSTANCE>
+                                </it:CONSUMED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                            <it:APPLICATION-ENDPOINT ID="AEP_ETS_CONSUMER_TCP">
+                                <ho:SHORT-NAME>ETS_Consumer_AEP_TCP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:TCP-TP>
+                                        <it:TCP-PORT>
+                                            <it:PORT-NUMBER>30491</it:PORT-NUMBER>
+                                        </it:TCP-PORT>
+                                    </it:TCP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_ETS_CONSUMER"/>
+                                <it:CONSUMED-SERVICE-INSTANCES>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_ETS_TCP">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_ETS_TCP"/>
+                                        <it:CONSUMED-EVENT-GROUPS>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_EG_ALL_TCP">
+                                                <service:EVENT-GROUP-REF ID-REF="EG_ALL"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_ETS_CONSUMER_TCP"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                        </it:CONSUMED-EVENT-GROUPS>
+                                    </it:CONSUMED-SERVICE-INSTANCE>
+                                </it:CONSUMED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                            <it:APPLICATION-ENDPOINT ID="AEP_ETS_CONSUMER_MCAST">
+                                <ho:SHORT-NAME>ETS_Consumer_AEP_Mcast</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30555</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_ETS_CONSUMER_MCAST"/>
+                                <it:CONSUMED-SERVICE-INSTANCES>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_ETS_MCAST">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_ETS"/>
+                                        <it:CONSUMED-EVENT-GROUPS>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_EG_MULTICAST">
+                                                <service:EVENT-GROUP-REF ID-REF="EG_MULTICAST"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_ETS_CONSUMER_MCAST"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                        </it:CONSUMED-EVENT-GROUPS>
+                                    </it:CONSUMED-SERVICE-INSTANCE>
+                                </it:CONSUMED-SERVICE-INSTANCES>
                             </it:APPLICATION-ENDPOINT>
                         </it:APPLICATION-ENDPOINTS>
 
