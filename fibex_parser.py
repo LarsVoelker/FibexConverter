@@ -20,6 +20,7 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
 import importlib.util
+import ipaddress
 import os
 import sys
 import xml.etree.ElementTree
@@ -946,6 +947,8 @@ class FibexParser(AbstractParser):
         p["Name"] = self.get_child_text(param, "./ho:SHORT-NAME")
         p["Desc"] = self.element_text(param.find("./ho:DESC", self.__ns__))
         p["Mandatory"] = self.element_text(param.find("./service:MANDATORY", self.__ns__))
+        p["Mandatory"] = str(p["Mandatory"]).upper() == "TRUE"
+
         p["Position"] = self.element_text(param.find("./service:POSITION", self.__ns__))
         if p["Position"] is not None:
             p["Position"] = int(p["Position"])
@@ -1220,7 +1223,7 @@ class FibexParser(AbstractParser):
 
         mandatory = element.find("fx:MANDATORY", self.__ns__)
         if mandatory is not None:
-            mandatory = "true" == mandatory.text or "True" == mandatory.text or "TRUE" == mandatory.text
+            mandatory = str(mandatory.text).upper() == "TRUE"
         p["Mandatory"] = mandatory
 
         p["Utilization"] = self.parse_utilization(element)
@@ -1438,6 +1441,17 @@ class FibexParser(AbstractParser):
         # we could add code here to determine real port based on name
         return -1
 
+    @staticmethod
+    def convert_to_ip_address(ip, none_value, extra_info):
+        try:
+            if ip["addr"] is None:
+                return ipaddress.ip_address(none_value)
+            else:
+                return ipaddress.ip_address(ip["addr"])
+        except ValueError:
+            print(f"ERROR: FIBEX has illegal IP address definition: {ip} {extra_info}! Skipping!")
+        return None
+
     def parse_ecus(self, root):
         self.parse_psis(root)
         self.parse_csis_and_cegs(root)
@@ -1492,10 +1506,10 @@ class FibexParser(AbstractParser):
                     ips = []
                     if "ipsv4" in nep:
                         for ip in nep["ipsv4"]:
-                            ips += [ip["addr"]]
+                            ips.append(self.convert_to_ip_address(ip, "0.0.0.0", f"IPv4. ctrl: {ctrl["name"]}"))
                     if "ipsv6" in nep:
                         for ip in nep["ipsv6"]:
-                            ips += [ip["addr"]]
+                            ips.append(self.convert_to_ip_address(ip, "::0", f"IPv6. ctrl: {ctrl["name"]}"))
 
                     for ip in ips:
                         if ip not in interface_ips:
@@ -1510,21 +1524,23 @@ class FibexParser(AbstractParser):
                         sis, csis, ehs, cegs = [], [], [], []
 
                     aep_name = self.get_child_text(aep, "it:MANUFACTURER-EXTENSION/ho:SHORT-NAME")
+                    if aep_name is None:
+                        aep_name = self.get_child_text(aep, "ho:SHORT-NAME")
                     nepref = self.get_child_attribute(aep, "it:NETWORK-ENDPOINT-REF", "ID-REF")
 
                     if nepref in neps:
                         nep = neps[nepref]
                     else:
-                        nep = None
-                        print("ERROR in FIBEX: I cannot find NEP %s" % nepref)
+                        print("ERROR in FIBEX: I cannot find NEP %s — skipping AEP %s" % (nepref, aep_name))
+                        continue
 
                     ips = []
                     if "ipsv4" in nep:
                         for ip in nep["ipsv4"]:
-                            ips += [ip["addr"]]
+                            ips.append(self.convert_to_ip_address(ip, "0.0.0.0", f"IPv4. AEP: {aep_name}"))
                     if "ipsv6" in nep:
                         for ip in nep["ipsv6"]:
-                            ips += [ip["addr"]]
+                            ips.append(self.convert_to_ip_address(ip, "::0", f"IPv6. AEP: {aep_name}"))
 
                     udpport = self.get_child_text(
                         aep,
