@@ -74,7 +74,7 @@ def is_mac_mcast(mac):
 
     try:
         tmp = macaddress.EUI48(mac)
-    except ValueError:
+    except (ValueError, TypeError):
         return False
 
     return (tmp.__bytes__()[0] & 0x01) == 0x01
@@ -895,7 +895,13 @@ class BaseInterface(BaseItem):
     ):
         self.__vlanname__ = vlanname
         self.__sockets__ = sockets
-        self.__ips__ = ips
+        self.__ips__ = []
+
+        for ip in ips:
+            try:
+                self.__ips__.append(ipaddress.ip_address(ip))
+            except ValueError:
+                print(f"ERROR: parser return illegal IP Address {ip}! We will need to skip that.")
 
         self.__controller__ = None
 

@@ -493,7 +493,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def get_ipv4_netmask(self, ip):
         try:
-            return self.__ipv4_netmasks__.get(ip)
+            return self.__ipv4_netmasks__.get(str(ip))
         except ValueError:
             return None
 
@@ -623,7 +623,10 @@ class Interface(BaseInterface):
         for ip in sorted(self.ips(), key=lambda x: ip_to_key(x)):
             if is_ip(ip) and not is_ip_mcast(ip):
                 ret += (indent + 2) * " "
-                ret += f"IP: {ip}{factory.get_ipv4_netmask_or_ipv6_prefix_length(ip)}\n"
+                if ip.compressed in ("0.0.0.0", "::0", "::"):
+                    ret += f"IP: {ip.compressed}\n"
+                else:
+                    ret += f"IP: {ip.compressed}{factory.get_ipv4_netmask_or_ipv6_prefix_length(str(ip))}\n"
 
         for s in sorted(self.__sockets__, key=lambda x: (ip_to_key(x.ip()), x.portnumber())):
             ret += s.str(indent + 2)

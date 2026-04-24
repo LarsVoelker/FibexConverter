@@ -245,10 +245,10 @@ class MulticastPathEntry:
             f"{self.__sid_iid__:#08x}",
             self.__tx_swport__,
             self.__tx_socket__.interface().vlanid(),
-            self.__tx_socket__.ip(),
+            str(self.__tx_socket__.ip()),
             self.__rx_swport__,
             self.__rx_socket__.interface().vlanid(),
-            self.__rx_socket__.ip(),
+            str(self.__rx_socket__.ip()),
         ]
 
         return ret
@@ -844,7 +844,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def get_ipv4_netmask(self, ip):
         try:
-            return self.__ipv4_netmasks__.get(ip)
+            return self.__ipv4_netmasks__.get(str(ip))
         except ValueError:
             return None
 
@@ -928,10 +928,10 @@ class MulticastPath(BaseMulticastPath):
         ret = [
             self.switchport_tx_name(),
             self.vlanid(),
-            self.source_addr(),
+            str(self.source_addr()),
             self.switchport_rx_name(),
             self.vlanid(),
-            self.mc_addr(),
+            str(self.mc_addr()),
             f"{self.comment()}{self.sid_iids_to_string()}",
         ]
 
@@ -1137,7 +1137,7 @@ class Switch(BaseSwitch):
                     for sw_port in sw_ports:
                         portid = sw_port.portid(gen_name=g_gen_portid)
                         vlan_addresses = (ret.setdefault(portid, {})).setdefault(vlan_id, [])
-                        vlan_addresses.append(address)
+                        vlan_addresses.append(str(address))
 
             return ret
 
@@ -1447,7 +1447,7 @@ class ECU(BaseECU):
     def export_endpoints(self, factory, ret):
         for controller in sorted(self.__controllers__, key=lambda x: x.name()):
             for interface in sorted(controller.interfaces(), key=lambda x: x.vlanid()):
-                for ip in sorted(interface.ips()):
+                for ip in sorted(interface.ips(), key=lambda x: str(x)):
                     if ip is not None:
                         str_ip = str(ip)
                         str_netmask_prefix = factory.get_ipv4_netmask_or_ipv6_prefix_length(ip)
@@ -1480,7 +1480,7 @@ class Controller(BaseController):
                     if skip_multicast and is_mcast(address):
                         continue
 
-                    addresses.append(address)
+                    addresses.append(str(address))
 
             return ret
 
@@ -1813,6 +1813,7 @@ def main():
         conf_factory.extended_access_control_table(skip_multicast=True),
         xlsx_metadata,
     )
+
     with open(f"{aclfile2u}.json", "w") as f:
         tmp = conf_factory.extended_access_control_table(skip_multicast=True, file_format="json")
         json.dump(tmp, f, indent=4, sort_keys=True)
