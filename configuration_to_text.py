@@ -80,6 +80,7 @@ from parser_dispatcher import (
 
 g_gen_portid = False
 g_show_datatype = False
+g_skip_signal_based_communication = False
 
 
 class SimpleConfigurationFactory(BaseConfigurationFactory):
@@ -188,7 +189,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
         ret = SOMEIPService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
-        print(f"Adding Service(Name: {name} ID: 0x{serviceid:04x} Ver: {majorver:d}.{minorver:d})")
+        # print(f"Adding Service(Name: {name} ID: 0x{serviceid:04x} Ver: {majorver:d}.{minorver:d})")
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 
@@ -521,13 +522,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         for serviceid in sorted(self.__services__):
             ret += self.__services__[serviceid].str(2)
 
-        ret += "\nFrames: \n"
-        for name in sorted(self.__frames__):
-            ret += self.__frames__[name].str(2)
+        if not g_skip_signal_based_communication:
+            ret += "\nFrames: \n"
+            for name in sorted(self.__frames__):
+                ret += self.__frames__[name].str(2)
 
-        ret += "\nPDUs: \n"
-        for name in sorted(self.__pdus__):
-            ret += self.__pdus__[name].str(2)
+            ret += "\nPDUs: \n"
+            for name in sorted(self.__pdus__):
+                ret += self.__pdus__[name].str(2)
 
         ret += "\nECUs: \n"
         for name in sorted(self.__ecus__):
@@ -603,7 +605,7 @@ class Controller(BaseController):
     def str(self, indent, factory):
         ret = indent * " "
         ret += f"CTRL {self.__name__}\n"
-        for i in self.__interfaces__:
+        for i in sorted(self.__interfaces__, key=lambda x: x.vlanname()):
             ret += i.str(indent + 2, factory)
 
         return ret
@@ -623,7 +625,7 @@ class Interface(BaseInterface):
                 ret += (indent + 2) * " "
                 ret += f"IP: {ip}{factory.get_ipv4_netmask_or_ipv6_prefix_length(ip)}\n"
 
-        for s in self.__sockets__:
+        for s in sorted(self.__sockets__, key=lambda x: (ip_to_key(x.ip()), x.portnumber())):
             ret += s.str(indent + 2)
 
         if self.__frame_triggerings_in__ is not None and len(self.__frame_triggerings_in__.keys()) > 0:
@@ -645,14 +647,17 @@ class Socket(BaseSocket):
     def str(self, indent):
         ret = indent * " "
         ret += f"Socket {self.__name__} {self.__ip__}:{self.__portnumber__}/{self.__proto__}\n"
-        for i in self.__instances__:
+        for i in sorted(self.__instances__, key=lambda x: (x.service().serviceid(), x.instanceid())):
             ret += i.str(indent + 2)
-        for i in self.__instanceclients__:
+        for i in sorted(self.__instanceclients__, key=lambda x: (x.service().serviceid(), x.instanceid())):
             ret += i.str(indent + 2)
-        for c in self.__ehs__:
+        for c in sorted(self.__ehs__, key=lambda x: (x.serviceinstance().service().serviceid(), x.serviceinstance().instanceid(), x.eventgroupid())):
             ret += c.str(indent + 2)
-        for c in self.__cegs__:
-            ret += c.str(indent + 2)
+        if not self.is_multicast():
+            for c in sorted(
+                self.__cegs__, key=lambda x: (x.serviceinstance().service().serviceid(), x.serviceinstance().instanceid(), x.eventgroupid())
+            ):
+                ret += c.str(indent + 2)
 
         if len(self.__pdus_in__) > 0:
             ret += (indent + 2) * " " + "PDUs in:\n"
@@ -834,7 +839,8 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
             ret += (2 + indent) * " "
             ret += "Events: "
             first = True
-            for eid in sorted(self.__eventids__):
+            # ordered and unique
+            for eid in sorted(set(self.__eventids__)):
                 if not first:
                     ret += ", "
                 else:
@@ -846,7 +852,7 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
             ret += (2 + indent) * " "
             ret += "Notifiers: "
             first = True
-            for fid in sorted(self.__fieldids__):
+            for fid in sorted(set(self.__fieldids__)):
                 if not first:
                     ret += ", "
                 else:
@@ -864,7 +870,7 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
 class SOMEIPParameter(SOMEIPBaseParameter):
     def str(self, indent):
         ret = indent * " "
-        ret += f"Parameter {self.__position__:d} {self.__name__} (mandatory: {str(self.__mandatory__).lower()})\n"
+        ret += f"Parameter {self.__position__:d} {self.__name__} (mandatory: {self.__mandatory__})\n"
         if self.__datatype__ is None:
             ret += f"{(indent + 2) * ' '}None\n"
         else:
@@ -1244,6 +1250,7 @@ def parse_arguments():
         default=None,
     )
     parser.add_argument("--show-original-datatype", action="store_true")
+    parser.add_argument("--skip-signal-based-communication", action="store_true")
 
     args = parser.parse_args()
     return args
@@ -1252,12 +1259,14 @@ def parse_arguments():
 def main():
     global g_gen_portid
     global g_show_datatype
+    global g_skip_signal_based_communication
 
     print("Converting configuration to text")
     args = parse_arguments()
 
     g_gen_portid = args.generate_switch_port_names
     g_show_datatype = args.show_original_datatype
+    g_skip_signal_based_communication = args.skip_signal_based_communication
 
     ecu_name_mapping = {}
     if args.ecu_name_mapping is not None:
