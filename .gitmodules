@@ -1,0 +1,4 @@
+[submodule "external/FLYNC"]
+	path = external/FLYNC
+	url = https://github.com/LarsVoelker/FLYNC.git
+	branch = release-0.10-dirty-for-fibexconverter

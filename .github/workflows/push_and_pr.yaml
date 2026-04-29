@@ -77,6 +77,9 @@ jobs:
           pip install --upgrade pip
           pip install -r requirements.txt
           pip install -r tests/requirements.txt
+          git submodule init
+          git submodule update
+          pip install external/FLYNC/
 
       - name: Run pytest
         run: |
