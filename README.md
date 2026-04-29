@@ -1,6 +1,6 @@
 # FibexConverter
 
-Convert SOME/IP configuration from FIBEX 4 XML files (ASAM standard) to various output formats, including human-readable text, Wireshark dissector configs, CSV/XLSX reports, network topology visualizations, and Peach fuzzing definitions.
+Convert SOME/IP configuration from FIBEX 4 XML files (ASAM standard) to various output formats, including human-readable text, Wireshark dissector configs, CSV/XLSX reports, network topology visualizations, Peach fuzzing definitions, and FLYNC models.
 
 ## Installation
 
@@ -8,6 +8,9 @@ Install dependencies with:
 
     pip install -r requirements.txt
     pip install -r tests/requirements.txt
+    git submodule init
+    git submodule update
+    pip install external/FLYNC/
 
 Dependencies: `isodate`, `graphviz`, `macaddress`, `xlsxwriter`
 
@@ -112,6 +115,26 @@ Generates Peach framework XML files for SOME/IP fuzzing.
 
 ---
 
+### Convert to FLYNC model
+
+    python3 configuration_to_flync.py FIBEX example-file.xml
+
+Output:
+
+    example-file/flync/
+
+Generates a FLYNC workspace with ECU, socket, SOME/IP service, and topology models. Requires the FLYNC package (`pip install external/FLYNC/`).
+
+**Additional options:**
+
+| Option | Description |
+|--------|-------------|
+| `--mcast-list FILE` | Multicast entries (semicolon-separated) |
+| `--multicast-names FILE` | CSV file mapping multicast addresses to names |
+| `--generate-vlan-names` | Auto-generate VLAN names |
+
+---
+
 ## Examples
 
 The `examples/` directory contains ready-to-use FIBEX XML files:
@@ -135,7 +158,9 @@ Pre-generated outputs for `Ethernet_Topology_with_Switches.xml` are included in 
 | `configuration_to_reports.py` | Generate CSV/XLSX statistical reports |
 | `configuration_to_topology.py` | Generate network topology visualizations |
 | `configuration_to_peach.py` | Generate Peach fuzzing XML definitions |
+| `configuration_to_flync.py` | Convert to FLYNC model |
 | `fibex_parser.py` | FIBEX 4 XML parser |
+| `flync_parser.py` | FLYNC model parser |
 | `configuration_base_classes.py` | Shared data model and base classes |
 | `parser_dispatcher.py` | Routes input files to the appropriate parser |
 | `abstract_parser.py` | Abstract base class for XML parsing |
