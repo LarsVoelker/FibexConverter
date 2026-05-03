@@ -22,6 +22,7 @@
 import importlib.util
 import ipaddress
 import os
+import pprint
 import sys
 import xml.etree.ElementTree
 
@@ -260,8 +261,6 @@ class FibexParser(AbstractParser):
         coded_min_length = -1
         coded_max_length = -1
 
-        compu_scale = None
-
         ct = element.find("./ho:CODED-TYPE", self.__ns__)
         if ct is not None:
             coded_basetype = self.get_attribute(ct, "ho:BASE-DATA-TYPE")
@@ -282,42 +281,48 @@ class FibexParser(AbstractParser):
         if pt is not None:
             coded_basetype2 = self.get_attribute(pt, "ho:BASE-DATA-TYPE")
 
-        cs = element.find(
-            "./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:COMPU-INTERNAL-TO-PHYS/ho:COMPU-SCALES/ho:COMPU-SCALE/" "ho:COMPU-RATIONAL-COEFFS",
-            self.__ns__,
-        )
-        if cs is not None:
-            compu_scale = []
-            for num in cs.findall("./ho:COMPU-NUMERATOR/ho:V", self.__ns__):
-                compu_scale.append(float(num.text))
-            if len(compu_scale) != 2:
-                print(f"WARNING: We did not find to nums in the compu-numerator but {len(compu_scale)}!")
-            num = cs.find("./ho:COMPU-DENOMINATOR/ho:V", self.__ns__)
-            if num is not None:
-                compu_scale.append(float(num.text))
-            else:
-                compu_scale.append(None)
-
-        cm_cat = element.find("./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:CATEGORY", self.__ns__)
-
-        if cm_cat is not None:
-            cm_cat = cm_cat.text
-
+        compu_scale = None
         compu_consts = []
-        for cs in element.findall(
-            "./ho:COMPU-METHODS/ho:COMPU-METHOD/ho:COMPU-INTERNAL-TO-PHYS/ho:COMPU-SCALES/",
-            self.__ns__,
-        ):
+        cm_cat = ""
 
-            cc = cs.find("./ho:COMPU-CONST/ho:VT", self.__ns__)
+        for cm in element.findall("./ho:COMPU-METHODS/", self.__ns__):
+            cm_cat = self.get_child_text(cm, "ho:CATEGORY")
 
-            if cc is not None:
-                compu_const = (
-                    cc.text,
-                    self.get_child_text(cs, "ho:LOWER-LIMIT"),
-                    self.get_child_text(cs, "ho:UPPER-LIMIT"),
-                )
-                compu_consts.append(compu_const)
+            cs = cm.find(
+                "./ho:COMPU-INTERNAL-TO-PHYS/ho:COMPU-SCALES/ho:COMPU-SCALE/ho:COMPU-RATIONAL-COEFFS",
+                self.__ns__,
+            )
+            if cs is not None:
+                if compu_scale is not None:
+                    print(f"ERROR: I am overwritting the compu-scale! {name=}")
+
+                compu_scale = []
+                for num in cs.findall("./ho:COMPU-NUMERATOR/ho:V", self.__ns__):
+                    compu_scale.append(float(num.text))
+                if len(compu_scale) != 2:
+                    print(f"WARNING: We did not find to nums in the compu-numerator but {len(compu_scale)}!")
+                num = cs.find("./ho:COMPU-DENOMINATOR/ho:V", self.__ns__)
+                if num is not None:
+                    compu_scale.append(float(num.text))
+                else:
+                    compu_scale.append(None)
+
+            if cm_cat == "BITFIELD-TEXTTABLE":
+                print(f"WARNING: BITFIELD-TEXTTABLE is currently not supported! {name=}")
+            else:
+                for cs in cm.findall(
+                    "./ho:COMPU-INTERNAL-TO-PHYS/ho:COMPU-SCALES/",
+                    self.__ns__,
+                ):
+
+                    cc = cs.find("./ho:COMPU-CONST/ho:VT", self.__ns__)
+                    if cc is not None:
+                        compu_const = (
+                            cc.text,
+                            self.get_child_text(cs, "ho:LOWER-LIMIT"),
+                            self.get_child_text(cs, "ho:UPPER-LIMIT"),
+                        )
+                        compu_consts.append(compu_const)
 
         if id is None:
             print(f"ERROR: Coding does not have ID!\n{element.text}")
@@ -665,6 +670,10 @@ class FibexParser(AbstractParser):
                 items = {}
 
                 for name, value_min, value_max in coding1["CompuConsts"]:
+                    if coding1["CompuMethod_Category"] == "BITFIELD-TEXTTABLE":
+                        print(f"WARNING: BITFIELD-TEXTTABLE is not supported! Skipping {name}!")
+                        continue
+
                     if not value_min.isdigit() or not value_max.isdigit():
                         continue
 
@@ -1697,7 +1706,7 @@ class FibexParser(AbstractParser):
             print("*** Parsing Codings ***")
         self.parse_codings(root)
         if verbose:
-            print(self.__codings__)
+            pprint.pprint(self.__codings__)
             print("")
 
         if verbose:
