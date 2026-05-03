@@ -2272,6 +2272,18 @@ class BaseSignal(BaseItem):
             return float(num1) / float(denom)
         return 1
 
+    def scaler_raw(self):
+        if self.compu_scale() is not None and len(self.compu_scale()) == 3:
+            _, num1, _ = self.compu_scale()
+            return float(num1)
+        return 1
+
+    def denom_raw(self):
+        if self.compu_scale() is not None and len(self.compu_scale()) == 3:
+            _, _, denom = self.compu_scale()
+            return float(denom)
+        return 1
+
     def offset(self):
         if self.compu_scale() is not None and len(self.compu_scale()) == 3:
             num0, num1, denom = self.compu_scale()

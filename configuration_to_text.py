@@ -517,6 +517,17 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         return ""
 
+    @staticmethod
+    def dict_values_sorted_by_names(d):
+        keys = list(d.keys())
+        keys.sort(key=lambda x: d[x].name())
+
+        ret = []
+        for k in keys:
+            ret.append(d[k])
+
+        return ret
+
     def __str__(self):
         ret = "Services: \n"
         for serviceid in sorted(self.__services__):
@@ -524,16 +535,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         if not g_skip_signal_based_communication:
             ret += "\nFrames: \n"
-            for name in sorted(self.__frames__):
-                ret += self.__frames__[name].str(2)
+            for frame in self.dict_values_sorted_by_names(self.__frames__):
+                ret += frame.str(2)
 
             ret += "\nPDUs: \n"
-            for name in sorted(self.__pdus__):
-                ret += self.__pdus__[name].str(2)
+            for pdu in self.dict_values_sorted_by_names(self.__pdus__):
+                ret += pdu.str(2)
 
         ret += "\nECUs: \n"
-        for name in sorted(self.__ecus__):
-            ret += self.__ecus__[name].str(2, self)
+        for ecu in self.dict_values_sorted_by_names(self.__ecus__):
+            ret += ecu.str(2, self)
 
         ret += "\nChannels/Busses/VLANs: \n"
         for name in sorted(self.__channels__):
@@ -1040,17 +1051,20 @@ class SOMEIPParameterBitfieldItem(SOMEIPBaseParameterBitfieldItem):
 
 
 class Signal(BaseSignal):
-    def str(self, indent, indent_first_line=True, show_basetype=False):
+    def str(self, indent, indent_first_line=True):
         if indent_first_line:
             ret = indent * " "
         else:
             ret = ""
 
         ret += f"Signal {self.__name__}"
-        if show_basetype:
+        if g_show_datatype:
             ret += f" [{self.__basetype__}]"
         if self.__compu_scale__ is not None and len(self.__compu_scale__) == 3:
             ret += f", f(x) = {self.__compu_scale__[1]}/{self.__compu_scale__[2]} * x + {self.__compu_scale__[0]}"
+        else:
+            ret += f", f(x) = {1.0}/{1.0} * x + {0.0}"
+
         if self.__compu_consts__ is not None and len(self.__compu_consts__) > 0:
             ret += ", Consts: "
             first = True
@@ -1198,7 +1212,7 @@ class SignalInstance(BaseSignalInstance):
         else:
             bit_end = bit_start + bit_length - 1
             ret += f"[Bit pos.: {bit_start}..{bit_end}] "
-        ret += self.__signal__.str(indent + 2, indent_first_line=False, show_basetype=True)
+        ret += self.__signal__.str(indent + 2, indent_first_line=False)
         return ret
 
 

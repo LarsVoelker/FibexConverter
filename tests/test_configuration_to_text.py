@@ -465,10 +465,12 @@ class TestSignalAndSignalInstance:
         assert "TestSignal" in text
 
     def test_signal_str_with_basetype(self):
+        configuration_to_text.g_show_datatype = True
         signal = self.factory.create_signal("S1", "TestSignal", None, [], 8, 1, 8, "A_UINT8", 8)
-        text = signal.str(0, show_basetype=True)
+        text = signal.str(0)
         assert "TestSignal" in text
         assert "A_UINT8" in text
+        configuration_to_text.g_show_datatype = False
 
     def test_signal_str_with_compu_scale(self):
         signal = self.factory.create_signal("S1", "ScaledSignal", [1.0, 2.0, 3.0], [], 8, 1, 8, "A_UINT8", 8)
@@ -476,11 +478,11 @@ class TestSignalAndSignalInstance:
         assert "f(x)" in text
 
     def test_signal_str_compu_scale_not_three_elements(self):
-        """compu_scale with length != 3 must not add f(x)."""
+        """compu_scale with length != 3 adds default f(x)."""
         signal = self.factory.create_signal("S1", "Sig", [1.0, 0.0], [], 8, 1, 8, "A_UINT8", 8)
         text = signal.str(0)
         assert "Sig" in text
-        assert "f(x)" not in text
+        assert "f(x)" in text
 
     def test_signal_str_with_compu_consts(self):
         signal = self.factory.create_signal(
