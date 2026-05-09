@@ -1,0 +1,376 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    CAN FIBEX 4.1.2 Example
+
+    A simple CAN network with two ECUs transmitting frames and one ECU
+    receiving them.
+
+    Network:
+      - Cluster: CAN1 at 500 kbps (Classic CAN, ISO 11898-2)
+      - Channel: CAN1_CH
+
+    Frames:
+      - EngineStatus  (ID 0x100, 8 bytes)
+          EngineSpeed   bits  0-15  uint16  little-endian
+          CoolantTemp   bits 16-23  uint8
+          EngineLoad    bits 24-31  uint8
+
+      - BrakeStatus   (ID 0x200, 2 bytes)
+          BrakePressure bits  0-15  uint16  little-endian
+
+    ECUs:
+      - ECU_Engine    transmits EngineStatus
+      - ECU_Brake     transmits BrakeStatus
+      - ECU_Dashboard receives both frames
+-->
+<fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx"
+          xmlns:can="http://www.asam.net/xml/fbx/can"
+          xmlns:ho="http://www.asam.net/xml"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          VERSION="4.1.2">
+
+  <fx:PROJECT ID="CAN_Example_Project">
+    <ho:SHORT-NAME>CAN_Example</ho:SHORT-NAME>
+  </fx:PROJECT>
+
+  <fx:ELEMENTS>
+
+    <!-- ============================================================ -->
+    <!-- CLUSTERS                                                       -->
+    <!-- ============================================================ -->
+    <fx:CLUSTERS>
+      <fx:CLUSTER ID="CAN1">
+        <ho:SHORT-NAME>CAN1</ho:SHORT-NAME>
+        <ho:DESC>Classic CAN bus at 500 kbps</ho:DESC>
+        <fx:SPEED>500000</fx:SPEED>
+        <fx:IS-HIGH-LOW-BIT-ORDER>true</fx:IS-HIGH-LOW-BIT-ORDER>
+        <fx:BIT-COUNTING-POLICY>SAWTOOTH</fx:BIT-COUNTING-POLICY>
+        <fx:PROTOCOL xsi:type="can:PROTOCOL-TYPE">CAN</fx:PROTOCOL>
+        <fx:CHANNEL-REFS>
+          <fx:CHANNEL-REF ID-REF="CAN1_CH"/>
+        </fx:CHANNEL-REFS>
+        <fx:MEDIUM>ELECTRICAL</fx:MEDIUM>
+      </fx:CLUSTER>
+    </fx:CLUSTERS>
+
+    <!-- ============================================================ -->
+    <!-- CHANNELS                                                       -->
+    <!-- ============================================================ -->
+    <fx:CHANNELS>
+      <fx:CHANNEL ID="CAN1_CH">
+        <ho:SHORT-NAME>CAN1_CH</ho:SHORT-NAME>
+        <fx:FRAME-TRIGGERINGS>
+
+          <!-- EngineStatus frame triggering (CAN frames have no schema-level TIMINGS) -->
+          <fx:FRAME-TRIGGERING ID="FT_EngineStatus">
+            <fx:IDENTIFIER>
+              <fx:IDENTIFIER-VALUE>256</fx:IDENTIFIER-VALUE>
+            </fx:IDENTIFIER>
+            <fx:FRAME-REF ID-REF="FR_EngineStatus"/>
+            <fx:CAN-FRAME-RX-BEHAVIOR>CAN-20</fx:CAN-FRAME-RX-BEHAVIOR>
+            <fx:CAN-FRAME-TX-BEHAVIOR>CAN-20</fx:CAN-FRAME-TX-BEHAVIOR>
+          </fx:FRAME-TRIGGERING>
+
+          <!-- BrakeStatus frame triggering -->
+          <fx:FRAME-TRIGGERING ID="FT_BrakeStatus">
+            <fx:IDENTIFIER>
+              <fx:IDENTIFIER-VALUE>512</fx:IDENTIFIER-VALUE>
+            </fx:IDENTIFIER>
+            <fx:FRAME-REF ID-REF="FR_BrakeStatus"/>
+            <fx:CAN-FRAME-RX-BEHAVIOR>CAN-20</fx:CAN-FRAME-RX-BEHAVIOR>
+            <fx:CAN-FRAME-TX-BEHAVIOR>CAN-20</fx:CAN-FRAME-TX-BEHAVIOR>
+          </fx:FRAME-TRIGGERING>
+
+        </fx:FRAME-TRIGGERINGS>
+      </fx:CHANNEL>
+    </fx:CHANNELS>
+
+    <!-- ============================================================ -->
+    <!-- ECUS (must appear before PDUS and FRAMES in FIBEX 4.1.2)     -->
+    <!-- ============================================================ -->
+    <fx:ECUS>
+
+      <!-- ECU_Engine: transmits EngineStatus -->
+      <fx:ECU ID="ECU_Engine">
+        <ho:SHORT-NAME>ECU_Engine</ho:SHORT-NAME>
+        <ho:DESC>Engine control unit — transmits EngineStatus</ho:DESC>
+        <fx:CONTROLLERS>
+          <fx:CONTROLLER ID="ECU_Engine_Ctrl" xsi:type="can:CONTROLLER-TYPE">
+            <ho:SHORT-NAME>ECU_Engine_Ctrl</ho:SHORT-NAME>
+            <can:CAN-BIT-TIMING>
+              <can:TIME-SEG0>5</can:TIME-SEG0>
+              <can:TIME-SEG1>4</can:TIME-SEG1>
+              <can:SYNC-JUMP-WIDTH>1</can:SYNC-JUMP-WIDTH>
+            </can:CAN-BIT-TIMING>
+          </fx:CONTROLLER>
+        </fx:CONTROLLERS>
+        <fx:CONNECTORS>
+          <fx:CONNECTOR ID="ECU_Engine_Conn">
+            <fx:CHANNEL-REF ID-REF="CAN1_CH"/>
+            <fx:CONTROLLER-REF ID-REF="ECU_Engine_Ctrl"/>
+            <fx:OUTPUTS>
+              <fx:OUTPUT-PORT ID="ECU_Engine_Out_EngineStatus">
+                <fx:FRAME-TRIGGERING-REF ID-REF="FT_EngineStatus"/>
+                <fx:COMPLETE-FRAME/>
+              </fx:OUTPUT-PORT>
+            </fx:OUTPUTS>
+          </fx:CONNECTOR>
+        </fx:CONNECTORS>
+      </fx:ECU>
+
+      <!-- ECU_Brake: transmits BrakeStatus -->
+      <fx:ECU ID="ECU_Brake">
+        <ho:SHORT-NAME>ECU_Brake</ho:SHORT-NAME>
+        <ho:DESC>Brake control unit — transmits BrakeStatus</ho:DESC>
+        <fx:CONTROLLERS>
+          <fx:CONTROLLER ID="ECU_Brake_Ctrl" xsi:type="can:CONTROLLER-TYPE">
+            <ho:SHORT-NAME>ECU_Brake_Ctrl</ho:SHORT-NAME>
+            <can:CAN-BIT-TIMING>
+              <can:TIME-SEG0>5</can:TIME-SEG0>
+              <can:TIME-SEG1>4</can:TIME-SEG1>
+              <can:SYNC-JUMP-WIDTH>1</can:SYNC-JUMP-WIDTH>
+            </can:CAN-BIT-TIMING>
+          </fx:CONTROLLER>
+        </fx:CONTROLLERS>
+        <fx:CONNECTORS>
+          <fx:CONNECTOR ID="ECU_Brake_Conn">
+            <fx:CHANNEL-REF ID-REF="CAN1_CH"/>
+            <fx:CONTROLLER-REF ID-REF="ECU_Brake_Ctrl"/>
+            <fx:OUTPUTS>
+              <fx:OUTPUT-PORT ID="ECU_Brake_Out_BrakeStatus">
+                <fx:FRAME-TRIGGERING-REF ID-REF="FT_BrakeStatus"/>
+                <fx:COMPLETE-FRAME/>
+              </fx:OUTPUT-PORT>
+            </fx:OUTPUTS>
+          </fx:CONNECTOR>
+        </fx:CONNECTORS>
+      </fx:ECU>
+
+      <!-- ECU_Dashboard: receives both frames -->
+      <fx:ECU ID="ECU_Dashboard">
+        <ho:SHORT-NAME>ECU_Dashboard</ho:SHORT-NAME>
+        <ho:DESC>Dashboard unit — receives EngineStatus and BrakeStatus</ho:DESC>
+        <fx:CONTROLLERS>
+          <fx:CONTROLLER ID="ECU_Dashboard_Ctrl" xsi:type="can:CONTROLLER-TYPE">
+            <ho:SHORT-NAME>ECU_Dashboard_Ctrl</ho:SHORT-NAME>
+            <can:CAN-BIT-TIMING>
+              <can:TIME-SEG0>5</can:TIME-SEG0>
+              <can:TIME-SEG1>4</can:TIME-SEG1>
+              <can:SYNC-JUMP-WIDTH>1</can:SYNC-JUMP-WIDTH>
+            </can:CAN-BIT-TIMING>
+          </fx:CONTROLLER>
+        </fx:CONTROLLERS>
+        <fx:CONNECTORS>
+          <fx:CONNECTOR ID="ECU_Dashboard_Conn">
+            <fx:CHANNEL-REF ID-REF="CAN1_CH"/>
+            <fx:CONTROLLER-REF ID-REF="ECU_Dashboard_Ctrl"/>
+            <fx:INPUTS>
+              <fx:INPUT-PORT ID="ECU_Dashboard_In_EngineStatus">
+                <fx:FRAME-TRIGGERING-REF ID-REF="FT_EngineStatus"/>
+                <fx:COMPLETE-FRAME/>
+              </fx:INPUT-PORT>
+              <fx:INPUT-PORT ID="ECU_Dashboard_In_BrakeStatus">
+                <fx:FRAME-TRIGGERING-REF ID-REF="FT_BrakeStatus"/>
+                <fx:COMPLETE-FRAME/>
+              </fx:INPUT-PORT>
+            </fx:INPUTS>
+          </fx:CONNECTOR>
+        </fx:CONNECTORS>
+      </fx:ECU>
+
+    </fx:ECUS>
+
+    <!-- ============================================================ -->
+    <!-- PDUS — signal containers embedded in frames                   -->
+    <!-- ============================================================ -->
+    <fx:PDUS>
+
+      <!-- PDU carrying EngineStatus signals (8 bytes) -->
+      <fx:PDU ID="PDU_EngineStatus">
+        <ho:SHORT-NAME>PDU_EngineStatus</ho:SHORT-NAME>
+        <fx:BYTE-LENGTH>8</fx:BYTE-LENGTH>
+        <fx:PDU-TYPE>APPLICATION</fx:PDU-TYPE>
+        <fx:SIGNAL-INSTANCES>
+
+          <!-- EngineSpeed: bits 0-15, little-endian uint16 -->
+          <fx:SIGNAL-INSTANCE ID="SI_EngineSpeed">
+            <fx:BIT-POSITION>0</fx:BIT-POSITION>
+            <fx:IS-HIGH-LOW-BYTE-ORDER>false</fx:IS-HIGH-LOW-BYTE-ORDER>
+            <fx:SIGNAL-REF ID-REF="SIG_EngineSpeed"/>
+          </fx:SIGNAL-INSTANCE>
+
+          <!-- CoolantTemp: bits 16-23, uint8 -->
+          <fx:SIGNAL-INSTANCE ID="SI_CoolantTemp">
+            <fx:BIT-POSITION>16</fx:BIT-POSITION>
+            <fx:IS-HIGH-LOW-BYTE-ORDER>false</fx:IS-HIGH-LOW-BYTE-ORDER>
+            <fx:SIGNAL-REF ID-REF="SIG_CoolantTemp"/>
+          </fx:SIGNAL-INSTANCE>
+
+          <!-- EngineLoad: bits 24-31, uint8 -->
+          <fx:SIGNAL-INSTANCE ID="SI_EngineLoad">
+            <fx:BIT-POSITION>24</fx:BIT-POSITION>
+            <fx:IS-HIGH-LOW-BYTE-ORDER>false</fx:IS-HIGH-LOW-BYTE-ORDER>
+            <fx:SIGNAL-REF ID-REF="SIG_EngineLoad"/>
+          </fx:SIGNAL-INSTANCE>
+
+        </fx:SIGNAL-INSTANCES>
+      </fx:PDU>
+
+      <!-- PDU carrying BrakeStatus signals (2 bytes) -->
+      <fx:PDU ID="PDU_BrakeStatus">
+        <ho:SHORT-NAME>PDU_BrakeStatus</ho:SHORT-NAME>
+        <fx:BYTE-LENGTH>2</fx:BYTE-LENGTH>
+        <fx:PDU-TYPE>APPLICATION</fx:PDU-TYPE>
+        <fx:SIGNAL-INSTANCES>
+
+          <!-- BrakePressure: bits 0-15, little-endian uint16 -->
+          <fx:SIGNAL-INSTANCE ID="SI_BrakePressure">
+            <fx:BIT-POSITION>0</fx:BIT-POSITION>
+            <fx:IS-HIGH-LOW-BYTE-ORDER>false</fx:IS-HIGH-LOW-BYTE-ORDER>
+            <fx:SIGNAL-REF ID-REF="SIG_BrakePressure"/>
+          </fx:SIGNAL-INSTANCE>
+
+        </fx:SIGNAL-INSTANCES>
+      </fx:PDU>
+
+    </fx:PDUS>
+
+    <!-- ============================================================ -->
+    <!-- FRAMES                                                         -->
+    <!-- ============================================================ -->
+    <fx:FRAMES>
+
+      <!-- EngineStatus: 8-byte frame containing one PDU -->
+      <fx:FRAME ID="FR_EngineStatus">
+        <ho:SHORT-NAME>EngineStatus</ho:SHORT-NAME>
+        <ho:DESC>Engine status frame transmitted by ECU_Engine</ho:DESC>
+        <fx:BYTE-LENGTH>8</fx:BYTE-LENGTH>
+        <fx:PDU-INSTANCES>
+          <fx:PDU-INSTANCE ID="PDU_INST_EngineStatus">
+            <fx:PDU-REF ID-REF="PDU_EngineStatus"/>
+            <fx:BIT-POSITION>0</fx:BIT-POSITION>
+            <fx:IS-HIGH-LOW-BYTE-ORDER>false</fx:IS-HIGH-LOW-BYTE-ORDER>
+          </fx:PDU-INSTANCE>
+        </fx:PDU-INSTANCES>
+      </fx:FRAME>
+
+      <!-- BrakeStatus: 2-byte frame containing one PDU -->
+      <fx:FRAME ID="FR_BrakeStatus">
+        <ho:SHORT-NAME>BrakeStatus</ho:SHORT-NAME>
+        <ho:DESC>Brake status frame transmitted by ECU_Brake</ho:DESC>
+        <fx:BYTE-LENGTH>2</fx:BYTE-LENGTH>
+        <fx:PDU-INSTANCES>
+          <fx:PDU-INSTANCE ID="PDU_INST_BrakeStatus">
+            <fx:PDU-REF ID-REF="PDU_BrakeStatus"/>
+            <fx:BIT-POSITION>0</fx:BIT-POSITION>
+            <fx:IS-HIGH-LOW-BYTE-ORDER>false</fx:IS-HIGH-LOW-BYTE-ORDER>
+          </fx:PDU-INSTANCE>
+        </fx:PDU-INSTANCES>
+      </fx:FRAME>
+
+    </fx:FRAMES>
+
+    <!-- ============================================================ -->
+    <!-- SIGNALS                                                        -->
+    <!-- ============================================================ -->
+    <fx:SIGNALS>
+
+      <fx:SIGNAL ID="SIG_EngineSpeed">
+        <ho:SHORT-NAME>EngineSpeed</ho:SHORT-NAME>
+        <ho:DESC>Engine speed in rpm</ho:DESC>
+        <fx:CODING-REF ID-REF="COD_UINT16_12"/>
+      </fx:SIGNAL>
+
+      <fx:SIGNAL ID="SIG_CoolantTemp">
+        <ho:SHORT-NAME>CoolantTemp</ho:SHORT-NAME>
+        <ho:DESC>Coolant temperature in deg C (offset -40)</ho:DESC>
+        <fx:CODING-REF ID-REF="COD_UINT8_4"/>
+      </fx:SIGNAL>
+
+      <fx:SIGNAL ID="SIG_EngineLoad">
+        <ho:SHORT-NAME>EngineLoad</ho:SHORT-NAME>
+        <ho:DESC>Engine load in percent</ho:DESC>
+        <fx:CODING-REF ID-REF="COD_UINT8_4"/>
+      </fx:SIGNAL>
+
+      <fx:SIGNAL ID="SIG_BrakePressure">
+        <ho:SHORT-NAME>BrakePressure</ho:SHORT-NAME>
+        <ho:DESC>Brake pressure in kPa</ho:DESC>
+        <fx:CODING-REF ID-REF="COD_UINT16_12"/>
+      </fx:SIGNAL>
+
+    </fx:SIGNALS>
+
+  </fx:ELEMENTS>
+
+  <!-- ============================================================== -->
+  <!-- PROCESSING-INFORMATION: signal codings                          -->
+  <!-- ============================================================== -->
+  <fx:PROCESSING-INFORMATION>
+    <fx:CODINGS>
+
+      <!-- 12-bit unsigned integer with linear scaling: physical = 0.5 * raw -->
+      <fx:CODING ID="COD_UINT16_12">
+        <ho:SHORT-NAME>UINT16</ho:SHORT-NAME>
+        <ho:CODED-TYPE ho:BASE-DATA-TYPE="A_UINT16" CATEGORY="STANDARD-LENGTH-TYPE">
+          <ho:BIT-LENGTH>12</ho:BIT-LENGTH>
+        </ho:CODED-TYPE>
+        <ho:COMPU-METHODS>
+          <ho:COMPU-METHOD>
+            <ho:SHORT-NAME>Linear_0_5</ho:SHORT-NAME>
+            <ho:CATEGORY>LINEAR</ho:CATEGORY>
+            <ho:COMPU-INTERNAL-TO-PHYS>
+              <ho:COMPU-SCALES>
+                <ho:COMPU-SCALE>
+                  <ho:COMPU-RATIONAL-COEFFS>
+                    <ho:COMPU-NUMERATOR>
+                      <ho:V>0.0</ho:V>
+                      <ho:V>0.5</ho:V>
+                    </ho:COMPU-NUMERATOR>
+                    <ho:COMPU-DENOMINATOR>
+                      <ho:V>1.0</ho:V>
+                    </ho:COMPU-DENOMINATOR>
+                  </ho:COMPU-RATIONAL-COEFFS>
+                </ho:COMPU-SCALE>
+              </ho:COMPU-SCALES>
+            </ho:COMPU-INTERNAL-TO-PHYS>
+          </ho:COMPU-METHOD>
+        </ho:COMPU-METHODS>
+      </fx:CODING>
+
+      <!-- 4-bit unsigned integer with named constants (no linear scaling) -->
+      <fx:CODING ID="COD_UINT8_4">
+        <ho:SHORT-NAME>UINT8</ho:SHORT-NAME>
+        <ho:CODED-TYPE ho:BASE-DATA-TYPE="A_UINT8" CATEGORY="STANDARD-LENGTH-TYPE">
+          <ho:BIT-LENGTH>4</ho:BIT-LENGTH>
+        </ho:CODED-TYPE>
+        <ho:COMPU-METHODS>
+          <ho:COMPU-METHOD>
+            <ho:SHORT-NAME>UINT8_Consts</ho:SHORT-NAME>
+            <ho:CATEGORY>TEXTTABLE</ho:CATEGORY>
+            <ho:COMPU-INTERNAL-TO-PHYS>
+              <ho:COMPU-SCALES>
+                <ho:COMPU-SCALE>
+                  <ho:LOWER-LIMIT>0</ho:LOWER-LIMIT>
+                  <ho:UPPER-LIMIT>0</ho:UPPER-LIMIT>
+                  <ho:COMPU-CONST>
+                    <ho:VT>ERROR</ho:VT>
+                  </ho:COMPU-CONST>
+                </ho:COMPU-SCALE>
+                <ho:COMPU-SCALE>
+                  <ho:LOWER-LIMIT>1</ho:LOWER-LIMIT>
+                  <ho:UPPER-LIMIT>1</ho:UPPER-LIMIT>
+                  <ho:COMPU-CONST>
+                    <ho:VT>NOT_AVAILABLE</ho:VT>
+                  </ho:COMPU-CONST>
+                </ho:COMPU-SCALE>
+              </ho:COMPU-SCALES>
+            </ho:COMPU-INTERNAL-TO-PHYS>
+          </ho:COMPU-METHOD>
+        </ho:COMPU-METHODS>
+      </fx:CODING>
+
+    </fx:CODINGS>
+  </fx:PROCESSING-INFORMATION>
+
+</fx:FIBEX>
