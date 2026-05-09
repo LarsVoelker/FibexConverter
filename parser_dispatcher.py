@@ -24,8 +24,9 @@ import os.path
 import sys
 
 from fibex_parser import FibexParser
+from flync_parser import FlyncParser
 
-parser_formats = ["FIBEX"]
+parser_formats = ["FIBEX", "FLYNC"]
 
 
 def is_file_or_dir_valid(parser, arg):
@@ -52,6 +53,16 @@ def parse_input_files(
     file_filter="",
     verbose=False,
 ):
+    if t.upper() == "FLYNC":
+        if not os.path.isdir(filename):
+            print(f"FLYNC type requires a workspace directory, not a file: {filename}")
+            sys.exit(-2)
+        output_dir = filename.rstrip(os.sep) + "_output"
+        parser = FlyncParser()
+        parser.parse_dir(conf_factory, filename, verbose=verbose)
+        conf_factory.parsing_done()
+        return output_dir
+
     if file_filter == "":
         if t.upper() == "FIBEX":
             file_filter = "/**/FBX*.xml"

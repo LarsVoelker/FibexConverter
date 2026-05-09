@@ -73,10 +73,13 @@ jobs:
 
       - name: Prepare
         run: |
+          git submodule init
+          git submodule update
           sudo apt-get install -y graphviz
           pip install --upgrade pip
           pip install uv
           uv sync
+          uv pip install external/FLYNC
 
       - name: Run pytest
         run: |
