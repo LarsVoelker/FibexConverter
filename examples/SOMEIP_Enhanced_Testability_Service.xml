@@ -1569,7 +1569,7 @@
             </fx:DATATYPE>
 
             <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_BOOL">
-                <ho:SHORT-NAME>BOOLEAN</ho:SHORT-NAME>
+                <ho:SHORT-NAME>BOOL</ho:SHORT-NAME>
                 <fx:CODING-REF ID-REF="COD_BOOL"/>
             </fx:DATATYPE>
 
@@ -1717,63 +1717,63 @@
         <fx:CODINGS>
 
             <fx:CODING ID="COD_UINT8">
-                <ho:SHORT-NAME>UINT8Coding</ho:SHORT-NAME>
+                <ho:SHORT-NAME>UINT8</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT8">
                     <ho:BIT-LENGTH>8</ho:BIT-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
 
             <fx:CODING ID="COD_UINT16">
-                <ho:SHORT-NAME>UINT16Coding</ho:SHORT-NAME>
+                <ho:SHORT-NAME>UINT16</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT16">
                     <ho:BIT-LENGTH>16</ho:BIT-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
 
             <fx:CODING ID="COD_UINT32">
-                <ho:SHORT-NAME>UINT32Coding</ho:SHORT-NAME>
+                <ho:SHORT-NAME>UINT32</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT32">
                     <ho:BIT-LENGTH>32</ho:BIT-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
 
             <fx:CODING ID="COD_INT8">
-                <ho:SHORT-NAME>INT8Coding</ho:SHORT-NAME>
+                <ho:SHORT-NAME>INT8</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_INT8">
                     <ho:BIT-LENGTH>8</ho:BIT-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
 
             <fx:CODING ID="COD_INT16">
-                <ho:SHORT-NAME>INT16Coding</ho:SHORT-NAME>
+                <ho:SHORT-NAME>INT16</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_INT16">
                     <ho:BIT-LENGTH>16</ho:BIT-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
 
             <fx:CODING ID="COD_INT32">
-                <ho:SHORT-NAME>INT32Coding</ho:SHORT-NAME>
+                <ho:SHORT-NAME>INT32</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_INT32">
                     <ho:BIT-LENGTH>32</ho:BIT-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
 
             <fx:CODING ID="COD_INT64">
-                <ho:SHORT-NAME>INT64Coding</ho:SHORT-NAME>
+                <ho:SHORT-NAME>INT64</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_INT64">
                     <ho:BIT-LENGTH>64</ho:BIT-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
 
             <fx:CODING ID="COD_FLOAT32">
-                <ho:SHORT-NAME>FLOAT32Coding</ho:SHORT-NAME>
+                <ho:SHORT-NAME>FLOAT32</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_FLOAT32">
                     <ho:BIT-LENGTH>32</ho:BIT-LENGTH>
                 </ho:CODED-TYPE>
             </fx:CODING>
 
             <fx:CODING ID="COD_FLOAT64">
-                <ho:SHORT-NAME>FLOAT64Coding</ho:SHORT-NAME>
+                <ho:SHORT-NAME>FLOAT64</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_FLOAT64">
                     <ho:BIT-LENGTH>64</ho:BIT-LENGTH>
                 </ho:CODED-TYPE>
@@ -1781,7 +1781,7 @@
 
             <!-- Boolean is modeled as UINT8 since the parser only recognizes integer/float/string types -->
             <fx:CODING ID="COD_BOOL">
-                <ho:SHORT-NAME>BOOLCoding</ho:SHORT-NAME>
+                <ho:SHORT-NAME>BOOL</ho:SHORT-NAME>
                 <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT8">
                     <ho:BIT-LENGTH>8</ho:BIT-LENGTH>
                 </ho:CODED-TYPE>

@@ -1,0 +1,682 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Ethernet topology with two switches hosted on the same ECU, plus SOME/IP services.
+    Network layout:
+
+        ECU_A ── Switch1 ── Switch2 ── ECU_B
+                  (ECU_DUAL_SW)
+                  CPU: CTRL_SW1   CPU: CTRL_SW2
+
+    Switch1 and Switch2 are both hosted on ECU_DUAL_SW.
+    The two switches are connected to each other (intra-ECU switch-to-switch link).
+    Each switch has one CPU port connecting to a local management controller and
+    one external port connecting to an endpoint ECU.
+
+    Services:
+      SVC_A (0x1000, v1.0): provided by ECU_A, consumed by ECU_B
+      SVC_B (0x1001, v1.0): provided by ECU_B, consumed by ECU_A
+-->
+<fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx"
+          xmlns:ho="http://www.asam.net/xml"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:ethernet="http://www.asam.net/xml/fbx/ethernet"
+          xmlns:service="http://www.asam.net/xml/fbx/services"
+          xmlns:it="http://www.asam.net/xml/fbx/it"
+          VERSION="4.1.2">
+
+    <fx:PROJECT ID="PROJ_DUAL_SWITCH">
+        <ho:SHORT-NAME>DualSwitchSameECUTest</ho:SHORT-NAME>
+    </fx:PROJECT>
+
+    <fx:ELEMENTS>
+
+        <fx:CHANNELS>
+            <!-- VLAN10: ECU_A access VLAN -->
+            <fx:CHANNEL ID="CHAN_VLAN10" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN10</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN10">
+                    <ho:SHORT-NAME>VLAN10</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>10</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+            <!-- VLAN20: ECU_B access VLAN -->
+            <fx:CHANNEL ID="CHAN_VLAN20" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN20</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN20">
+                    <ho:SHORT-NAME>VLAN20</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>20</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+            <!-- VLAN30: inter-switch trunk carrying both user VLANs -->
+            <fx:CHANNEL ID="CHAN_VLAN30" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN30</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN30">
+                    <ho:SHORT-NAME>VLAN30</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>30</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+            <!-- VLAN18: management VLAN for switch CPU ports -->
+            <fx:CHANNEL ID="CHAN_VLAN18" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN18</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN18">
+                    <ho:SHORT-NAME>VLAN18</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>18</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+        </fx:CHANNELS>
+
+        <fx:COUPLING-ELEMENTS>
+
+            <!-- Switch1 hosted on ECU_DUAL_SW -->
+            <fx:COUPLING-ELEMENT ID="CE_SWITCH1" xsi:type="ethernet:COUPLING-ELEMENT-TYPE">
+                <ho:SHORT-NAME>Switch1</ho:SHORT-NAME>
+                <fx:CLUSTER-REF ID-REF="CLUSTER_ETH"/>
+                <fx:ECU-REF ID-REF="ECU_DUAL_SW"/>
+                <fx:COUPLING-PORTS>
+
+                    <!-- Port 1: external — connected to ECU_A's controller on VLAN10,VLAN18 -->
+                    <fx:COUPLING-PORT ID="SW1_PORT1" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_A"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 2: inter-switch trunk — connected to Switch2 Port1 on VLAN10,VLAN20,VLAN30,VLAN18 -->
+                    <fx:COUPLING-PORT ID="SW1_PORT2" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:COUPLING-PORT-REF ID-REF="SW2_PORT1"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN30"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN30"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 3: CPU port — connected to Switch1 management controller on VLAN18 -->
+                    <fx:COUPLING-PORT ID="SW1_PORT3" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_SW1"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                </fx:COUPLING-PORTS>
+                <ethernet:COUPLING-ELEMENT-TYPE>SWITCH</ethernet:COUPLING-ELEMENT-TYPE>
+            </fx:COUPLING-ELEMENT>
+
+            <!-- Switch2 also hosted on ECU_DUAL_SW (same ECU as Switch1) -->
+            <fx:COUPLING-ELEMENT ID="CE_SWITCH2" xsi:type="ethernet:COUPLING-ELEMENT-TYPE">
+                <ho:SHORT-NAME>Switch2</ho:SHORT-NAME>
+                <fx:CLUSTER-REF ID-REF="CLUSTER_ETH"/>
+                <fx:ECU-REF ID-REF="ECU_DUAL_SW"/>
+                <fx:COUPLING-PORTS>
+
+                    <!-- Port 1: inter-switch trunk — connected to Switch1 Port2 on VLAN10,VLAN20,VLAN30,VLAN18 -->
+                    <fx:COUPLING-PORT ID="SW2_PORT1" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:COUPLING-PORT-REF ID-REF="SW1_PORT2"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN30"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN30"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 2: external — connected to ECU_B's controller on VLAN20,VLAN18 -->
+                    <fx:COUPLING-PORT ID="SW2_PORT2" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_B"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                    <!-- Port 3: CPU port — connected to Switch2 management controller on VLAN18 -->
+                    <fx:COUPLING-PORT ID="SW2_PORT3" xsi:type="ethernet:COUPLING-PORT-TYPE">
+                        <fx:CONTROLLER-REF ID-REF="CTRL_SW2"/>
+                        <ethernet:VLAN-MEMBERSHIPS>
+                            <ethernet:VLAN-MEMBERSHIP>
+                                <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                                <ethernet:DEFAULT-PRIORITY>
+                                    <fx:PRIORITY>0</fx:PRIORITY>
+                                </ethernet:DEFAULT-PRIORITY>
+                            </ethernet:VLAN-MEMBERSHIP>
+                        </ethernet:VLAN-MEMBERSHIPS>
+                        <ethernet:DEFAULT-VLAN>
+                            <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        </ethernet:DEFAULT-VLAN>
+                    </fx:COUPLING-PORT>
+
+                </fx:COUPLING-PORTS>
+                <ethernet:COUPLING-ELEMENT-TYPE>SWITCH</ethernet:COUPLING-ELEMENT-TYPE>
+            </fx:COUPLING-ELEMENT>
+
+        </fx:COUPLING-ELEMENTS>
+
+        <fx:ECUS>
+
+            <!-- ECU_DUAL_SW: hosts both Switch1 and Switch2 -->
+            <!-- Socket 1 (AEP_DSW_CONSUME_A): Ctrl1 consumes SVC_A on UDP:30000 -->
+            <!-- Socket 2 (AEP_DSW_CONSUME_B): Ctrl2 consumes SVC_B on UDP:30000 -->
+            <fx:ECU ID="ECU_DUAL_SW">
+                <ho:SHORT-NAME>ECU_DUAL_SW</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <!-- Management controller for Switch1 (CPU port SW1_PORT3) -->
+                    <fx:CONTROLLER ID="CTRL_SW1">
+                        <ho:SHORT-NAME>ECU_DUAL_SW_Ctrl1</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                    <!-- Management controller for Switch2 (CPU port SW2_PORT3) -->
+                    <fx:CONTROLLER ID="CTRL_SW2">
+                        <ho:SHORT-NAME>ECU_DUAL_SW_Ctrl2</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+
+                    <!-- Ctrl1 on VLAN18: consumes SVC_A -->
+                    <fx:CONNECTOR ID="CONN_SW1_MGMT" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_SW1"/>
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_DUAL_SW_1">
+                                <ho:SHORT-NAME>ECU_DUAL_SW_NEP1</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.18.1</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+                        <it:APPLICATION-ENDPOINTS>
+                            <!-- Socket 1: ECU_DUAL_SW consumes SVC_A -->
+                            <it:APPLICATION-ENDPOINT ID="AEP_DSW_CONSUME_A">
+                                <ho:SHORT-NAME>ECU_DUAL_SW_Consume_A</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30000</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_DUAL_SW_1"/>
+                                <it:CONSUMED-SERVICE-INSTANCES>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_SVC_A_AT_DSW">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_SVC_A"/>
+                                        <it:CONSUMED-EVENT-GROUPS>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_DSW_SVC_A">
+                                                <service:EVENT-GROUP-REF ID-REF="EG_A1"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_DSW_CONSUME_A"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                        </it:CONSUMED-EVENT-GROUPS>
+                                    </it:CONSUMED-SERVICE-INSTANCE>
+                                </it:CONSUMED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                        </it:APPLICATION-ENDPOINTS>
+                    </fx:CONNECTOR>
+
+                    <!-- Ctrl2 on VLAN18: consumes SVC_B -->
+                    <fx:CONNECTOR ID="CONN_SW2_MGMT" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_SW2"/>
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_DUAL_SW_2">
+                                <ho:SHORT-NAME>ECU_DUAL_SW_NEP2</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.18.2</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+                        <it:APPLICATION-ENDPOINTS>
+                            <!-- Socket 2: ECU_DUAL_SW consumes SVC_B -->
+                            <it:APPLICATION-ENDPOINT ID="AEP_DSW_CONSUME_B">
+                                <ho:SHORT-NAME>ECU_DUAL_SW_Consume_B</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30000</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_DUAL_SW_2"/>
+                                <it:CONSUMED-SERVICE-INSTANCES>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_SVC_B_AT_DSW">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_SVC_B"/>
+                                        <it:CONSUMED-EVENT-GROUPS>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_DSW_SVC_B">
+                                                <service:EVENT-GROUP-REF ID-REF="EG_B1"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_DSW_CONSUME_B"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                        </it:CONSUMED-EVENT-GROUPS>
+                                    </it:CONSUMED-SERVICE-INSTANCE>
+                                </it:CONSUMED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                        </it:APPLICATION-ENDPOINTS>
+                    </fx:CONNECTOR>
+
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <!-- ECU_A: endpoint ECU connected to Switch1 external port -->
+            <!-- Socket 1 (AEP_A_PROVIDE): provides SVC_A on UDP:30000 -->
+            <!-- Socket 2 (AEP_A_CONSUME): consumes SVC_B on UDP:30001 -->
+            <fx:ECU ID="ECU_A">
+                <ho:SHORT-NAME>ECU_A</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_ECU_A">
+                        <ho:SHORT-NAME>ECU_A_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_ECU_A" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN10"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_A"/>
+
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_ECU_A">
+                                <ho:SHORT-NAME>ECU_A_NEP</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.10.1</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+
+                        <it:APPLICATION-ENDPOINTS>
+
+                            <!-- Socket 1: ECU_A provides SVC_A -->
+                            <it:APPLICATION-ENDPOINT ID="AEP_A_PROVIDE">
+                                <ho:SHORT-NAME>ECU_A_Provide</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30000</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_ECU_A"/>
+                                <it:PROVIDED-SERVICE-INSTANCES>
+                                    <it:PROVIDED-SERVICE-INSTANCE ID="PSI_SVC_A">
+                                        <it:INSTANCE-IDENTIFIER>1</it:INSTANCE-IDENTIFIER>
+                                        <service:SERVICE-INTERFACE-REF ID-REF="SVC_A"/>
+                                        <it:EVENT-HANDLERS>
+                                            <it:EVENT-HANDLER>
+                                                <it:CONSUMED-EVENT-GROUP-REFS>
+                                                    <!-- References all consumers' event groups for SVC_A -->
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_B_EG1"/>
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_DSW_SVC_A"/>
+                                                </it:CONSUMED-EVENT-GROUP-REFS>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_A_PROVIDE"/>
+                                            </it:EVENT-HANDLER>
+                                        </it:EVENT-HANDLERS>
+                                    </it:PROVIDED-SERVICE-INSTANCE>
+                                </it:PROVIDED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+
+                            <!-- Socket 2: ECU_A consumes SVC_B -->
+                            <it:APPLICATION-ENDPOINT ID="AEP_A_CONSUME">
+                                <ho:SHORT-NAME>ECU_A_Consume</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30001</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_ECU_A"/>
+                                <it:CONSUMED-SERVICE-INSTANCES>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_SVC_B_AT_A">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_SVC_B"/>
+                                        <it:CONSUMED-EVENT-GROUPS>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_A_EG1">
+                                                <service:EVENT-GROUP-REF ID-REF="EG_B1"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_A_CONSUME"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                        </it:CONSUMED-EVENT-GROUPS>
+                                    </it:CONSUMED-SERVICE-INSTANCE>
+                                </it:CONSUMED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+
+                        </it:APPLICATION-ENDPOINTS>
+                    </fx:CONNECTOR>
+
+                    <fx:CONNECTOR ID="CONN_ECU_A_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_A"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <!-- ECU_B: endpoint ECU connected to Switch2 external port -->
+            <!-- Socket 1 (AEP_B_PROVIDE): provides SVC_B on UDP:30000 -->
+            <!-- Socket 2 (AEP_B_CONSUME): consumes SVC_A on UDP:30001 -->
+            <fx:ECU ID="ECU_B">
+                <ho:SHORT-NAME>ECU_B</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_ECU_B">
+                        <ho:SHORT-NAME>ECU_B_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_ECU_B" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN20"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_B"/>
+
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_ECU_B">
+                                <ho:SHORT-NAME>ECU_B_NEP</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.20.1</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+
+                        <it:APPLICATION-ENDPOINTS>
+
+                            <!-- Socket 1: ECU_B provides SVC_B -->
+                            <it:APPLICATION-ENDPOINT ID="AEP_B_PROVIDE">
+                                <ho:SHORT-NAME>ECU_B_Provide</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30000</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_ECU_B"/>
+                                <it:PROVIDED-SERVICE-INSTANCES>
+                                    <it:PROVIDED-SERVICE-INSTANCE ID="PSI_SVC_B">
+                                        <it:INSTANCE-IDENTIFIER>1</it:INSTANCE-IDENTIFIER>
+                                        <service:SERVICE-INTERFACE-REF ID-REF="SVC_B"/>
+                                        <it:EVENT-HANDLERS>
+                                            <it:EVENT-HANDLER>
+                                                <it:CONSUMED-EVENT-GROUP-REFS>
+                                                    <!-- References all consumers' event groups for SVC_B -->
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_A_EG1"/>
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_DSW_SVC_B"/>
+                                                </it:CONSUMED-EVENT-GROUP-REFS>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_B_PROVIDE"/>
+                                            </it:EVENT-HANDLER>
+                                        </it:EVENT-HANDLERS>
+                                    </it:PROVIDED-SERVICE-INSTANCE>
+                                </it:PROVIDED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+
+                            <!-- Socket 2: ECU_B consumes SVC_A -->
+                            <it:APPLICATION-ENDPOINT ID="AEP_B_CONSUME">
+                                <ho:SHORT-NAME>ECU_B_Consume</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30001</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_ECU_B"/>
+                                <it:CONSUMED-SERVICE-INSTANCES>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_SVC_A_AT_B">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_SVC_A"/>
+                                        <it:CONSUMED-EVENT-GROUPS>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_B_EG1">
+                                                <service:EVENT-GROUP-REF ID-REF="EG_A1"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_B_CONSUME"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                        </it:CONSUMED-EVENT-GROUPS>
+                                    </it:CONSUMED-SERVICE-INSTANCE>
+                                </it:CONSUMED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+
+                        </it:APPLICATION-ENDPOINTS>
+                    </fx:CONNECTOR>
+
+                    <fx:CONNECTOR ID="CONN_ECU_B_MGMT">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN18"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_ECU_B"/>
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+        </fx:ECUS>
+
+        <fx:SERVICE-INTERFACES>
+
+            <!-- SVC_A: provided by ECU_A, consumed by ECU_B -->
+            <fx:SERVICE-INTERFACE ID="SVC_A" xsi:type="service:SERVICE-INTERFACE-TYPE">
+                <ho:SHORT-NAME>SVC_A</ho:SHORT-NAME>
+                <fx:SERVICE-IDENTIFIER>4096</fx:SERVICE-IDENTIFIER>
+                <service:API-VERSION>
+                    <service:MAJOR>1</service:MAJOR>
+                    <service:MINOR>0</service:MINOR>
+                </service:API-VERSION>
+                <service:METHODS>
+                    <service:METHOD ID="SVC_A_METHOD_GET">
+                        <ho:SHORT-NAME>GetValue</ho:SHORT-NAME>
+                        <service:METHOD-IDENTIFIER>1</service:METHOD-IDENTIFIER>
+                        <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                        <service:INPUT-PARAMETERS>
+                            <service:INPUT-PARAMETER ID="SVC_A_PARAM_IN">
+                                <ho:SHORT-NAME>requestValue</ho:SHORT-NAME>
+                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <service:POSITION>0</service:POSITION>
+                                <service:MANDATORY>true</service:MANDATORY>
+                            </service:INPUT-PARAMETER>
+                        </service:INPUT-PARAMETERS>
+                        <service:RETURN-PARAMETERS>
+                            <service:RETURN-PARAMETER ID="SVC_A_PARAM_OUT">
+                                <ho:SHORT-NAME>responseValue</ho:SHORT-NAME>
+                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <service:POSITION>0</service:POSITION>
+                                <service:MANDATORY>true</service:MANDATORY>
+                            </service:RETURN-PARAMETER>
+                        </service:RETURN-PARAMETERS>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:METHOD>
+                </service:METHODS>
+                <service:EVENTS>
+                    <service:EVENT ID="SVC_A_EVT_STATUS">
+                        <ho:SHORT-NAME>StatusEvent</ho:SHORT-NAME>
+                        <service:METHOD-IDENTIFIER>32769</service:METHOD-IDENTIFIER>
+                        <service:INPUT-PARAMETERS>
+                            <service:INPUT-PARAMETER ID="SVC_A_EVT_PARAM">
+                                <ho:SHORT-NAME>statusValue</ho:SHORT-NAME>
+                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <service:POSITION>0</service:POSITION>
+                                <service:MANDATORY>true</service:MANDATORY>
+                            </service:INPUT-PARAMETER>
+                        </service:INPUT-PARAMETERS>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:EVENT>
+                </service:EVENTS>
+                <service:EVENT-GROUPS>
+                    <service:EVENT-GROUP ID="EG_A1">
+                        <ho:SHORT-NAME>EG_A1</ho:SHORT-NAME>
+                        <fx:SERVICE-IDENTIFIER>1</fx:SERVICE-IDENTIFIER>
+                        <service:EVENT-REFS>
+                            <service:EVENT-REF ID-REF="SVC_A_EVT_STATUS"/>
+                        </service:EVENT-REFS>
+                    </service:EVENT-GROUP>
+                </service:EVENT-GROUPS>
+            </fx:SERVICE-INTERFACE>
+
+            <!-- SVC_B: provided by ECU_B, consumed by ECU_A -->
+            <fx:SERVICE-INTERFACE ID="SVC_B" xsi:type="service:SERVICE-INTERFACE-TYPE">
+                <ho:SHORT-NAME>SVC_B</ho:SHORT-NAME>
+                <fx:SERVICE-IDENTIFIER>4097</fx:SERVICE-IDENTIFIER>
+                <service:API-VERSION>
+                    <service:MAJOR>1</service:MAJOR>
+                    <service:MINOR>0</service:MINOR>
+                </service:API-VERSION>
+                <service:METHODS>
+                    <service:METHOD ID="SVC_B_METHOD_SET">
+                        <ho:SHORT-NAME>SetValue</ho:SHORT-NAME>
+                        <service:METHOD-IDENTIFIER>1</service:METHOD-IDENTIFIER>
+                        <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                        <service:INPUT-PARAMETERS>
+                            <service:INPUT-PARAMETER ID="SVC_B_PARAM_IN">
+                                <ho:SHORT-NAME>setValue</ho:SHORT-NAME>
+                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <service:POSITION>0</service:POSITION>
+                                <service:MANDATORY>true</service:MANDATORY>
+                            </service:INPUT-PARAMETER>
+                        </service:INPUT-PARAMETERS>
+                        <service:RETURN-PARAMETERS>
+                            <service:RETURN-PARAMETER ID="SVC_B_PARAM_OUT">
+                                <ho:SHORT-NAME>setResult</ho:SHORT-NAME>
+                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <service:POSITION>0</service:POSITION>
+                                <service:MANDATORY>true</service:MANDATORY>
+                            </service:RETURN-PARAMETER>
+                        </service:RETURN-PARAMETERS>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:METHOD>
+                </service:METHODS>
+                <service:EVENTS>
+                    <service:EVENT ID="SVC_B_EVT_UPDATE">
+                        <ho:SHORT-NAME>UpdateEvent</ho:SHORT-NAME>
+                        <service:METHOD-IDENTIFIER>32769</service:METHOD-IDENTIFIER>
+                        <service:INPUT-PARAMETERS>
+                            <service:INPUT-PARAMETER ID="SVC_B_EVT_PARAM">
+                                <ho:SHORT-NAME>updateValue</ho:SHORT-NAME>
+                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <service:POSITION>0</service:POSITION>
+                                <service:MANDATORY>true</service:MANDATORY>
+                            </service:INPUT-PARAMETER>
+                        </service:INPUT-PARAMETERS>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:EVENT>
+                </service:EVENTS>
+                <service:EVENT-GROUPS>
+                    <service:EVENT-GROUP ID="EG_B1">
+                        <ho:SHORT-NAME>EG_B1</ho:SHORT-NAME>
+                        <fx:SERVICE-IDENTIFIER>1</fx:SERVICE-IDENTIFIER>
+                        <service:EVENT-REFS>
+                            <service:EVENT-REF ID-REF="SVC_B_EVT_UPDATE"/>
+                        </service:EVENT-REFS>
+                    </service:EVENT-GROUP>
+                </service:EVENT-GROUPS>
+            </fx:SERVICE-INTERFACE>
+
+        </fx:SERVICE-INTERFACES>
+
+        <fx:DATATYPES>
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_UINT8">
+                <ho:SHORT-NAME>UINT8</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_UINT8"/>
+            </fx:DATATYPE>
+        </fx:DATATYPES>
+
+    </fx:ELEMENTS>
+
+    <fx:PROCESSING-INFORMATION>
+        <fx:CODINGS>
+            <fx:CODING ID="COD_UINT8">
+                <ho:SHORT-NAME>UINT8Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT8">
+                    <ho:BIT-LENGTH>8</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+        </fx:CODINGS>
+    </fx:PROCESSING-INFORMATION>
+
+</fx:FIBEX>
