@@ -1679,6 +1679,8 @@ class TestBaseFrameTriggering:
             id="FT1",
             frame=frame,
             can_id=0x100,
+            is_extended_id=False,
+            is_can_fd=False,
         )
         assert frame_triggering.id() == "FT1"
         assert frame_triggering.frame() == frame
@@ -1726,9 +1728,13 @@ class TestBaseFrameTriggeringCAN:
             id="FT1",
             frame=frame,
             can_id=0x100,
+            is_extended_id=True,
+            is_can_fd=True,
         )
         assert frame_triggering.can_id() == 0x100
         assert frame_triggering.frame() == frame
+        assert frame_triggering.is_can_fd()
+        assert frame_triggering.is_extended_id()
 
 
 class TestBaseFrameTriggeringFlexRay:

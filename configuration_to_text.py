@@ -441,8 +441,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__frames__[short_name] = ret
         return ret
 
-    def create_frame_triggering_can(self, id, frame_ref, can_id):
-        ret = FrameTriggeringCAN(id, frame_ref, can_id)
+    def create_frame_triggering_can(self, id, frame_ref, can_id, is_extended_id, is_can_fd):
+        ret = FrameTriggeringCAN(id, frame_ref, can_id, is_extended_id, is_can_fd)
 
         self.__frame_triggerings__[id] = ret
         return ret
@@ -1223,7 +1223,10 @@ class FrameTriggeringCAN(BaseFrameTriggeringCAN):
         frame = self.__frame__.name() if self.__frame__ is not None else "undefined"
         # frame_id = self.__frame__.id() if self.__frame__ is not None else "undefined"
 
-        ret += f"FrameTriggeringCAN (CAN-ID: {self.__can_id__}) for Frame {frame}\n"
+        ext = "ext" if self.is_extended_id() else "std"
+        fd = "[CAN-FD]" if self.is_can_fd() else "[CAN]"
+
+        ret += f"FrameTriggeringCAN (CAN-ID: {self.__can_id__}, {ext}) for Frame {frame} {fd}\n"
         return ret
 
 

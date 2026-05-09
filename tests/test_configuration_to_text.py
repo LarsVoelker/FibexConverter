@@ -151,7 +151,7 @@ class TestInterface:
             frame_type="CAN",
             pdu_instances={},
         )
-        frame_trigger = self.factory.create_frame_triggering_can(id="trig1", frame_ref=frame, can_id=0x123)
+        frame_trigger = self.factory.create_frame_triggering_can(id="trig1", frame_ref=frame, can_id=0x123, is_extended_id=True, is_can_fd=True)
         interface = self.factory.create_interface(
             name="EthIf1",
             vlanid=0,
@@ -172,7 +172,7 @@ class TestInterface:
             frame_type="CAN",
             pdu_instances={},
         )
-        frame_trigger = self.factory.create_frame_triggering_can(id="trig1", frame_ref=frame, can_id=0x123)
+        frame_trigger = self.factory.create_frame_triggering_can(id="trig1", frame_ref=frame, can_id=0x123, is_extended_id=True, is_can_fd=True)
         interface = self.factory.create_interface(
             name="EthIf1",
             vlanid=0,
@@ -543,13 +543,13 @@ class TestFrameTriggering:
             frame_type="CAN",
             pdu_instances={},
         )
-        frame_trigger = self.factory.create_frame_triggering_can(id="t1", frame_ref=frame, can_id=0x123)
+        frame_trigger = self.factory.create_frame_triggering_can(id="t1", frame_ref=frame, can_id=0x123, is_extended_id=True, is_can_fd=True)
         text = frame_trigger.str(0)
         assert "CAN-ID" in text
         assert "0x123" in text or "291" in text
 
     def test_frame_triggering_can_str_no_frame(self):
-        frame_trigger = self.factory.create_frame_triggering_can(id="t1", frame_ref=None, can_id=0x456)
+        frame_trigger = self.factory.create_frame_triggering_can(id="t1", frame_ref=None, can_id=0x456, is_extended_id=True, is_can_fd=True)
         text = frame_trigger.str(0)
         assert "undefined" in text
 

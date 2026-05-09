@@ -484,8 +484,8 @@ class BaseConfigurationFactory(object):
     def create_frame(self, id, short_name, byte_length, frame_type, pdu_instances):
         return BaseFrame(id, short_name, byte_length, frame_type, pdu_instances)
 
-    def create_frame_triggering_can(self, id, frame, can_id):
-        return BaseFrameTriggeringCAN(id, frame, can_id)
+    def create_frame_triggering_can(self, id, frame, can_id, is_extended_id, is_can_fd):
+        return BaseFrameTriggeringCAN(id, frame, can_id, is_extended_id, is_can_fd)
 
     def create_frame_triggering_flexray(self, id, frame, slot_id, cycle_counter, base_cycle, cycle_repetition):
         return BaseFrameTriggeringFlexRay(id, frame, slot_id, cycle_counter, base_cycle, cycle_repetition)
@@ -2590,10 +2590,12 @@ class BaseFrameTriggering(BaseItem):
 
 
 class BaseFrameTriggeringCAN(BaseFrameTriggering):
-    def __init__(self, id, frame, can_id):
+    def __init__(self, id, frame, can_id, is_extended_id, is_can_fd):
         super(BaseFrameTriggeringCAN, self).__init__(id, frame)
 
         self.__can_id__ = can_id
+        self.__is_can_fd = is_can_fd
+        self.__is_extended_id = is_extended_id
 
     def can_id(self):
         return self.__can_id__
@@ -2603,6 +2605,12 @@ class BaseFrameTriggeringCAN(BaseFrameTriggering):
 
     def is_can(self):
         return True
+
+    def is_extended_id(self):
+        return self.__is_extended_id
+
+    def is_can_fd(self):
+        return self.__is_can_fd
 
 
 class BaseFrameTriggeringFlexRay(BaseFrameTriggering):

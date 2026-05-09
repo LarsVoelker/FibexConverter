@@ -396,7 +396,7 @@ class TestFibexParserFrameTriggering:
 
         # Mock factory
         class MockFactory:
-            def create_frame_triggering_can(self, id, frame, can_id):
+            def create_frame_triggering_can(self, id, frame, can_id, is_extended_id=False, is_can_fd=False):
                 return type("MockCANTriggering", (), {"id": lambda self: id, "frame": lambda self: frame, "can_id": lambda self: can_id})()
 
             def create_frame_triggering_flexray(self, id, frame, slot_id, cycle_counter, base_cycle, cycle_repetition):

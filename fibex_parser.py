@@ -522,6 +522,9 @@ class FibexParser(AbstractParser):
 
         # CAN:
         identifier_tmp = self.get_child_text(element, "./fx:IDENTIFIER/fx:IDENTIFIER-VALUE")
+        id_ext_tmp = self.get_child_attribute(element, "./fx:IDENTIFIER/fx:IDENTIFIER-VALUE", "EXTENDED-ADDRESSING")
+        fd_frame_rx_tmp = self.get_child_text(element, "./fx:CAN-FRAME-RX-BEHAVIOR")
+        fd_frame_tx_tmp = self.get_child_text(element, "./fx:CAN-FRAME-TX-BEHAVIOR")
 
         # FlexRay
         slot_id_tmp = self.get_child_text(element, "./fx:TIMINGS/fx:ABSOLUTELY-SCHEDULED-TIMING/fx:SLOT-ID")
@@ -543,8 +546,10 @@ class FibexParser(AbstractParser):
 
         elif identifier_tmp is not None:
             can_id = int(identifier_tmp)
+            can_id_ext = str(id_ext_tmp).lower() == "true"
+            can_fd = str(fd_frame_rx_tmp).lower() == "can-fd" or str(fd_frame_tx_tmp).lower() == "can-fd"
 
-            ret = self.__conf_factory__.create_frame_triggering_can(id, frame, can_id)
+            ret = self.__conf_factory__.create_frame_triggering_can(id, frame, can_id, is_extended_id=can_id_ext, is_can_fd=can_fd)
             return ret
 
         return None
