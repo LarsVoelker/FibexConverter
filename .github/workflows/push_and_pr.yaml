@@ -80,7 +80,7 @@ jobs:
 
       - name: Run pytest
         run: |
-          pytest tests/ --cov=. --cov-report=html
+          pytest -n auto tests/ --cov=. --cov-report=html
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v7
