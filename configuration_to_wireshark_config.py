@@ -84,10 +84,16 @@ def cleanup_datatype_string(tmp):
 
 
 def translate_datatype(dt):
-    if dt.lower().startswith("a_"):
-        return dt[2:].lower()
-    else:
-        return dt.lower()
+    ret = dt.lower()
+
+    if ret.lower().startswith("a_"):
+        ret = dt[2:].lower()
+
+    # Wireshark only supports uint8 but not bool and boolean directly
+    if ret in ("bool", "boolean"):
+        ret = "uint8"
+
+    return ret
 
 
 class WiresharkConfigurationFactory(BaseConfigurationFactory):
@@ -310,6 +316,8 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
     def create_someip_parameter_basetype(self, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
         if bitlength_basetype != bitlength_encoded_type:
             name = "%s-%d" % (name, bitlength_encoded_type)
+
+        datatype = translate_datatype(datatype)
 
         ret = SOMEIPParameterBasetype(
             self.__globalid_basetypes__,
@@ -623,7 +631,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 )
 
                 if version > 1:
-                    tmp += f',"{service.name()}.{method.name()}.{p.name()}"'
+                    tmp += f',"{service.name()}.{method.name()}.{p.name()}"'.replace(" ", "")
 
                 tmp += "\n"
                 f.write(tmp)
@@ -1518,7 +1526,7 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
                 self.name(),
                 self.chartype().lower(),
                 dynlength,  # self.lowerlimit(),
-                self.upperlimit(),
+                self.upperlimit() if self.upperlimit() >= 0 else 0,
                 self.length_of_length(),
                 endianess,
                 self.pad_to(),
@@ -1532,7 +1540,7 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
                 self.name(),
                 self.chartype().lower(),
                 dynlength,  # self.lowerlimit(),
-                self.upperlimit(),
+                self.upperlimit() if self.upperlimit() >= 0 else 0,
                 self.length_of_length(),
                 endianess,
                 self.pad_to(),
@@ -1584,10 +1592,11 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
                 len(self.dims()),
             )
             if version > 1:
-                if self.__parent_service__ is None or self.__parent_method__ is None:
-                    ret += f',"invalid.invalid.{self.name()}"'
-                else:
-                    ret += f',"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{self.name()}"'
+                filter_string = f',"invalid.invalid.{self.name()}"'
+                if self.__parent_service__ is not None and self.__parent_method__ is not None:
+                    filter_string = f',"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{self.name()}"'
+
+                ret += filter_string.replace(" ", "")
 
             ret += ',"%d","%d","%d","%d","%d"\n' % (
                 d.dim() - 1,
@@ -1882,10 +1891,10 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
                 m.child().globalid(version),
             )
             if version > 1:
-                if self.__parent_service__ is None or self.__parent_method__ is None:
-                    ret += f',"invalid.invalid.{m.name()}"'
-                else:
-                    ret += f',"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{m.name()}"'
+                filter_string = f',"invalid.invalid.{m.name()}"'
+                if self.__parent_service__ is not None and self.__parent_method__ is not None:
+                    filter_string = f',"{self.__parent_service__.name()}.{self.__parent_method__.name()}.{m.name()}"'
+                ret += filter_string.replace(" ", "")
             ret += "\n"
         return ret
 
@@ -1945,7 +1954,7 @@ class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
                 len(self.items()),
                 i.bit_number(),
                 i.name(),
-                f"{self.name()}.{i.name()}",
+                f"{self.name()}.{i.name()}".replace(" ", ""),
             )
         return ret
 
