@@ -1,3 +1,6 @@
+[project]
+name = "FibexConverter"
+
 [tool.black]
 line-length = 149
 
