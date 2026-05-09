@@ -1,5 +1,23 @@
 [project]
 name = "FibexConverter"
+version = "0.1.0"
+description = "A tool to work with FIBEX files and generate different representations as well as Wireshark Configs."
+license = "GPL-2.0-or-later"
+license-file = "LICENSE"
+readme = "README.md"
+requires-python = ">=3.11"
+maintainers = [
+    { name = "Dr. Lars Völker", email = "lars.voelker@technica-engineering.de" },
+]
+dependencies = [
+    "graphviz>=0.21",
+    "isodate>=0.7.2",
+    "macaddress>=2.0.2",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
+    "xlsxwriter>=3.2.9",
+]
 
 [tool.black]
 line-length = 149

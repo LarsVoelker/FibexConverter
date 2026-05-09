@@ -6,8 +6,8 @@ Convert SOME/IP configuration from FIBEX 4 XML files (ASAM standard) to various 
 
 Install dependencies with:
 
-    pip install -r requirements.txt
-    pip install -r tests/requirements.txt
+    pip install uv
+    uv sync
 
 Dependencies: `isodate`, `graphviz`, `macaddress`, `xlsxwriter`
 

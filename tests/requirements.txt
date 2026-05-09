@@ -1,4 +1,0 @@
-# requirements for testing
-pytest
-pytest-cov
-pytest-xdist
