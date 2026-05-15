@@ -26,5 +26,6 @@ line-length = 149
 profile = "black"
 line_length = 149
 
-[tool.pytest.ini_options]
+[tool.pytest]
+addopts = ["-n", "auto", "--cov=.", "--cov-report=html"]
 testpaths = ["tests"]
