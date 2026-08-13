@@ -1070,6 +1070,10 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                     basetype = signal.basetype()
                     bitlen_base = signal.basetype_length()
 
+                    if bitlen_base not in (8, 16, 32, 64):
+                        print(f"        WARNING: {bitlen_base=} is not a multiple of 8! Wireshark might not like this. {name=}")
+                        print(f"        {pdu_id=} {signal.name()=} {current_bit_pos=} {start_pos=} {signal_length=}")
+
                     if basetype.lower() in ("asciistring", "a_asciistring"):
                         basetype = "STRING"
                         bitlen_base = 8
