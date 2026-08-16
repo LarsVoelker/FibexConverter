@@ -145,3 +145,9 @@ Pre-generated outputs for `Ethernet_Topology_with_Switches.xml` are included in 
 ## Running Tests
 
     pytest tests/ -v
+
+## AI Usage
+
+Use of AI (Claude, Opencode, Beacon, etc.) allowed. Please mark MRs with `Assisted-by: ...` and replace `...` with tools used.
+
+
