@@ -14,10 +14,11 @@ import pytest
 REPO_ROOT = Path(__file__).parent.parent
 EXAMPLES_DIR = REPO_ROOT / "examples"
 SCHEMA_PATH = REPO_ROOT / "tools" / "fibex_schema" / "4.1.2" / "validate_wrapper.xsd"
+FBX_PATH = REPO_ROOT / "tools" / "fibex_schema" / "4.1.2" / "fibex.xsd"
 
 # Skip the entire module at collection time if the schema is not present.
 pytestmark = pytest.mark.skipif(
-    not SCHEMA_PATH.is_file(),
+    not FBX_PATH.is_file(),
     reason="FIBEX 4.1.2 XSD schemas not present in tools/fibex_schema/4.1.2/",
 )
 

@@ -490,6 +490,9 @@ class BaseConfigurationFactory(object):
     def create_frame_triggering_flexray(self, id, frame, slot_id, cycle_counter, base_cycle, cycle_repetition):
         return BaseFrameTriggeringFlexRay(id, frame, slot_id, cycle_counter, base_cycle, cycle_repetition)
 
+    def add_cluster_info(self, cluster_id, name, speed, protocol, channel_refs):
+        pass
+
     def create_pdu_route(self, sender_socket, receiving_socket, pdu_name, pdu_id):
         if sender_socket.is_multicast():
             print(

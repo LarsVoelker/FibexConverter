@@ -62,6 +62,7 @@ class FibexParser(AbstractParser):
         self.__frame_triggerings__ = dict()
         self.__pdus__ = dict()
         self.__signals__ = dict()
+        self.__eth_pdu_header_id_counter = 0
 
         # FIBEX-ID -> (FIBEX-ID of Service, Eventgroup-ID)
         self.__eventgrouprefs__ = dict()
@@ -552,6 +553,14 @@ class FibexParser(AbstractParser):
             ret = self.__conf_factory__.create_frame_triggering_can(id, frame, can_id, is_extended_id=can_id_ext, is_can_fd=can_fd)
             return ret
 
+        # Ethernet (or other non-CAN, non-FlexRay) frame — register each PDU instance
+        # so that __eth_pdu_insts is populated for FLYNC ContainerPDU generation.
+        if frame is not None:
+            for pi in frame.pdu_instances().values():
+                if pi.pdu() is not None:
+                    eth_inst = self.__conf_factory__.create_ethernet_pdu_instance(pi.__pdu_ref__, self.__eth_pdu_header_id_counter)
+                    eth_inst.add_pdu(pi.pdu())
+                    self.__eth_pdu_header_id_counter += 1
         return None
 
     def parse_frame_triggerings(self, root):
