@@ -19,66 +19,114 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+from __future__ import annotations
+
 import argparse
 import os.path
 import time
+from typing import Any, Protocol, TextIO, cast
 
 from configuration_base_classes import (
     BaseConfigurationFactory,
+    BaseController,
     BaseECU,
+    BaseSignal,
+    BaseSocket,
+    SOMEIPBaseDatatype,
     SOMEIPBaseParameter,
     SOMEIPBaseParameterArray,
+    SOMEIPBaseParameterArrayDim,
     SOMEIPBaseParameterBasetype,
     SOMEIPBaseParameterBitfield,
+    SOMEIPBaseParameterBitfieldItem,
     SOMEIPBaseParameterEnumeration,
+    SOMEIPBaseParameterEnumerationItem,
     SOMEIPBaseParameterString,
     SOMEIPBaseParameterStruct,
+    SOMEIPBaseParameterStructMember,
     SOMEIPBaseParameterTypedef,
     SOMEIPBaseParameterUnion,
+    SOMEIPBaseParameterUnionMember,
     SOMEIPBaseService,
+    SOMEIPBaseServiceEvent,
+    SOMEIPBaseServiceEventgroup,
+    SOMEIPBaseServiceField,
+    SOMEIPBaseServiceInstance,
+    SOMEIPBaseServiceMethod,
     read_csv_to_dict,
 )
 from parser_dispatcher import is_file_or_dir_valid, is_file_valid, parse_input_files, parser_formats
 
+g_gen_portid: bool = False
+
+
+class _PeachDatatype(Protocol):
+    def peachout(self, f: TextIO, *args: Any) -> None: ...
+
 
 class PeachConfigurationFactory(BaseConfigurationFactory):
-    def __init__(self):
-        self.__services__ = dict()
-        self.__services_long__ = dict()
-        self.__ecus__ = dict()
+    def __init__(self) -> None:
+        self.__services__: dict[str, SOMEIPBaseService] = dict()
+        self.__services_long__: dict[str, SOMEIPBaseService] = dict()
+        self.__ecus__: dict[str, BaseECU] = dict()
 
-    def create_ecu(self, name, controllers):
+    def create_ecu(self, name: str, controllers: list[BaseController]) -> BaseECU:
         ret = BaseECU(name, controllers)
         assert name not in self.__ecus__
         self.__ecus__[name] = ret
         return ret
 
-    def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
+    def create_someip_service(
+        self,
+        name: str,
+        serviceid: int,
+        majorver: int,
+        minorver: int,
+        methods: dict[int, SOMEIPBaseServiceMethod],
+        events: dict[int, SOMEIPBaseServiceEvent],
+        fields: dict[int, SOMEIPBaseServiceField],
+        eventgroups: dict[int, SOMEIPBaseServiceEventgroup],
+    ) -> SOMEIPBaseService:
         ret = SOMEIPBaseService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
         print("Adding Service(ID: 0x%04x Ver: %d.%d)" % (serviceid, majorver, minorver))
         #        assert(self.add_service(serviceid, majorver, minorver, ret))
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 
-    def create_someip_parameter(self, position, name, desc, mandatory, datatype, signal):
+    def create_someip_parameter(
+        self,
+        position: int,
+        name: str,
+        desc: str | None,
+        mandatory: bool,
+        datatype: SOMEIPBaseDatatype | None,
+        signal: BaseSignal | None,
+    ) -> SOMEIPParameter:
         ret = SOMEIPParameter(position, name, desc, mandatory, datatype, signal)
         return ret
 
-    def create_someip_parameter_basetype(self, name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type):
+    def create_someip_parameter_basetype(
+        self,
+        name: str,
+        datatype: str,
+        bigendian: bool,
+        bitlength_basetype: int,
+        bitlength_encoded_type: int,
+    ) -> SOMEIPParameterBasetype:
         ret = SOMEIPParameterBasetype(name, datatype, bigendian, bitlength_basetype, bitlength_encoded_type)
         return ret
 
     def create_someip_parameter_string(
         self,
-        name,
-        chartype,
-        bigendian,
-        lowerlimit,
-        upperlimit,
-        termination,
-        length_of_length,
-        pad_to,
-    ):
+        name: str,
+        chartype: str,
+        bigendian: bool,
+        lowerlimit: int,
+        upperlimit: int,
+        termination: str | None,
+        length_of_length: int | None,
+        pad_to: int,
+    ) -> SOMEIPParameterString:
         ret = SOMEIPParameterString(
             name,
             chartype,
@@ -91,31 +139,66 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
         )
         return ret
 
-    def create_someip_parameter_array(self, name, dims, child):
+    def create_someip_parameter_array(
+        self,
+        name: str,
+        dims: dict[int, SOMEIPBaseParameterArrayDim],
+        child: SOMEIPBaseDatatype,
+    ) -> SOMEIPParameterArray:
         ret = SOMEIPParameterArray(name, dims, child)
         return ret
 
-    def create_someip_parameter_struct(self, name, length_of_length, pad_to, members, tlv=False):
+    def create_someip_parameter_struct(
+        self,
+        name: str,
+        length_of_length: int | None,
+        pad_to: int,
+        members: dict[int, SOMEIPBaseParameterStructMember],
+        tlv: bool = False,
+    ) -> SOMEIPParameterStruct:
         ret = SOMEIPParameterStruct(name, length_of_length, pad_to, members, tlv)
         return ret
 
-    def create_someip_parameter_typedef(self, name, name2, child):
+    def create_someip_parameter_typedef(self, name: str, name2: str, child: SOMEIPBaseDatatype) -> SOMEIPParameterTypedef:
         ret = SOMEIPParameterTypedef(name, name2, child)
         return ret
 
-    def create_someip_parameter_enumeration(self, name, items, child):
+    def create_someip_parameter_enumeration(
+        self,
+        name: str,
+        items: list[SOMEIPBaseParameterEnumerationItem],
+        child: SOMEIPBaseDatatype,
+    ) -> SOMEIPParameterEnumeration:
         ret = SOMEIPParameterEnumeration(name, items, child)
         return ret
 
-    def create_someip_parameter_union(self, name, length_of_length, length_of_type, pad_to, members):
+    def create_someip_parameter_union(
+        self,
+        name: str,
+        length_of_length: int | None,
+        length_of_type: int | None,
+        pad_to: int,
+        members: dict[int, SOMEIPBaseParameterUnionMember],
+    ) -> SOMEIPParameterUnion:
         ret = SOMEIPParameterUnion(name, length_of_length, length_of_type, pad_to, members)
         return ret
 
-    def create_someip_parameter_bitfield(self, name, items, child):
+    def create_someip_parameter_bitfield(
+        self,
+        name: str,
+        items: list[SOMEIPBaseParameterBitfieldItem],
+        child: SOMEIPBaseDatatype,
+    ) -> SOMEIPParameterBitfield:
         ret = SOMEIPParameterBitfield(name, items, child)
         return ret
 
-    def add_service(self, serviceid, majorver, minorver, service):
+    def add_service(
+        self,
+        serviceid: int,
+        majorver: int,
+        minorver: int,
+        service: SOMEIPBaseService,
+    ) -> bool:
         sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
         if sid in self.__services_long__:
             print("ERROR: Service (SID: 0x%04x, Major-Ver: %d, Minor-Ver: %d) already exists! Not overriding it!" % (serviceid, majorver, minorver))
@@ -132,7 +215,7 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
         self.__services__[sid] = service
         return True
 
-    def get_service(self, serviceid, majorver, minorver=None):
+    def get_service(self, serviceid: int, majorver: int, minorver: int | None = None) -> SOMEIPBaseService | None:
         if minorver is None:
             sid = "%04x-%02x" % (serviceid, majorver)
             if sid in self.__services__:
@@ -146,7 +229,7 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
             else:
                 return None
 
-    def generate_configs(self, target_dir):
+    def generate_configs(self, target_dir: str) -> None:
         for ecukey in sorted(self.__ecus__.keys()):
             ecu = self.__ecus__[ecukey]
             # ecu_name = ecu.name()
@@ -161,7 +244,9 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
                         # proto = socket.proto()
                         # print "%s eth0.%d %s:%d/%s" % (ecu_name, vlanid, ip, portnumber, proto)
 
-                        for si in socket.instances():
+                        instances = socket.instances()
+                        assert instances is not None
+                        for si in instances:
                             serv = si.service()
 
                             for m in serv.methods():
@@ -188,39 +273,51 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
 
                             for f in serv.fields():
                                 field = serv.fields()[f]
-                                if field.notifier() is not None:
+                                notifier = field.notifier()
+                                if notifier is not None:
                                     self.write_configfile_event(
                                         target_dir,
                                         ecu,
                                         vlanid,
                                         socket,
                                         si,
-                                        field.notifier(),
+                                        notifier,
                                         "",
                                     )
                                 # getter has empty request anyhow
-                                if field.getter() is not None:
+                                getter = field.getter()
+                                if getter is not None:
                                     self.write_configfile_method_request(
                                         target_dir,
                                         ecu,
                                         vlanid,
                                         socket,
                                         si,
-                                        field.getter(),
+                                        getter,
                                         "-Request",
                                     )
-                                if field.setter() is not None:
+                                setter = field.setter()
+                                if setter is not None:
                                     self.write_configfile_method_request(
                                         target_dir,
                                         ecu,
                                         vlanid,
                                         socket,
                                         si,
-                                        field.setter(),
+                                        setter,
                                         "-Request",
                                     )
 
-    def write_configfile_method_request(self, target_dir, ecu, vlanid, socket, si, method, postfix):
+    def write_configfile_method_request(
+        self,
+        target_dir: str,
+        ecu: BaseECU,
+        vlanid: int,
+        socket: BaseSocket,
+        si: SOMEIPBaseServiceInstance,
+        method: SOMEIPBaseServiceMethod,
+        postfix: str,
+    ) -> None:
         if (socket.proto() == "udp" and not method.reliable()) or (socket.proto() == "tcp" and method.reliable()):
             if method.calltype() == "REQUEST_RESPONSE":
                 msgtype = 0x00
@@ -270,7 +367,16 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
 
             f.close()
 
-    def write_configfile_event(self, target_dir, ecu, vlanid, socket, si, event, postfix):
+    def write_configfile_event(
+        self,
+        target_dir: str,
+        ecu: BaseECU,
+        vlanid: int,
+        socket: BaseSocket,
+        si: SOMEIPBaseServiceInstance,
+        event: SOMEIPBaseServiceEvent,
+        postfix: str,
+    ) -> None:
         if (socket.proto() == "udp" and not event.reliable()) or (socket.proto() == "tcp" and event.reliable()):
             filename = "SOMEIP-%s-0x%04x-0x%04x-%s%s.xml" % (
                 ecu.name(),
@@ -313,11 +419,20 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
             f.close()
 
     @staticmethod
-    def write_parameter(f, param):
-        param.peachout(f)
+    def write_parameter(f: TextIO, param: SOMEIPBaseParameter) -> None:
+        cast(_PeachDatatype, param).peachout(f)
 
     @staticmethod
-    def write_header(f, msgname, serviceid, methodid, protover, interfacever, msgtype, returncode):
+    def write_header(
+        f: TextIO,
+        msgname: str,
+        serviceid: int,
+        methodid: int,
+        protover: int,
+        interfacever: int,
+        msgtype: int,
+        returncode: int,
+    ) -> None:
 
         xml_header = """<?xml version="1.0" encoding="utf-8"?>
 <Peach xmlns="http://peachfuzzer.com/2012/Peach"
@@ -364,17 +479,17 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
         f.write(block)
 
     @staticmethod
-    def capdevstring(vlanid):
+    def capdevstring(vlanid: int) -> str:
         return "eth0.%d" % vlanid
 
     @staticmethod
-    def filterstring(proto, portnumber):
+    def filterstring(proto: int | str, portnumber: int) -> str:
         if portnumber == -1:
             portnumber = 30491
         return "%s and port %d" % (proto, portnumber)
 
     @staticmethod
-    def publisherstring(proto):
+    def publisherstring(proto: int | str) -> str | None:
         if proto == "udp":
             return "Udp"
         if proto == "tcp":
@@ -382,7 +497,15 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
         return None
 
     @staticmethod
-    def write_footer(f, msgname, capdev, capfilter, publisher, ip, portnumber):
+    def write_footer(
+        f: TextIO,
+        msgname: str,
+        capdev: str,
+        capfilter: str,
+        publisher: str | None,
+        ip: str,
+        portnumber: int,
+    ) -> None:
 
         block = """			</Block>
 
@@ -442,13 +565,13 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
 
 
 class SOMEIPParameter(SOMEIPBaseParameter):
-    def peachout(self, f):
+    def peachout(self, f: TextIO) -> None:
         if self.__datatype__ is not None:
-            self.__datatype__.peachout(f, 4, self.name(), 1, 1)
+            cast(_PeachDatatype, self.__datatype__).peachout(f, 4, self.name(), 1, 1)
 
 
 class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
-    def peachout(self, f, indent, paramname, minnum, maxnum):
+    def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
         endian = "little"
         if self.bigendian():
             endian = "big"
@@ -467,7 +590,7 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
 
 
 class SOMEIPParameterString(SOMEIPBaseParameterString):
-    def peachout_bom(self, f, indent, blockid):
+    def peachout_bom(self, f: TextIO, indent: int, blockid: str) -> int:
         identtabs = indent * "	"
         t = self.__chartype__
 
@@ -486,7 +609,7 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
         print("ERROR: Cannot generate BOM for this string %s" % (self.name()))
         return 0
 
-    def peachout(self, f, indent, paramname, minnum, maxnum):
+    def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
         identtabs = indent * "	"
 
         endian = "BE"
@@ -571,7 +694,7 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
 
 
 class SOMEIPParameterArray(SOMEIPBaseParameterArray):
-    def peachout(self, f, indent, paramname, minnum, maxnum):
+    def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
         counter = 0
         identtabs = indent * "	"
 
@@ -598,13 +721,13 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
 
             f.write('%s<Block name="%s" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid))
             f.write('%s	<Block name="%s" minOccurs="%d" maxOccurs="%d">\n' % (identtabs, "Data" + blockid, min2, max2))
-            self.child().peachout(f, indent + 2, paramname, 1, 1)
+            cast(_PeachDatatype, self.child()).peachout(f, indent + 2, paramname, 1, 1)
             f.write("%s	</Block>\n" % identtabs)
             f.write("%s</Block>\n" % identtabs)
 
 
 class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
-    def peachout(self, f, indent, paramname, minnum, maxnum):
+    def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
         identtabs = indent * "	"
         blockid = "Struct%s%x" % (self.name(), id(self))
 
@@ -623,25 +746,25 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
             # print "struct-member: ", member
             child = member.child()
             # print "struct-member-child: ", child
-            child.peachout(f, indent + 1, member.name(), 1, 1)
+            cast(_PeachDatatype, child).peachout(f, indent + 1, member.name(), 1, 1)
         f.write("%s</Block>\n" % identtabs)
         # f.write("%s<!-- Struct %s end -->\n" % (identtabs, self.__name__))
 
 
 class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
-    def peachout(self, f, indent, paramname, minnum, maxnum):
+    def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
         if self.__child__ is not None:
-            self.__child__.peachout(f, indent, paramname, minnum, maxnum)
+            cast(_PeachDatatype, self.__child__).peachout(f, indent, paramname, minnum, maxnum)
 
 
 class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
-    def peachout(self, f, indent, paramname, minnum, maxnum):
+    def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
         if self.__child__ is not None:
-            self.__child__.peachout(f, indent, paramname, minnum, maxnum)
+            cast(_PeachDatatype, self.__child__).peachout(f, indent, paramname, minnum, maxnum)
 
 
 class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
-    def peachout(self, f, indent, paramname, minnum, maxnum):
+    def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
         identtabs = indent * "	"
 
         blockidchoice = "Union%s%x" % (self.name(), id(self))
@@ -673,7 +796,7 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
                 return
 
             f.write('%s		<Block name="%s" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid))
-            member.child().peachout(f, indent + 3, member.name(), 1, 1)
+            cast(_PeachDatatype, member.child()).peachout(f, indent + 3, member.name(), 1, 1)
             f.write("%s		</Block>\n" % identtabs)
 
             f.write("	%s</Block>\n" % identtabs)
@@ -682,12 +805,12 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
 
 
 class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
-    def peachout(self, f, indent, paramname, minnum, maxnum):
+    def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
         if self.__child__ is not None:
-            self.__child__.peachout(f, indent, paramname, minnum, maxnum)
+            cast(_PeachDatatype, self.__child__).peachout(f, indent, paramname, minnum, maxnum)
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Converting configuration to peach xml.")
     parser.add_argument("type", choices=parser_formats, help="format")
     parser.add_argument(
@@ -713,7 +836,7 @@ def parse_arguments():
     return args
 
 
-def main():
+def main() -> None:
     global g_gen_portid
 
     print("Converting configuration to peach xml\n")
@@ -721,7 +844,7 @@ def main():
 
     g_gen_portid = args.generate_switch_port_names
 
-    ecu_name_mapping = {}
+    ecu_name_mapping: dict[str, str] = {}
     if args.ecu_name_mapping is not None:
         ecu_name_mapping = read_csv_to_dict(args.ecu_name_mapping)
 
@@ -733,6 +856,7 @@ def main():
         plugin_file=args.plugin,
         ecu_name_replacement=ecu_name_mapping,
     )
+    assert output_dir is not None
 
     target_dir = os.path.join(output_dir, "peach")
 

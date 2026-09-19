@@ -27,6 +27,24 @@ line-length = 149
 profile = "black"
 line_length = 149
 
+[tool.mypy]
+python_version = "3.13"
+strict = true
+warn_unused_ignores = true
+show_error_codes = true
+warn_return_any = true
+no_implicit_reexport = true
+disallow_any_generics = true
+
+# Never scan local virtual environments.
+exclude = "(^|/)(\\.venv|venv_brew|venv_brew\\.disables)/"
+
 [tool.pytest]
 addopts = ["-n", "auto", "--cov=.", "--cov-report=html"]
 testpaths = ["tests"]
+
+[dependency-groups]
+dev = [
+    "lxml-stubs>=0.5.1",
+    "mypy>=2.3.1",
+]

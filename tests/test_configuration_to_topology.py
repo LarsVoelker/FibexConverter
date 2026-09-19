@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """Unit tests for configuration_to_topology module."""
 
 from configuration_base_classes import BaseConfigurationFactory
@@ -7,32 +8,32 @@ from configuration_base_classes import BaseConfigurationFactory
 class TestTopologyOutput:
     """Test cases for topology output generation."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.factory = BaseConfigurationFactory()
 
-    def test_create_vlan(self):
+    def test_create_vlan(self) -> None:
         """Test VLAN creation."""
         vlan = self.factory.create_vlan("VLAN100", 100, 0)
         assert vlan.name() == "VLAN100"
         assert vlan.vlanid() == 100
         assert vlan.priority() == 0
 
-    def test_create_switch(self):
+    def test_create_switch(self) -> None:
         """Test switch creation."""
         ecu = self.factory.create_ecu("ECU1", [])
         switch = self.factory.create_switch("Switch1", ecu, [])
         assert switch.name() == "Switch1"
         assert switch.ecu() == ecu
 
-    def test_create_switch_port(self):
+    def test_create_switch_port(self) -> None:
         """Test switch port creation."""
         controller = self.factory.create_controller("Controller1", [])
         port = self.factory.create_switch_port(portid="PORT1", ctrl=controller, port=None, default_vlan=None, vlans=[])
         assert port.portid() == "PORT1"
         assert port.connected_to_ecu_ctrl() == controller
 
-    def test_create_multicast_path(self):
+    def test_create_multicast_path(self) -> None:
         """Test multicast path creation."""
         port1 = self.factory.create_switch_port("PORT1", None, None, None, [])
         port2 = self.factory.create_switch_port("PORT2", None, None, None, [])
@@ -50,7 +51,7 @@ class TestTopologyOutput:
         assert mcast.source_addr() == "192.168.1.1"
         assert mcast.mc_addr() == "224.0.0.1"
 
-    def test_create_socket(self):
+    def test_create_socket(self) -> None:
         """Test socket creation."""
         socket = self.factory.create_socket(
             name="Socket1",
@@ -71,7 +72,7 @@ class TestTopologyOutput:
 class TestTopologyTableEntry:
     """Test cases for TopologyTableEntry."""
 
-    def test_entry_creation_with_controllers(self):
+    def test_entry_creation_with_controllers(self) -> None:
         """Test creating an entry with controllers."""
         from configuration_to_topology import TopologyTableEntry
 
@@ -90,7 +91,7 @@ class TestTopologyTableEntry:
         assert entry.ecu_to() == "ECU2"
         assert entry.to_output_set([100, 200]) is not None
 
-    def test_entry_creation_with_switches(self):
+    def test_entry_creation_with_switches(self) -> None:
         """Test creating an entry with switches."""
         from configuration_to_topology import TopologyTableEntry
 
@@ -113,7 +114,7 @@ class TestTopologyTableEntry:
 class TestTopologyHelper:
     """Test helper functions for topology."""
 
-    def test_create_vlan(self):
+    def test_create_vlan(self) -> None:
         """Test creating VLANs."""
         factory = BaseConfigurationFactory()
         vlan1 = factory.create_vlan("VLAN100", 100, 0)
@@ -122,7 +123,7 @@ class TestTopologyHelper:
         assert vlan1.vlanid() == 100
         assert vlan2.vlanid() == 200
 
-    def test_create_ecu(self):
+    def test_create_ecu(self) -> None:
         """Test creating ECUs."""
         factory = BaseConfigurationFactory()
         ecu1 = factory.create_ecu("ECU1", [])

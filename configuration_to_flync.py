@@ -27,7 +27,9 @@ import json
 import os.path
 import re
 import time
+from typing import Any, Literal, cast
 
+from flync.core.datatypes.macaddress import FLYNCMacAddress
 from flync.model.flync_4_bus.can_bus import CANBus
 from flync.model.flync_4_communication import FLYNCChannelConfig, FLYNCCommunicationConfig
 from flync.model.flync_4_ecu import BASET1, ECU, RGMII, Controller, ECUPort, EthernetInterface, InternalTopology
@@ -44,7 +46,7 @@ from flync.model.flync_4_ecu.socket_container import SocketContainer
 from flync.model.flync_4_ecu.sockets import DeploymentUnion, IPv4AddressEndpoint, IPv6AddressEndpoint, SocketTCP, SocketUDP, TCPOption
 from flync.model.flync_4_ecu.switch import Switch as FLYNCSwitch
 from flync.model.flync_4_ecu.switch import SwitchPort as FLYNCSwitchPort
-from flync.model.flync_4_ecu.switch import VLANEntry
+from flync.model.flync_4_ecu.switch import VLANEntry  # type: ignore[attr-defined]
 from flync.model.flync_4_metadata import BaseVersion, ECUMetadata, EmbeddedMetadata, SOMEIPServiceMetadata, SystemMetadata
 from flync.model.flync_4_signal.frame import CANFDFrame, CANFrame
 from flync.model.flync_4_signal.pdu import ContainedPDURef, ContainerPDU, ContainerPDUHeader, MultiplexedPDU, MuxGroup, PDUInstance, StandardPDU
@@ -71,6 +73,7 @@ from flync.model.flync_4_someip import (
 
 # Import FLYNC datatypes for parameter conversion
 from flync.model.flync_4_someip.someip_datatypes import (
+    AllTypes,
     Boolean,
     DynamicLengthString,
     Enum,
@@ -78,10 +81,12 @@ from flync.model.flync_4_someip.someip_datatypes import (
     FixedLengthString,
     Float32,
     Float64,
+    Floats,
     Int8,
     Int16,
     Int32,
     Int64,
+    Ints,
     Typedef,
     UInt8,
     UInt16,
@@ -91,10 +96,28 @@ from flync.model.flync_4_someip.someip_datatypes import (
 from flync.model.flync_4_topology import FLYNCTopology, SystemTopology
 from flync.model.flync_4_topology.system_topology import ExternalConnection
 from flync.model.flync_model import FLYNCModel
-from flync.sdk.workspace.flync_workspace import FLYNCWorkspace, WorkspaceConfiguration
+from flync.sdk.workspace.flync_workspace import FLYNCWorkspace, WorkspaceConfiguration  # type: ignore[attr-defined]
 
 from configuration_base_classes import (
     BaseConfigurationFactory,
+    BaseController,
+    BaseECU,
+    BaseEthernetPDUInstance,
+    BaseFrame,
+    BaseFrameTriggering,
+    BaseFrameTriggeringCAN,
+    BaseInterface,
+    BaseMultiplexPDU,
+    BaseMultiplexPDUSegmentPosition,
+    BaseMultiplexPDUSwitch,
+    BasePDU,
+    BasePDUInstance,
+    BaseSignal,
+    BaseSignalInstance,
+    BaseSocket,
+    BaseSwitchPort,
+    BaseVLAN,
+    SOMEIPBaseDatatype,
     SOMEIPBaseParameter,
     SOMEIPBaseParameterArray,
     SOMEIPBaseParameterBasetype,
@@ -105,6 +128,10 @@ from configuration_base_classes import (
     SOMEIPBaseParameterTypedef,
     SOMEIPBaseParameterUnion,
     SOMEIPBaseService,
+    SOMEIPBaseServiceEvent,
+    SOMEIPBaseServiceEventgroup,
+    SOMEIPBaseServiceField,
+    SOMEIPBaseServiceMethod,
     read_csv_to_dict,
 )
 from parser_dispatcher import (
@@ -116,53 +143,67 @@ from parser_dispatcher import (
 
 FLYNC_VERSION = "0.11.0"
 
+FLYNCUsage = Literal[
+    "application",
+    "bap",
+    "diag_request",
+    "diag_response",
+    "diag_state",
+    "network_management",
+    "other",
+    "service",
+    "tpl",
+    "xcp_pre_configured",
+    "xcp_runtime_configured",
+]
+
 g_gen_portid = False
 
 
-def _fibex_endianness_to_flync(value):
+def _fibex_endianness_to_flync(value: object) -> Literal["BE", "LE"]:
     """Map a FIBEX is-high-low-byte-order value (bool or truthy string) to FLYNC 'BE'/'LE'."""
     return "BE" if str(value).lower() == "true" else "LE"
 
 
 class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
-    def __init__(self, globalid, name, name2, child):
+    def __init__(self, globalid: int | str, name: str, name2: str, child: SOMEIPBaseDatatype) -> None:
         super(SOMEIPParameterTypedef, self).__init__(name, name2, child)
         self.__globalid__ = int(globalid)
 
-    def globalid(self):
+    def globalid(self) -> int:
         return self.__globalid__
 
 
 class SimpleConfigurationFactory(BaseConfigurationFactory):
-    def __init__(self):
-        self.__param_typedefs_children = dict()
-        self.__globalid_typedefs = 1
+    def __init__(self) -> None:
+        self.__param_typedefs_children: dict[int, SOMEIPParameter] = dict()
+        self.__globalid_typedefs: int = 1
 
-        self.__flync_model = None
-        self.__flync_workspace = None
+        self.__flync_model: FLYNCModel | None = None
+        self.__flync_workspace: FLYNCWorkspace | None = None
 
-        self.__flync_ecus = list()
-        self.__flync_connections = list()
+        self.__flync_ecus: list[ECU] = list()
+        self.__flync_connections: list[ExternalConnection] = list()
 
-        self.__base_ecus = {}  # ecu_name -> BaseECU
-        self.__base_vlan_name_to_id = {}  # vlan_name -> int vlan_id
-        self.__ipv4_netmasks = {}  # ip_str -> netmask_str
-        self.__ipv6_prefix_lengths = {}  # exploded_ip_str -> prefixlen_str
+        self.__base_ecus: dict[str, BaseECU] = {}  # ecu_name -> BaseECU
+        self.__base_vlan_name_to_id: dict[str, int] = {}  # vlan_name -> int vlan_id
+        self.__ipv4_netmasks: dict[str, str] = {}  # ip_str -> netmask_str
+        self.__ipv6_prefix_lengths: dict[str, str] = {}  # exploded_ip_str -> prefixlen_str
         self.__mac_counter = 0
 
         # CAN signal/PDU/frame/cluster data collected during FIBEX parsing
-        self.__cluster_info = {}  # cluster_id → {name, speed, protocol, channel_refs}
-        self.__channel_to_cluster = {}  # channel_ref → cluster_id
-        self.__can_signals = {}  # signal_id → BaseSignal
-        self.__can_pdus = {}  # pdu_id → BasePDU
-        self.__mux_sub_pdu_ids = set()  # IDs of PDUs that are sub-PDUs of a mux PDU (not written as standalone FLYNC files)
-        self.__can_frames = {}  # frame_id → BaseFrame
-        self.__eth_pdu_insts = {}  # header_id → BaseEthernetPDUInstance
-        self.__can_fts = {}  # ft_id → BaseFrameTriggeringCAN
-        self.__ft_to_channel = {}  # ft.id() → channel_name
-        self.__ecu_frame_fts = {}  # ecu_name → {out: [ft,...], in: [ft,...]}
+        self.__cluster_info: dict[str, dict[str, Any]] = {}  # cluster_id → {name, speed, protocol, channel_refs}
+        self.__channel_to_cluster: dict[str, str] = {}  # channel_ref → cluster_id
+        self.__can_signals: dict[str, BaseSignal] = {}  # signal_id → BaseSignal
+        self.__can_pdus: dict[str, BasePDU | BaseMultiplexPDU] = {}  # pdu_id → BasePDU
+        self.__mux_sub_pdu_ids: set[str] = set()  # IDs of PDUs that are sub-PDUs of a mux PDU (not written as standalone FLYNC files)
+        self.__can_frames: dict[str, BaseFrame] = {}  # frame_id → BaseFrame
+        self.__eth_pdu_insts: dict[int | None, BaseEthernetPDUInstance] = {}  # header_id → BaseEthernetPDUInstance
+        self.__can_fts: dict[str, BaseFrameTriggeringCAN] = {}  # ft_id → BaseFrameTriggeringCAN
+        self.__ft_to_channel: dict[str, str] = {}  # ft.id() → channel_name
+        self.__ecu_frame_fts: dict[str, dict[str, list[BaseFrameTriggering]]] = {}  # ecu_name → {out: [ft,...], in: [ft,...]}
 
-        self.__flync_someip_services = list()
+        self.__flync_someip_services: list[SOMEIPServiceInterface] = list()
         self.__flync_tcp_profile = TCPOption(tcp_profile_id=1)
         self.__flync_someip_timings = SOMEIPTimingProfile(
             profiles=[
@@ -190,18 +231,19 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             )
         )
 
-    def base_ecus(self):
+    def base_ecus(self) -> dict[str, BaseECU]:
         return self.__base_ecus
 
     # -------------------------------------------------------------------------
     # Overrides to track FIBEX base objects for topology generation
     # -------------------------------------------------------------------------
 
-    def create_ecu(self, name, controllers):
+    def create_ecu(self, name: str, controllers: list[BaseController]) -> BaseECU:
         ret = super().create_ecu(name, controllers)
         self.base_ecus()[name] = ret
         # Collect per-ECU frame triggerings for CAN bus building
-        out_fts, in_fts = [], []
+        out_fts: list[BaseFrameTriggering] = []
+        in_fts: list[BaseFrameTriggering] = []
         for ctrl in controllers:
             for iface in ctrl.interfaces():
                 out_fts.extend(iface.frame_triggerings_out().values())
@@ -209,65 +251,100 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__ecu_frame_fts[name] = {"out": out_fts, "in": in_fts}
         return ret
 
-    def add_cluster_info(self, cluster_id, name, speed, protocol, channel_refs):
+    def add_cluster_info(self, cluster_id: str, name: str, speed: int, protocol: str, channel_refs: list[str]) -> None:
         self.__cluster_info[cluster_id] = {"name": name, "speed": speed, "protocol": protocol, "channel_refs": channel_refs}
         for ch_ref in channel_refs:
             self.__channel_to_cluster[ch_ref] = cluster_id
 
-    def create_signal(self, id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen):
+    def create_signal(
+        self,
+        id: str,
+        name: str,
+        compu_scale: tuple[float, float, float] | None,
+        compu_consts: list[object] | None,
+        bit_len: int,
+        min_len: int,
+        max_len: int,
+        basetype: str,
+        basetypelen: int,
+    ) -> BaseSignal:
         ret = super().create_signal(id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen)
         self.__can_signals[id] = ret
         return ret
 
-    def create_pdu(self, id, short_name, byte_length, pdu_type, signal_instances):
+    def create_pdu(self, id: str, short_name: str, byte_length: int, pdu_type: str, signal_instances: dict[int, BaseSignalInstance]) -> BasePDU:
         ret = super().create_pdu(id, short_name, byte_length, pdu_type, signal_instances)
         self.__can_pdus[id] = ret
         return ret
 
-    def create_multiplex_pdu(self, id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances, static_segs, static_pdu):
+    def create_multiplex_pdu(
+        self,
+        id: str,
+        short_name: str,
+        byte_length: int,
+        pdu_type: str,
+        switch: BaseMultiplexPDUSwitch | None,
+        seg_pos: list[BaseMultiplexPDUSegmentPosition],
+        pdu_instances: list[BasePDUInstance] | None,
+        static_segs: list[BaseMultiplexPDUSegmentPosition],
+        static_pdu: BasePDU | None,
+    ) -> BaseMultiplexPDU:
         ret = super().create_multiplex_pdu(id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances, static_segs, static_pdu)
         self.__can_pdus[id] = ret
         # Sub-PDUs must NOT be written as standalone FLYNC files; their signal names clash
         # with the same names embedded inside the MultiplexedPDU's mux groups, causing the
         # FLYNC workspace loader's UniqueName registry to raise assertion errors.
-        for sub_pdu in (pdu_instances or {}).values():
+        for sub_pdu in cast("dict[str, BasePDUInstance | None]", pdu_instances or {}).values():
             if sub_pdu is not None:
-                self.__mux_sub_pdu_ids.add(sub_pdu.id())
+                self.__mux_sub_pdu_ids.add(cast(Any, sub_pdu).id())
         if static_pdu is not None:
             self.__mux_sub_pdu_ids.add(static_pdu.id())
         return ret
 
-    def create_frame(self, id, short_name, byte_length, frame_type, pdu_instances):
+    def create_frame(self, id: str, short_name: str, byte_length: int, frame_type: str, pdu_instances: dict[str, BasePDUInstance]) -> BaseFrame:
         ret = super().create_frame(id, short_name, byte_length, frame_type, pdu_instances)
         self.__can_frames[id] = ret
         return ret
 
-    def create_frame_triggering_can(self, id, frame, can_id, is_extended_id=False, is_can_fd=False):
+    def create_frame_triggering_can(
+        self, id: str, frame: BaseFrame, can_id: int, is_extended_id: bool = False, is_can_fd: bool = False
+    ) -> BaseFrameTriggeringCAN:
         ret = super().create_frame_triggering_can(id, frame, can_id, is_extended_id=is_extended_id, is_can_fd=is_can_fd)
         self.__can_fts[id] = ret
         return ret
 
-    def create_ethernet_pdu_instance(self, pdu_ref, header_id):
+    def create_ethernet_pdu_instance(self, pdu_ref: str, header_id: int | None) -> BaseEthernetPDUInstance:
         ret = super().create_ethernet_pdu_instance(pdu_ref, header_id)
         self.__eth_pdu_insts[header_id] = ret
         return ret
 
-    def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
+    def create_interface(
+        self,
+        name: str,
+        vlanid: int | None,
+        ips: list[str],
+        sockets: list[BaseSocket],
+        input_frame_trigs: dict[str, BaseFrameTriggering],
+        output_frame_trigs: dict[str, BaseFrameTriggering],
+        fr_channel: int | None,
+    ) -> BaseInterface:
         ret = super().create_interface(name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel)
         # Map frame triggering IDs → channel name so we can group frames by channel
         for ft in list((input_frame_trigs or {}).values()) + list((output_frame_trigs or {}).values()):
             self.__ft_to_channel[ft.id()] = name
         return ret
 
-    def create_vlan(self, name, vlanid, prio):
+    def create_vlan(self, name: str, vlanid: int | None, prio: int | None) -> BaseVLAN:
         ret = super().create_vlan(name, vlanid, prio)
         if vlanid is not None and name:
             self.__base_vlan_name_to_id[name] = int(vlanid)
         return ret
 
-    def create_switch_port(self, portid, ctrl, port, default_vlan, vlans):
+    def create_switch_port(
+        self, portid: str, ctrl: BaseController | None, port: BaseSwitchPort | None, default_vlan: int | None, vlans: list[BaseVLAN]
+    ) -> BaseSwitchPort:
         ret = super().create_switch_port(portid, ctrl, port, default_vlan, vlans)
-        ret._flync_default_vlan_ref = default_vlan
+        ret._flync_default_vlan_ref = default_vlan  # type: ignore[attr-defined]
         return ret
 
     # -------------------------------------------------------------------------
@@ -275,52 +352,53 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     # -------------------------------------------------------------------------
 
     @staticmethod
-    def _safe_name(s):
+    def _safe_name(s: str | None) -> str:
         return re.sub(r"[^a-zA-Z0-9]", "_", s) if s else "unknown"
 
-    def _get_default_vlan_id(self, base_switch_port):
+    def _get_default_vlan_id(self, base_switch_port: BaseSwitchPort) -> int:
         default_ref = getattr(base_switch_port, "_flync_default_vlan_ref", None)
         vlans = base_switch_port.vlans_objs()
         if default_ref:
             for vlan in vlans:
                 if vlan.name() and vlan.name() in default_ref:
-                    return int(vlan.vlanid()) if vlan.vlanid() is not None else 0
+                    vlan_id_val = vlan.vlanid()
+                    return int(vlan_id_val) if vlan_id_val is not None else 0
         ids = base_switch_port.vlans()
         return ids[0] if ids else 0
 
-    def add_ipv4_address_config(self, ip, netmask):
+    def add_ipv4_address_config(self, ip: str, netmask: str) -> None:
         self.__ipv4_netmasks[ip] = netmask
 
-    def get_ipv4_netmask(self, ip):
+    def get_ipv4_netmask(self, ip: str) -> str:
         return self.__ipv4_netmasks.get(str(ip), "255.255.255.0")
 
-    def add_ipv6_address_config(self, ip, prefixlen):
+    def add_ipv6_address_config(self, ip: str, prefixlen: str) -> None:
         tmp = ipaddress.ip_address(ip).exploded
         self.__ipv6_prefix_lengths[tmp] = prefixlen
 
-    def get_ipv6_prefix_length(self, ip):
+    def get_ipv6_prefix_length(self, ip: str) -> str:
         try:
             tmp = ipaddress.ip_address(ip).exploded
-            return self.__ipv6_prefix_lengths.get(tmp)
+            return self.__ipv6_prefix_lengths.get(tmp, "")
         except ValueError:
-            return None
+            return ""
 
-    def _next_mac(self):
+    def _next_mac(self) -> str:
         """Generate a unique locally-administered placeholder MAC address."""
         mac_int = 0x020000000000 | (self.__mac_counter & 0xFFFFFFFFFF)
         self.__mac_counter += 1
         hex_str = f"{mac_int:012x}"
         return ":".join(hex_str[i : i + 2] for i in range(0, 12, 2))
 
-    def _to_flync_socket(self, fibex_socket):
+    def _to_flync_socket(self, fibex_socket: BaseSocket) -> SocketTCP | SocketUDP | None:
         """Convert a FIBEX BaseSocket to a FLYNC SocketUDP/SocketTCP, or None if not supported."""
         if fibex_socket.is_multicast():
             # Multicast sockets use IPv4 multicast addresses; only UDP is valid.
             if not fibex_socket.is_ipv4():
                 print(f"WARNING: Only IPv4 multicast sockets are supported! Address: {fibex_socket.ip()}")
                 return None
-            ip = ipaddress.IPv4Address(fibex_socket.ip())
-            deployments = []
+            mcast_ip = ipaddress.IPv4Address(fibex_socket.ip())
+            mcast_deployments: list[DeploymentUnion] = []
             for client in fibex_socket.serviceinstanceclients() or []:
                 svc = client.service()
                 try:
@@ -331,7 +409,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     ]
                     receiver_eg_ids = {r.eventgroupid() for r in svc_receivers}
                     consumed_egs = [svc.eventgroups()[egid].name() for egid in sorted(receiver_eg_ids) if egid in svc.eventgroups()]
-                    dep = SOMEIPServiceConsumer(
+                    dep_consumer = SOMEIPServiceConsumer(
                         deployment_type="someip_consumer",
                         service=svc.serviceid(),
                         major_version=svc.majorversion(),
@@ -339,18 +417,19 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         someip_sd_timings_profile="default",
                         consumed_eventgroups=consumed_egs,
                     )
-                    deployments.append(DeploymentUnion(root=dep))
+                    mcast_deployments.append(DeploymentUnion(root=dep_consumer))
                 except Exception as e:
                     print(f"WARNING: Could not create SOMEIPServiceConsumer for 0x{svc.serviceid():04x}: {type(e).__name__}: {e}")
             sock_name = str(fibex_socket.name()) if fibex_socket.name() is not None else "None"
             return SocketUDP(
                 name=sock_name,
-                endpoint_address=ip,
+                endpoint_address=mcast_ip,
                 protocol="udp",
                 port_no=fibex_socket.portnumber(),
-                deployments=deployments,
+                deployments=mcast_deployments,
             )
 
+        ip: ipaddress.IPv4Address | ipaddress.IPv6Address
         if fibex_socket.is_ipv4():
             ip = ipaddress.IPv4Address(fibex_socket.ip())
         elif fibex_socket.is_ipv6():
@@ -359,9 +438,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             print(f"WARNING: Only support sockets with IPv4 or IPv6 addresses! Address: {fibex_socket.ip()}")
             return None
 
-        proto = (fibex_socket.proto() or "udp").lower()
+        proto = str(fibex_socket.proto() or "udp").lower()
 
-        deployments = []
+        deployments: list[DeploymentUnion] = []
 
         for instance in fibex_socket.instances() or []:
             svc = instance.service()
@@ -377,7 +456,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     provided_egs = [svc.eventgroups()[egid].name() for egid in sorted(sender_eg_ids) if egid in svc.eventgroups()]
                 else:
                     provided_egs = None
-                dep = SOMEIPServiceProvider(
+                dep_provider = SOMEIPServiceProvider(
                     deployment_type="someip_provider",
                     service=svc.serviceid(),
                     major_version=svc.majorversion(),
@@ -386,7 +465,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     someip_sd_timings_profile="default",
                     provided_eventgroups=provided_egs,
                 )
-                deployments.append(DeploymentUnion(root=dep))
+                deployments.append(DeploymentUnion(root=dep_provider))
             except Exception as e:
                 print(f"WARNING: Could not create SOMEIPServiceProvider for 0x{svc.serviceid():04x}: {type(e).__name__}: {e}")
 
@@ -400,7 +479,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 ]
                 receiver_eg_ids = {r.eventgroupid() for r in svc_receivers}
                 consumed_egs = [svc.eventgroups()[egid].name() for egid in sorted(receiver_eg_ids) if egid in svc.eventgroups()]
-                dep = SOMEIPServiceConsumer(
+                dep_client = SOMEIPServiceConsumer(
                     deployment_type="someip_consumer",
                     service=svc.serviceid(),
                     major_version=svc.majorversion(),
@@ -408,7 +487,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     someip_sd_timings_profile="default",
                     consumed_eventgroups=consumed_egs,
                 )
-                deployments.append(DeploymentUnion(root=dep))
+                deployments.append(DeploymentUnion(root=dep_client))
             except Exception as e:
                 print(f"WARNING: Could not create SOMEIPServiceConsumer for 0x{svc.serviceid():04x}: {type(e).__name__}: {e}")
 
@@ -430,14 +509,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             deployments=deployments,
         )
 
-    def create_flync_ecus(self):
+    def create_flync_ecus(self) -> None:
         """Convert FIBEX ECU/switch topology into FLYNC ECU objects."""
         self._create_flync_ecus_impl()
 
-    def _create_flync_ecus_impl(self):
+    def _create_flync_ecus_impl(self) -> None:
         # cpu_port_ctrl_name_map[(ecu_name, port_id)] = ctrl_name
         # Populated in Step 2; used in Step 3 to create SwitchPortToControllerInterface.
-        cpu_port_ctrl_name_map = {}
+        cpu_port_ctrl_name_map: dict[tuple[str, str], str] = {}
 
         # ------------------------------------------------------------------
         # Step 1: Collect external connections and assign MDI roles
@@ -445,17 +524,17 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         # The issue is that we do know the role and have to set something.
         # ------------------------------------------------------------------
         # role_map[(ecu_name, port_id)] = "master" | "slave"
-        role_map = {}
+        role_map: dict[tuple[str, str], str] = {}
         # ext_connections: list of (ecu1_name, port1_id, ecu2_name, port2_id)
-        ext_connections = []
+        ext_connections: list[tuple[str, str, str, str]] = []
         # intra_ecu_swsw_pairs: list of (ecu_name, port1_id, sw1_name, port2_id, sw2_name)
         # for switch-to-switch connections that stay within a single ECU. Emitted
         # in Step 3b as SwitchPortToSwitchPort (FLYNC "switch_to_switch_same_ecu").
-        intra_ecu_swsw_pairs = []
+        intra_ecu_swsw_pairs: list[tuple[str, str, str, str, str]] = []
         # intra_ecu_swsw_mii_mode[(ecu_name, port_id)] = "mac" | "phy"
         # FLYNC requires complementary MII modes on the two endpoints.
-        intra_ecu_swsw_mii_mode = {}
-        seen_pairs = set()
+        intra_ecu_swsw_mii_mode: dict[tuple[str, str], Literal["mac", "phy"]] = {}
+        seen_pairs: set[frozenset[tuple[str, str]]] = set()
 
         for ecu_name, base_ecu in sorted(self.base_ecus().items()):
             for base_switch in base_ecu.switches():
@@ -465,7 +544,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
                     if peer_port is not None:
                         # Switch-to-switch connection
-                        peer_ecu = peer_port.switch().ecu()
+                        peer_switch = peer_port.switch()
+                        assert peer_switch is not None
+                        peer_ecu = peer_switch.ecu()
                         if peer_ecu is None:
                             continue
                         peer_ecu_name = peer_ecu.name()
@@ -485,7 +566,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                                     own_port_id,
                                     self._safe_name(base_switch.name()),
                                     peer_port_id,
-                                    self._safe_name(peer_port.switch().name()),
+                                    self._safe_name(peer_switch.name()),
                                 )
                             )
                             # FLYNC requires both endpoints of a SwitchPortToSwitchPort to
@@ -532,20 +613,20 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         # Step 2: Build FLYNC SwitchPorts, VLANEntries, and Switches per ECU
         # ------------------------------------------------------------------
         # flync_switches_per_ecu[ecu_name] = [FLYNCSwitch, ...]
-        flync_switches_per_ecu = {}
+        flync_switches_per_ecu: dict[str, list[FLYNCSwitch]] = {}
         # flync_swport_name_map[(ecu_name, sw_name_safe, base_port_id)] = flync_sw_port_name
-        flync_swport_name_map = {}
+        flync_swport_name_map: dict[tuple[str, str, str], str] = {}
         # flync_ecuport_name_map[(ecu_name, base_port_id)] = flync_ecu_port_name
-        flync_ecuport_name_map = {}
+        flync_ecuport_name_map: dict[tuple[str, str], str] = {}
 
         for ecu_name, base_ecu in sorted(self.base_ecus().items()):
-            flync_sw_list = []
+            flync_sw_list: list[FLYNCSwitch] = []
             for base_switch in base_ecu.switches():
                 sw_name = self._safe_name(base_switch.name())
 
-                flync_sw_ports = []
+                flync_sw_ports: list[FLYNCSwitchPort] = []
                 # vlan_id -> {name, priority, [port_names]}
-                vlan_groups = {}
+                vlan_groups: dict[int, dict[str, Any]] = {}
 
                 for i, base_port in enumerate(base_switch.ports()):
                     port_id = base_port.portid(gen_name=g_gen_portid)
@@ -556,8 +637,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     # Identify CPU/management ports: switch port connects to the
                     # ECU's own controller (not an external ECU's controller).
                     local_ctrl = base_port.connected_to_ecu_ctrl()
-                    is_cpu_port = local_ctrl is not None and local_ctrl.ecu() is not None and local_ctrl.ecu().name() == ecu_name
+                    local_ctrl_ecu = local_ctrl.ecu() if local_ctrl is not None else None
+                    is_cpu_port = local_ctrl is not None and local_ctrl_ecu is not None and local_ctrl_ecu.name() == ecu_name
                     if is_cpu_port:
+                        assert local_ctrl is not None
                         cpu_port_ctrl_name_map[(ecu_name, port_id)] = local_ctrl.name()
 
                     # CPU port → RGMII MAC-side. Intra-ECU sw-to-sw port →
@@ -581,8 +664,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
                     # Aggregate VLAN memberships
                     for vlan_obj in base_port.vlans_objs():
-                        vid = int(vlan_obj.vlanid()) if vlan_obj.vlanid() is not None else 0
-                        prio = int(vlan_obj.priority()) if vlan_obj.priority() is not None else 0
+                        vlan_id_val = vlan_obj.vlanid()
+                        vid = int(vlan_id_val) if vlan_id_val is not None else 0
+                        prio_val = vlan_obj.priority()
+                        prio = int(prio_val) if prio_val is not None else 0
                         vlan_name = vlan_obj.name() or f"VLAN{vid}"
                         if vid not in vlan_groups:
                             vlan_groups[vid] = {"name": vlan_name, "priority": prio, "ports": []}
@@ -618,40 +703,40 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         # ------------------------------------------------------------------
         int_conn_id = 0
         for ecu_name, base_ecu in sorted(self.__base_ecus.items()):
-            ecu_ports = []
-            internal_connections = []
+            ecu_ports: list[ECUPort] = []
+            internal_connections: list[InternalConnectionUnion] = []
             has_switches = bool(base_ecu.switches())
 
             # Step 3a: Build FLYNC controllers first.
             # ctrl_iface_map[fibex_ctrl_name] = iface_name  (only for ctrlrs with interfaces)
             fibex_controllers = base_ecu.controllers()
-            flync_controllers = []
-            ctrl_iface_map = {}
+            flync_controllers: list[Controller] = []
+            ctrl_iface_map: dict[str, str] = {}
 
             # Identify which controllers own a CPU/management switch port for this ECU.
             cpu_ctrl_names = {ctrl_name for (e_name, _port_id), ctrl_name in cpu_port_ctrl_name_map.items() if e_name == ecu_name}
 
             for fibex_ctrl in sorted(fibex_controllers, key=lambda c: c.name()):
-                eth_interfaces = []
+                eth_interfaces: list[EthernetInterface] = []
                 fibex_ifaces = fibex_ctrl.interfaces()
 
                 if fibex_ifaces:
-                    virt_ifaces = []
-                    ctrl_vlan_sockets = {}  # vlan_id -> [sockets] for this controller
+                    virt_ifaces: list[VirtualControllerInterface] = []
+                    ctrl_vlan_sockets: dict[int | None, list[SocketTCP | SocketUDP]] = {}  # vlan_id -> [sockets] for this controller
                     for fibex_iface in sorted(fibex_ifaces, key=lambda i: i.vlanid()):
-                        addresses = []
-                        multicast_ips = []
+                        addresses: list[IPv4AddressEndpoint | IPv6AddressEndpoint] = []
+                        multicast_ips: list[ipaddress.IPv4Address | ipaddress.IPv6Address | FLYNCMacAddress] = []
                         for ip_str in fibex_iface.ips():
                             try:
                                 ip_obj = ipaddress.ip_address(ip_str)
                             except ValueError:
                                 continue
                             if ip_obj.version == 4:
-                                ip_addr = ipaddress.IPv4Address(ip_str)
-                                if ip_addr.is_multicast:
-                                    multicast_ips.append(ip_addr)
+                                ip_addr4 = ipaddress.IPv4Address(ip_str)
+                                if ip_addr4.is_multicast:
+                                    multicast_ips.append(ip_addr4)
                                 else:
-                                    netmask_str = self.get_ipv4_netmask(ip_str)
+                                    netmask_str = self.get_ipv4_netmask(str(ip_str))
                                     try:
                                         netmask_addr = ipaddress.IPv4Address(netmask_str)
                                     except (ipaddress.AddressValueError, ValueError) as e:
@@ -659,16 +744,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                                         netmask_addr = ipaddress.IPv4Address("255.255.255.0")
                                     addresses.append(
                                         IPv4AddressEndpoint(
-                                            address=ip_addr,
+                                            address=ip_addr4,
                                             ipv4netmask=netmask_addr,
                                         )
                                     )
                             elif ip_obj.version == 6:
-                                ip_addr = ipaddress.IPv6Address(ip_str)
-                                if ip_addr.is_multicast:
-                                    multicast_ips.append(ip_addr)
+                                ip_addr6 = ipaddress.IPv6Address(ip_str)
+                                if ip_addr6.is_multicast:
+                                    multicast_ips.append(ip_addr6)
                                 else:
-                                    prefix_len = self.get_ipv6_prefix_length(ip_str)
+                                    prefix_len = self.get_ipv6_prefix_length(str(ip_str))
                                     try:
                                         ipv6prefix = int(prefix_len) if prefix_len else 128
                                     except (TypeError, ValueError) as e:
@@ -676,7 +761,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                                         ipv6prefix = 128
                                     addresses.append(
                                         IPv6AddressEndpoint(
-                                            address=ip_addr,
+                                            address=ip_addr6,
                                             ipv6prefix=ipv6prefix,
                                         )
                                     )
@@ -715,14 +800,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         # SwitchPortToControllerInterface compulsory MII check passes.
                         is_cpu_ctrl = fibex_ctrl.name() in cpu_ctrl_names
                         ctrl_iface = EthernetInterfaceConfig(
-                            mac_address=self._next_mac(),
+                            mac_address=cast(Any, self._next_mac()),
                             mii_config=RGMII(type="rgmii", mode="phy", speed=1000) if is_cpu_ctrl else None,
                             virtual_interfaces=virt_ifaces,
                         )
 
                         # Sort sockets by name for deterministic output
-                        for vlan_id in ctrl_vlan_sockets:
-                            ctrl_vlan_sockets[vlan_id].sort(key=lambda s: s.name)
+                        for vid_key in ctrl_vlan_sockets:
+                            ctrl_vlan_sockets[vid_key].sort(key=lambda s: s.name)
                         iface_socket_containers = [
                             SocketContainer(
                                 name=f"{self._safe_name(ecu_name)}_vlan{vlan_id if vlan_id is not None else 0}",
@@ -747,15 +832,15 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 eth_interfaces.sort(key=lambda ei: ei.interface_config.name)
 
                 # Build CAN interfaces for this controller from its FIBEX frame triggerings
-                can_iface_frames: dict = {}  # bus_ref → {"sender": set, "receiver": set}
+                can_iface_frames: dict[str, dict[str, set[int]]] = {}  # bus_ref → {"sender": set, "receiver": set}
                 for fibex_iface in fibex_ctrl.interfaces():
                     for ft in fibex_iface.frame_triggerings_out().values():
-                        if ft.is_can() and ft.frame() is not None:
+                        if isinstance(ft, BaseFrameTriggeringCAN) and ft.is_can() and ft.frame() is not None:
                             ch = self.__ft_to_channel.get(ft.id())
                             if ch:
                                 can_iface_frames.setdefault(ch, {"sender": set(), "receiver": set()})["sender"].add(ft.can_id())
                     for ft in fibex_iface.frame_triggerings_in().values():
-                        if ft.is_can() and ft.frame() is not None:
+                        if isinstance(ft, BaseFrameTriggeringCAN) and ft.is_can() and ft.frame() is not None:
                             ch = self.__ft_to_channel.get(ft.id())
                             if ch:
                                 can_iface_frames.setdefault(ch, {"sender": set(), "receiver": set()})["receiver"].add(ft.can_id())
@@ -802,32 +887,32 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                             ep_name = f"{self._safe_name(ecu_name)}_{sw_name}_{self._safe_name(port_id)}_ep"
                             flync_ecuport_name_map[(ecu_name, port_id)] = ep_name
 
-                            ep = ECUPort(name=ep_name, mdi_config=BASET1(mode="base_t1", role=role))
+                            ep = ECUPort(name=ep_name, mdi_config=BASET1(mode="base_t1", role=cast(Literal["master", "slave"], role)))
                             ecu_ports.append(ep)
 
                             sp_name = flync_swport_name_map[(ecu_name, sw_name, port_id)]
-                            conn = ECUPortToSwitchPort(
+                            conn_sw_port = ECUPortToSwitchPort(
                                 type="ecu_port_to_switch_port",
                                 id=f"int_conn_{int_conn_id}",
                                 ecu_port=ep_name,
                                 switch_port=sp_name,
                             )
-                            internal_connections.append(InternalConnectionUnion(root=conn))
+                            internal_connections.append(InternalConnectionUnion(root=conn_sw_port))
                             int_conn_id += 1
                         else:
                             # CPU/management port → SwitchPortToControllerInterface
                             ctrl_name_for_port = cpu_port_ctrl_name_map.get((ecu_name, port_id))
                             if ctrl_name_for_port is not None:
-                                iface_name = ctrl_iface_map.get(ctrl_name_for_port)
-                                if iface_name is not None:
+                                ctrl_iface_name = ctrl_iface_map.get(ctrl_name_for_port)
+                                if ctrl_iface_name is not None:
                                     sp_name = flync_swport_name_map[(ecu_name, sw_name, port_id)]
-                                    conn = SwitchPortToControllerInterface(
+                                    conn_sw_ctrl = SwitchPortToControllerInterface(
                                         type="switch_port_to_controller_interface",
                                         id=f"int_conn_{int_conn_id}",
                                         switch_port=sp_name,
-                                        controller_interface=iface_name,
+                                        controller_interface=ctrl_iface_name,
                                     )
-                                    internal_connections.append(InternalConnectionUnion(root=conn))
+                                    internal_connections.append(InternalConnectionUnion(root=conn_sw_ctrl))
                                     int_conn_id += 1
 
                 # Intra-ECU switch-to-switch links → SwitchPortToSwitchPort
@@ -839,7 +924,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     sp2_name = flync_swport_name_map.get((ecu_name, sw2_name, port2_id))
                     if sp1_name is None or sp2_name is None:
                         continue
-                    conn = SwitchPortToSwitchPort(
+                    conn_swsw = SwitchPortToSwitchPort(
                         type="switch_to_switch_same_ecu",
                         id=f"int_conn_{int_conn_id}",
                         switch_port=sp1_name,
@@ -847,7 +932,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         switch2_port=sp2_name,
                         switch2=sw2_name,
                     )
-                    internal_connections.append(InternalConnectionUnion(root=conn))
+                    internal_connections.append(InternalConnectionUnion(root=conn_swsw))
                     int_conn_id += 1
 
                 # Corner case "incoherent modeling":
@@ -860,17 +945,17 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         continue
                     ctrl_name_key = port_key.removeprefix("_port_")
                     ep_name = f"{self._safe_name(ecu_name)}_{self._safe_name(ctrl_name_key)}_port"
-                    ep = ECUPort(name=ep_name, mdi_config=BASET1(mode="base_t1", role=endpoint_role))
+                    ep = ECUPort(name=ep_name, mdi_config=BASET1(mode="base_t1", role=cast(Literal["master", "slave"], endpoint_role)))
                     ecu_ports.append(ep)
-                    iface_name = ctrl_iface_map.get(ctrl_name_key)
-                    if iface_name is not None:
-                        conn = ECUPortToControllerInterface(
+                    iface_name_cc = ctrl_iface_map.get(ctrl_name_key)
+                    if iface_name_cc is not None:
+                        conn_ecu_ctrl = ECUPortToControllerInterface(
                             type="ecu_port_to_controller_interface",
                             id=f"int_conn_{int_conn_id}",
                             ecu_port=ep_name,
-                            controller_interface=iface_name,
+                            controller_interface=iface_name_cc,
                         )
-                        internal_connections.append(InternalConnectionUnion(root=conn))
+                        internal_connections.append(InternalConnectionUnion(root=conn_ecu_ctrl))
                         int_conn_id += 1
             else:
                 # Endpoint ECU: one ECUPort per controller connection
@@ -889,29 +974,29 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         ep_name = f"{self._safe_name(ecu_name)}_{self._safe_name(ctrl_name_key)}_port"
                     else:
                         ep_name = f"{self._safe_name(ecu_name)}_port"
-                    ep = ECUPort(name=ep_name, mdi_config=BASET1(mode="base_t1", role=role))
+                    ep = ECUPort(name=ep_name, mdi_config=BASET1(mode="base_t1", role=cast(Literal["master", "slave"], role)))
                     ecu_ports.append(ep)
 
-                    iface_name = ctrl_iface_map.get(ctrl_name_key) if ctrl_name_key else None
-                    if iface_name is not None:
-                        conn = ECUPortToControllerInterface(
+                    iface_name_ep = ctrl_iface_map.get(ctrl_name_key) if ctrl_name_key else None
+                    if iface_name_ep is not None:
+                        conn_ecu_ctrl_ep = ECUPortToControllerInterface(
                             type="ecu_port_to_controller_interface",
                             id=f"int_conn_{int_conn_id}",
                             ecu_port=ep_name,
-                            controller_interface=iface_name,
+                            controller_interface=iface_name_ep,
                         )
-                        internal_connections.append(InternalConnectionUnion(root=conn))
+                        internal_connections.append(InternalConnectionUnion(root=conn_ecu_ctrl_ep))
                         int_conn_id += 1
                     else:
                         # Controller has no virtual interfaces: connect all known interfaces
-                        for iface_name in ctrl_iface_map.values():
-                            conn = ECUPortToControllerInterface(
+                        for other_iface_name in ctrl_iface_map.values():
+                            conn_ecu_ctrl_all = ECUPortToControllerInterface(
                                 type="ecu_port_to_controller_interface",
                                 id=f"int_conn_{int_conn_id}",
                                 ecu_port=ep_name,
-                                controller_interface=iface_name,
+                                controller_interface=other_iface_name,
                             )
-                            internal_connections.append(InternalConnectionUnion(root=conn))
+                            internal_connections.append(InternalConnectionUnion(root=conn_ecu_ctrl_all))
                             int_conn_id += 1
 
             if not ecu_ports:
@@ -958,19 +1043,19 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             self.__flync_connections.append(conn)
 
     # Helper function to convert internal parameter type to FLYNC type
-    def to_flync_base_datatype(self, datatype, name):
+    def to_flync_base_datatype(self, datatype: Any, name: str) -> Boolean | Ints | Floats | None:
         dt = datatype.datatype()
 
         if datatype.bitlength_basetype() != datatype.bitlength_encoded_type():
             print(f"WARNING: Not supporting shortened datatypes! {name=}")
 
-        endian = "BE" if datatype.bigendian() else "LE"
+        endian: Literal["BE", "LE"] = "BE" if datatype.bigendian() else "LE"
 
         match dt:
             case "A_UINT8":
                 # Unfortunately, FIBEX does not model BOOLEAN so we need a heuristic
                 if datatype.name().upper() in ("BOOLEAN", "BOOL"):
-                    return Boolean(name=datatype.name(), type="boolean")
+                    return Boolean(name=datatype.name(), type="boolean")  # type: ignore[call-arg]
                 return UInt8(name=datatype.name(), type="uint8", endianness="BE", signed=False, bit_size=8)
             case "A_UINT16":
                 return UInt16(name=datatype.name(), type="uint16", endianness=endian, signed=False, bit_size=16)
@@ -994,11 +1079,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         print(f"WARNING: Unsupported Base Datatype {dt=}")
         return None
 
-    def to_flync_parameter(self, param, name_override=None):
+    def to_flync_parameter(self, param: Any, name_override: str | None = None) -> SOMEIPParameter | None:
         if isinstance(param, SOMEIPParameterTypedef):
-            tmp = self.__param_typedefs_children.setdefault(param.globalid(), self.to_flync_parameter(param.child()))
+            tmp = self.__param_typedefs_children.setdefault(param.globalid(), cast(SOMEIPParameter, self.to_flync_parameter(param.child())))
             effective_name = name_override if name_override is not None else param.name()
-            return SOMEIPParameter(name=effective_name, datatype=Typedef(name=param.name(), type="typedef", datatyperef=tmp.datatype))
+            return SOMEIPParameter(
+                name=effective_name,
+                datatype=Typedef(name=param.name(), type="typedef", datatyperef=tmp.datatype),  # type: ignore[call-arg]
+            )
 
         if isinstance(param, SOMEIPBaseParameter):
             datatype = param.datatype()
@@ -1011,26 +1099,28 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         if isinstance(datatype, SOMEIPBaseParameterTypedef):
             child = datatype.child()
-            tmp = self.to_flync_parameter(child)
-            if tmp is None:
+            tmp_ref = self.to_flync_parameter(child)
+            if tmp_ref is None:
                 return None
             # TODO: This should be a ref to the datatype and not a copy of the datatype!!!
             return SOMEIPParameter(
-                name=name, description=description, datatype=Typedef(name=datatype.name(), type="typedef", datatyperef=tmp.datatype)
+                name=name,
+                description=description,
+                datatype=Typedef(name=datatype.name(), type="typedef", datatyperef=tmp_ref.datatype),  # type: ignore[call-arg]
             )
 
         elif isinstance(datatype, SOMEIPBaseParameterBasetype):
-            return SOMEIPParameter(name=name, description=description, datatype=self.to_flync_base_datatype(datatype, name))
+            return SOMEIPParameter(name=name, description=description, datatype=cast(AllTypes, self.to_flync_base_datatype(datatype, name)))
 
         elif isinstance(datatype, SOMEIPBaseParameterEnumeration):
             child_dt = datatype.child()
-            dt = self.to_flync_base_datatype(child_dt, child_dt.name())
+            dt = self.to_flync_base_datatype(child_dt, cast(Any, child_dt).name())
             if dt is None:
                 print(f"WARNING: Not supporting enumerations with unknown basetype! {name=}")
                 return None
             endian = dt.endianness
 
-            entries = list()
+            entries: list[EnumEntry] = list()
             for item in datatype.items():
                 descr = "" if item.desc() is None else str(item.desc())
                 entries.append(EnumEntry(name=item.name(), value=item.value(), description=descr))
@@ -1038,7 +1128,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             return SOMEIPParameter(
                 name=name,
                 description=description,
-                datatype=Enum(name=datatype.name(), type="enum", endianness=endian, base_type=dt, entries=entries),
+                datatype=Enum(name=datatype.name(), type="enum", endianness=endian, base_type=cast(Ints, dt), entries=entries),
             )
 
         elif isinstance(datatype, SOMEIPBaseParameterString):
@@ -1059,9 +1149,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         else:
             # Fallback to UInt8 for unknown types
             print(f"WARNING: Unknown datatype '{datatype}' for parameter '{name}', using UInt8")
-            return SOMEIPParameter(name=name, description=description, datatype=UInt8(type="UInt8"))
+            return SOMEIPParameter(name=name, description=description, datatype=UInt8(type="UInt8"))  # type: ignore[call-arg,arg-type]
 
-    def to_flync_string(self, datatype, name, description=""):
+    def to_flync_string(self, datatype: Any, name: str, description: str = "") -> SOMEIPParameter:
         """Convert a FIBEX string to a FLYNC string type."""
         encoding = datatype.chartype() or "UTF-8"
 
@@ -1072,6 +1162,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             print(f"WARNING: Unsupported string encoding '{encoding}' for '{name}', defaulting to UTF-8")
             encoding = "UTF-8"
 
+        encoding_lit = cast(Literal["UTF-8", "UTF-16BE", "UTF-16LE"], encoding)
+
         if datatype.lowerlimit() > datatype.upperlimit():
             print(f"WARNING: String {name} has lowerlimit: {datatype.lowerlimit()} > upperlimit: {datatype.upperlimit()}")
         elif datatype.upperlimit() < 0:
@@ -1079,13 +1171,13 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         if datatype.lowerlimit() == datatype.upperlimit():
             # fixed length
-            tmp = FixedLengthString(
+            tmp: FixedLengthString | DynamicLengthString = FixedLengthString(
                 name=datatype.name(),
                 type="fixed_length_string",
                 length=datatype.upperlimit(),
                 length_of_length_field=datatype.length_of_length(),
-                encoding=encoding,
-            )
+                encoding=encoding_lit,
+            )  # type: ignore[call-arg]
         else:
             # variable length
             pad_to = datatype.pad_to()
@@ -1099,17 +1191,17 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 type="dynamic_length_string",
                 length_of_length_field=datatype.length_of_length(),
                 bit_alignment=pad_to,
-                encoding=encoding,
+                encoding=encoding_lit,
                 max_length=max_len,
                 min_length=min_len,
-            )
+            )  # type: ignore[call-arg]
         return SOMEIPParameter(name=name, description=description, datatype=tmp)
 
-    def to_flync_bitfield(self, datatype, name, description=""):
+    def to_flync_bitfield(self, datatype: Any, name: str, description: str = "") -> SOMEIPParameter:
         """Convert a FIBEX bitfield to a FLYNC Bitfield."""
         from flync.model.flync_4_someip.someip_datatypes import Bitfield, BitfieldEntry
 
-        entries = []
+        entries: list[BitfieldEntry] = []
         for item in datatype.items():
             entries.append(BitfieldEntry(name=item.name(), bitposition=item.bit_number(), description="", values=[]))
 
@@ -1121,14 +1213,21 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             length = 8
 
         return SOMEIPParameter(
-            name=name, description=description, datatype=Bitfield(name=child.name(), type="bitfield", length=length, fields=entries)
+            name=name,
+            description=description,
+            datatype=Bitfield(  # type: ignore[call-arg]
+                name=child.name(),
+                type="bitfield",
+                length=cast(Literal[8, 16, 32, 64], length),
+                fields=entries,
+            ),
         )
 
-    def to_flync_struct(self, datatype, name, description=""):
+    def to_flync_struct(self, datatype: Any, name: str, description: str = "") -> SOMEIPParameter:
         """Convert a FIBEX struct to a FLYNC Struct."""
         from flync.model.flync_4_someip.someip_datatypes import Struct
 
-        members = []
+        members: list[AllTypes] = []
         for m in datatype.members().values():
             child = m.child()
 
@@ -1151,16 +1250,20 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         return SOMEIPParameter(
             name=name,
             description=description,
-            datatype=Struct(
-                name=datatype.name(), type="struct", members=members, length_of_length_field=datatype.length_of_length(), bit_alignment=bit_alignment
+            datatype=Struct(  # type: ignore[call-arg]
+                name=datatype.name(),
+                type="struct",
+                members=members,
+                length_of_length_field=datatype.length_of_length(),
+                bit_alignment=bit_alignment,
             ),
         )
 
-    def to_flync_union(self, datatype, name, description=""):
+    def to_flync_union(self, datatype: Any, name: str, description: str = "") -> SOMEIPParameter:
         """Convert a FIBEX union to a FLYNC Union."""
         from flync.model.flync_4_someip.someip_datatypes import Union, UnionMember
 
-        members = []
+        members: list[UnionMember] = []
         for m in datatype.members().values():
             child = m.child()
 
@@ -1170,7 +1273,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 print(f"WARNING: Skipping union member '{m.name()}' (unsupported datatype)")
                 continue
 
-            members.append(UnionMember(type=child_datatype.datatype, index=m.index(), name=m.name(), mandatory=m.mandatory()))
+            members.append(
+                UnionMember(type=child_datatype.datatype, index=m.index(), name=m.name(), mandatory=m.mandatory())  # type: ignore[call-arg]
+            )
 
         bit_alignment = datatype.pad_to()
         if bit_alignment == 0:
@@ -1179,7 +1284,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         return SOMEIPParameter(
             name=name,
             description=description,
-            datatype=Union(
+            datatype=Union(  # type: ignore[call-arg]
                 name=datatype.name(),
                 type="union",
                 members=members,
@@ -1189,7 +1294,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             ),
         )
 
-    def to_flync_array(self, datatype, name, description=""):
+    def to_flync_array(self, datatype: Any, name: str, description: str = "") -> SOMEIPParameter | None:
         """Convert a FIBEX array to a FLYNC ArrayType."""
         from flync.model.flync_4_someip.someip_datatypes import ArrayDimension, ArrayType
 
@@ -1202,13 +1307,13 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             return None
 
         # Build dimensions from the array
-        dimensions = []
+        dimensions: list[ArrayDimension] = []
         for dim in datatype.dims().values():
             kind = "fixed" if dim.lowerlimit() == dim.upperlimit() else "dynamic"
             # Only set bit_alignment if non-zero
             bit_alignment = dim.pad_to() if dim.pad_to() > 0 else None
             dimension = ArrayDimension(
-                kind=kind,
+                kind=cast(Literal["fixed", "dynamic"], kind),
                 length=dim.upperlimit() if kind == "fixed" else None,
                 length_of_length_field=dim.length_of_length() if kind == "dynamic" else None,
                 upper_limit=dim.upperlimit(),
@@ -1220,10 +1325,15 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         return SOMEIPParameter(
             name=name,
             description=description,
-            datatype=ArrayType(name=datatype.name(), type="array", dimensions=dimensions, element_type=child_datatype.datatype),
+            datatype=ArrayType(  # type: ignore[call-arg]
+                name=datatype.name(),
+                type="array",
+                dimensions=dimensions,
+                element_type=child_datatype.datatype,
+            ),
         )
 
-    def create_someip_parameter_typedef(self, name, name2, child):
+    def create_someip_parameter_typedef(self, name: str, name2: str, child: SOMEIPBaseDatatype) -> SOMEIPParameterTypedef:
         ret = SOMEIPParameterTypedef(self.__globalid_typedefs, name, name2, child)
         self.__globalid_typedefs += 1
         return ret
@@ -1251,7 +1361,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     _ALLOWED_CAN_BAUD_RATES = (10_000, 20_000, 50_000, 100_000, 125_000, 250_000, 500_000, 1_000_000)
 
     @classmethod
-    def _basetype_to_signal_data_type(cls, basetype):
+    def _basetype_to_signal_data_type(cls, basetype: str) -> SignalDataType:
         """Map a FIBEX BASE-DATA-TYPE string directly to a FLYNC SignalDataType.
 
         A_UINT8 → UINT8, A_UINT16 → UINT16, … The bit_length for the FLYNC
@@ -1261,7 +1371,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         return cls._FIBEX_TO_SIGNAL_DATA_TYPE.get(basetype, SignalDataType.BYTEARRAY)
 
     @classmethod
-    def _nearest_can_baud_rate(cls, speed):
+    def _nearest_can_baud_rate(cls, speed: int | None) -> int:
         if speed is None:
             return 500_000
         if speed in cls._ALLOWED_CAN_BAUD_RATES:
@@ -1270,7 +1380,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         print(f"WARNING: CAN speed {speed} not in allowed FLYNC baud rates; using {nearest}")
         return nearest
 
-    def _cluster_speed_for_channel(self, channel_name):
+    def _cluster_speed_for_channel(self, channel_name: str) -> int:
         cluster_id = self.__channel_to_cluster.get(channel_name)
         if cluster_id is None:
             return 500_000
@@ -1291,17 +1401,17 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         "XCP_RUNTIME_CONFIGURED": "xcp_runtime_configured",
     }
 
-    def _flync_pdu_type(self, pdu):
+    def _flync_pdu_type(self, pdu: Any) -> FLYNCUsage:
         if pdu is None:
             return "other"
-        return self._FIBEX_TO_FLYNC_USAGE_MAPPING.get(pdu.pdu_type(), "other")
+        return cast(FLYNCUsage, self._FIBEX_TO_FLYNC_USAGE_MAPPING.get(pdu.pdu_type(), "other"))
 
-    def _flync_frame_type(self, frame):
+    def _flync_frame_type(self, frame: Any) -> FLYNCUsage:
         if frame is None:
             return "other"
-        return self._FIBEX_TO_FLYNC_USAGE_MAPPING.get(frame.frame_type(), "other")
+        return cast(FLYNCUsage, self._FIBEX_TO_FLYNC_USAGE_MAPPING.get(frame.frame_type(), "other"))
 
-    def _build_flync_multiplexed_pdu(self, base_pdu, pdu_byte_len, flync_sigs):
+    def _build_flync_multiplexed_pdu(self, base_pdu: Any, pdu_byte_len: int, flync_sigs: dict[str, Signal]) -> MultiplexedPDU | None:
         """Convert a BaseMultiplexPDU into a FLYNC MultiplexedPDU.
 
         Sub-PDU signal positions in mux groups are stored as absolute bit offsets
@@ -1344,12 +1454,12 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         )
 
         # Build one MuxGroup per switch code; signals use absolute bit positions
-        mux_groups = []
+        mux_groups: list[MuxGroup] = []
         for switch_code in sorted(pdu_instances_map.keys()):
             sub_pdu = pdu_instances_map[switch_code]
             if sub_pdu is None:
                 continue
-            group_sigs = []
+            group_sigs: list[SignalInstance] = []
             for si in sub_pdu.signal_instances_sorted_by_bit_position():
                 sig = si.signal()
                 if sig is None:
@@ -1382,13 +1492,13 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             return None
 
         # Build static_group PDU if a static PDU exists
-        static_flync_pdu = None
+        static_flync_pdu: StandardPDU | None = None
         static_base_pdu = base_pdu.static_pdu()
         if static_base_pdu is not None:
             static_segs = base_pdu.static_segments()
             static_seg = static_segs[0] if static_segs else None
             static_seg_offset = int(static_seg.bit_position()) if static_seg else 0
-            static_sigs = []
+            static_sigs: list[SignalInstance] = []
             for si in static_base_pdu.signal_instances_sorted_by_bit_position():
                 sig = si.signal()
                 if sig is None:
@@ -1446,7 +1556,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             print(f"WARNING: Could not create FLYNC MultiplexedPDU for {base_pdu.name()}: {type(e).__name__}: {e}")
             return None
 
-    def _create_flync_channels(self):
+    def _create_flync_channels(self) -> FLYNCChannelConfig | None:
         if not self.__can_frames:
             return None
 
@@ -1456,7 +1566,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         frame_ids_with_can_ft = {ft.frame().id() for ft in self.__can_fts.values() if ft.frame() is not None}
 
         # Map frame_id → publisher ECU name (first ECU with an output FT for this frame)
-        frame_to_publisher = {}
+        frame_to_publisher: dict[str, str] = {}
         for ecu_name, fts in self.__ecu_frame_fts.items():
             for ft in fts["out"]:
                 if ft.is_can() and ft.frame() is not None:
@@ -1466,7 +1576,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         # The FLYNC type is derived directly from the FIBEX BASE-DATA-TYPE.
         # Use the coded bit length from the original FIBEX signal (bit_length()),
         # falling back to the natural width of the data type if unset or invalid.
-        flync_sigs = {}
+        flync_sigs: dict[str, Signal] = {}
         for sig_id, base_sig in self.__can_signals.items():
             dt = self._basetype_to_signal_data_type(base_sig.basetype())
             # Preserve the exact bit length from FIBEX; default to natural width
@@ -1477,7 +1587,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             try:
                 single_entries: dict[int, str] = {}
                 range_entries: list[tuple[int, int, str]] = []
-                for name, start, end in base_sig.compu_consts() or []:
+                for name, start, end in cast(list[tuple[str, Any, Any]], base_sig.compu_consts() or []):
                     try:
                         lo, hi = int(start), int(end)
                     except (TypeError, ValueError):
@@ -1532,8 +1642,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         # Build FLYNC PDU objects (StandardPDU for regular PDUs, MultiplexedPDU for mux PDUs).
         # Sub-PDUs of a mux PDU are embedded inside the MultiplexedPDU's mux_groups and must
         # NOT be written as standalone files to avoid FLYNC UniqueName registry conflicts.
-        flync_pdus = []
-        flync_pdu_by_id = {}
+        flync_pdus: list[StandardPDU | MultiplexedPDU] = []
+        flync_pdu_by_id: dict[str, StandardPDU | MultiplexedPDU] = {}
         for pdu_id, base_pdu in self.__can_pdus.items():
             if pdu_id in self.__mux_sub_pdu_ids:
                 continue
@@ -1543,10 +1653,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             except (TypeError, ValueError):
                 pdu_byte_len = 1
             if base_pdu.is_multiplex_pdu():
-                flync_pdu = self._build_flync_multiplexed_pdu(base_pdu, pdu_byte_len, flync_sigs)
+                flync_pdu: StandardPDU | MultiplexedPDU | None = self._build_flync_multiplexed_pdu(base_pdu, pdu_byte_len, flync_sigs)
             else:
-                sig_insts = []
-                for si in base_pdu.signal_instances_sorted_by_bit_position():
+                sig_insts: list[SignalInstance] = []
+                for si in cast(BasePDU, base_pdu).signal_instances_sorted_by_bit_position():
                     sig = si.signal()
                     if sig is None:
                         continue
@@ -1584,7 +1694,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         # longer require globally unique names (Frame is no longer a UniqueName)
         # and CANFrameRef references frames by (bus, CAN ID), so we keep the
         # original FIBEX frame name to preserve a clean round-trip.
-        flync_frames_by_channel = {}
+        flync_frames_by_channel: dict[str, list[CANFrame | CANFDFrame]] = {}
         for ft in self.__can_fts.values():
             base_frame = ft.frame()
             if base_frame is None:
@@ -1592,7 +1702,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             channel_name = self.__ft_to_channel.get(ft.id())
             if channel_name is None:
                 continue
-            packed_pdus = []
+            packed_pdus: list[PDUInstance] = []
             for pi in base_frame.pdu_instances().values():
                 pdu = pi.pdu()
                 if pdu is None:
@@ -1611,6 +1721,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 frame_byte_len = 8
             try:
                 name_id = base_frame.name()
+                flync_frame: CANFrame | CANFDFrame
                 if ft.is_can_fd():
                     # What about the bit_rate_switch?
                     flync_frame = CANFDFrame(
@@ -1639,12 +1750,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         # Build FLYNC ContainerPDU objects for Ethernet frames (no CAN frame triggering).
         # Use header_ids from __eth_pdu_insts; fall back to enumeration index if not found.
-        eth_header_by_pdu_id = {inst.pdu().id(): h_id for h_id, inst in self.__eth_pdu_insts.items() if inst.pdu() is not None}
-        flync_eth_containers = []
+        eth_header_by_pdu_id: dict[str, int | None] = {}
+        for h_id, inst in self.__eth_pdu_insts.items():
+            pdu_obj = inst.pdu()
+            if pdu_obj is not None:
+                eth_header_by_pdu_id[pdu_obj.id()] = h_id
+        flync_eth_containers: list[ContainerPDU] = []
         for frame_id, base_frame in self.__can_frames.items():
             if frame_id in frame_ids_with_can_ft:
                 continue  # already handled as a CAN frame
-            contained_pdus = []
+            contained_pdus: list[ContainedPDURef] = []
             for idx, pi in enumerate(base_frame.pdu_instances().values()):
                 pdu = pi.pdu()
                 if pdu is None:
@@ -1653,7 +1768,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 if flync_pdu is None:
                     continue
                 pdu_header_id = eth_header_by_pdu_id.get(pdu.id(), idx)
-                contained_pdus.append(ContainedPDURef(pdu_id=pdu_header_id, pdu_ref=flync_pdu.name, offset=pi.bit_position()))
+                contained_pdus.append(ContainedPDURef(pdu_id=cast(int, pdu_header_id), pdu_ref=flync_pdu.name, offset=pi.bit_position()))
             frame_byte_len = base_frame.byte_length()
             try:
                 frame_byte_len = int(frame_byte_len)
@@ -1678,10 +1793,11 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             return None
 
         # Build one CANBus per channel
-        can_buses = []
+        can_buses: list[CANBus] = []
         for channel_name, frames in sorted(flync_frames_by_channel.items()):
             baud_rate = self._cluster_speed_for_channel(channel_name)
             fd_enabled = False
+            fd_speed: int = 2_000_000
             for f in frames:
                 if f.type == "can_fd":
                     fd_enabled = True
@@ -1700,15 +1816,35 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             ethernet_pdu_containers=flync_eth_containers if flync_eth_containers else None,
         )
 
-    def create_someip_service(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
+    def create_someip_service(
+        self,
+        name: str,
+        serviceid: int,
+        majorver: int,
+        minorver: int,
+        methods: dict[int, SOMEIPBaseServiceMethod],
+        events: dict[int, SOMEIPBaseServiceEvent],
+        fields: dict[int, SOMEIPBaseServiceField],
+        eventgroups: dict[int, SOMEIPBaseServiceEventgroup],
+    ) -> SOMEIPBaseService:
         ret = SOMEIPBaseService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
         self._create_flync_service_interface(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
         return ret
 
-    def _create_flync_service_interface(self, name, serviceid, majorver, minorver, methods, events, fields, eventgroups):
+    def _create_flync_service_interface(
+        self,
+        name: str,
+        serviceid: int,
+        majorver: int,
+        minorver: int,
+        methods: dict[int, SOMEIPBaseServiceMethod],
+        events: dict[int, SOMEIPBaseServiceEvent],
+        fields: dict[int, SOMEIPBaseServiceField],
+        eventgroups: dict[int, SOMEIPBaseServiceEventgroup],
+    ) -> None:
 
         # Methods
-        flync_methods = list()
+        flync_methods: list[SOMEIPRequestResponseMethod | SOMEIPFireAndForgetMethod] = list()
         for m in methods.values():
             call_type = m.calltype()
             # Map calltype to FLYNC type
@@ -1720,7 +1856,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 method_type = "request_response"  # default
 
             # Convert in/out params to FLYNC parameters
-            input_params = []
+            input_params: list[SOMEIPParameter] = []
             for p in m.inparams():
                 result = self.to_flync_parameter(p)
                 if result is not None:
@@ -1728,7 +1864,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 else:
                     print(f"WARNING: Skipping unsupported input parameter in method '{m.name()}'")
 
-            output_params = []
+            output_params: list[SOMEIPParameter] = []
             for p in m.outparams():
                 result = self.to_flync_parameter(p)
                 if result is not None:
@@ -1745,7 +1881,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         reliable=m.reliable(),
                         input_parameters=input_params,
                         output_parameters=output_params,
-                    )
+                    )  # type: ignore[no-untyped-call]
                 )
             else:
                 flync_methods.append(
@@ -1754,14 +1890,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         id=m.methodid(),
                         reliable=m.reliable(),
                         input_parameters=input_params,
-                    )
+                    )  # type: ignore[no-untyped-call]
                 )
             # print(f"INFO: Created FLYNC method '{m.name()}' (id: 0x{m.methodid():04x}, type: {method_type})")
 
         # Events
-        flync_events = dict()
+        flync_events: dict[int, SOMEIPEvent] = dict()
         for e in events.values():
-            params = list()
+            params: list[SOMEIPParameter] = list()
             for p in e.params():
                 result = self.to_flync_parameter(p)
                 if result is not None:
@@ -1777,23 +1913,26 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             )
 
         # Fields
-        flync_fields = dict()  # keyed by f.id() (unique per field)
-        flync_fields_by_notifier = dict()  # keyed by notifier_id (for eventgroup lookup)
+        flync_fields: dict[int | None, SOMEIPField] = dict()  # keyed by f.id() (unique per field)
+        flync_fields_by_notifier: dict[int, SOMEIPField] = dict()  # keyed by notifier_id (for eventgroup lookup)
         for f in fields.values():
             notifier_id = f.notifierid()
             getter_id = None
             setter_id = None
+            getter = f.getter()
+            setter = f.setter()
+            notifier = f.notifier()
 
-            if f.getter() is not None:
-                getter_id = f.getter().methodid()
-            if f.setter() is not None:
-                setter_id = f.setter().methodid()
+            if getter is not None:
+                getter_id = getter.methodid()
+            if setter is not None:
+                setter_id = setter.methodid()
 
             # Determine reliability based on field type
             reliable = False
-            getter_reliable = f.getter().reliable() if f.getter() else None
-            setter_reliable = f.setter().reliable() if f.setter() else None
-            notifier_reliable = f.notifier().reliable() if f.notifier() else None
+            getter_reliable = getter.reliable() if getter else None
+            setter_reliable = setter.reliable() if setter else None
+            notifier_reliable = notifier.reliable() if notifier else None
 
             # Check if all reliable values are the same (ignore absent accessors)
             reliable_values = {v for v in (getter_reliable, setter_reliable, notifier_reliable) if v is not None}
@@ -1803,15 +1942,15 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     f"notifier={notifier_reliable}"
                 )
 
-            if f.getter() is not None and f.getter().reliable():
-                reliable = f.getter().reliable()
-            elif f.setter() is not None and f.setter().reliable():
-                reliable = f.setter().reliable()
-            elif f.notifier() is not None and f.notifier().reliable():
-                reliable = f.notifier().reliable()
+            if getter is not None and getter.reliable():
+                reliable = getter.reliable()
+            elif setter is not None and setter.reliable():
+                reliable = setter.reliable()
+            elif notifier is not None and notifier.reliable():
+                reliable = notifier.reliable()
 
             params = list()
-            for p in f.params():
+            for p in f.params() or []:
                 result = self.to_flync_parameter(p)
                 if result is not None:
                     params.append(result)
@@ -1834,12 +1973,12 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 flync_fields_by_notifier[notifier_id] = flync_field
 
         # Eventgroups
-        flync_eventgroups = list()
+        flync_eventgroups: list[SOMEIPEventgroup] = list()
         missing_events = 0
         missing_fields = 0
         for eg in eventgroups.values():
-            eg_events = list()
-            eg_fields = list()
+            eg_events: list[SOMEIPEvent | SOMEIPField] = list()
+            eg_fields: list[SOMEIPEvent | SOMEIPField] = list()
             for eid in eg.eventids():
                 if eid in flync_events:
                     eg_events.append(flync_events[eid])
@@ -1885,7 +2024,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__flync_someip_services.append(tmp)
 
     @staticmethod
-    def embedded_metadata(target_system):
+    def embedded_metadata(target_system: str) -> EmbeddedMetadata:
         return EmbeddedMetadata(
             type="embedded",
             author="FIBEXConverter",
@@ -1894,7 +2033,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         )
 
     @staticmethod
-    def ecu_metadata():
+    def ecu_metadata() -> ECUMetadata:
         return ECUMetadata(
             type="ecu",
             author="FIBEXConverter",
@@ -1902,7 +2041,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         )
 
     @staticmethod
-    def someip_metadata():
+    def someip_metadata() -> SOMEIPServiceMetadata:
         return SOMEIPServiceMetadata(
             type="someip_service",
             author="FIBEXConverter",
@@ -1910,7 +2049,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         )
 
     @staticmethod
-    def system_metadata():
+    def system_metadata() -> SystemMetadata:
         return SystemMetadata(
             type="system",
             author="FIBEXConverter",
@@ -1918,20 +2057,20 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             release=BaseVersion(version_schema="semver", version=FLYNC_VERSION),
         )
 
-    def ecus(self):
+    def ecus(self) -> list[ECU]:
         return self.__flync_ecus
 
-    def someipsd_config(self):
+    def someipsd_config(self) -> SDConfig:
         return SDConfig(ip_address=self.__flync_someipsd_addr, port=self.__flync_someipsd_port, sd_timings=self.__flync_someipsd_timings)
 
-    def someip_config(self):
+    def someip_config(self) -> SOMEIPConfig:
         return SOMEIPConfig(sd_config=self.someipsd_config(), services=self.__flync_someip_services, someip_timings=self.__flync_someip_timings)
 
-    def topology(self):
+    def topology(self) -> FLYNCTopology:
         st = SystemTopology(connections=self.__flync_connections)
         return FLYNCTopology(system_topology=st)
 
-    def create_flync_model(self):
+    def create_flync_model(self) -> None:
         self._create_flync_ecus_impl()
         channel_config = self._create_flync_channels()
         # general should be optional but FLYNCWorkspace does not respect that
@@ -1942,13 +2081,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         )
         self.__flync_model = FLYNCModel(ecus=self.ecus(), general=general_config, topology=self.topology(), metadata=self.system_metadata())
 
-    def save_flync_model(self, target_dir):
+    def save_flync_model(self, target_dir: str) -> None:
         workspace_config = WorkspaceConfiguration(exclude_unset=False)
         self.__flync_workspace = FLYNCWorkspace("FLYNC_WORKSPACE", workspace_path=target_dir, configuration=workspace_config)
+        assert self.__flync_model is not None
         self.__flync_workspace.load_model(flync_model=self.__flync_model, file_path=target_dir)
 
 
-def parse_arguments():
+def parse_arguments() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Converting configuration to FLYNC model.")
     parser.add_argument("type", choices=parser_formats, help="format")
     parser.add_argument(
@@ -1987,7 +2127,7 @@ def parse_arguments():
     return args
 
 
-def main():
+def main() -> None:
     global g_gen_portid
 
     print("Converting configuration to FLYNC Model (experimental!)")
@@ -2010,6 +2150,7 @@ def main():
     )
 
     print("Generating output directories:")
+    assert output_dir is not None
     target_dir = os.path.join(output_dir, "flync")
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)

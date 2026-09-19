@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """Tests for SOMEIP_Multiple_AEPs.xml — verifying that empty/bad AEPs are
 handled gracefully and that valid AEPs are still converted correctly.
 
@@ -24,7 +25,9 @@ Assertions:
 from pathlib import Path
 
 import pytest
+from flync.model.flync_4_ecu import SocketTCP, SocketUDP
 
+from configuration_base_classes import BaseSocket
 from configuration_to_flync import SimpleConfigurationFactory as FlyncFactory
 from fibex_parser import FibexParser
 
@@ -38,7 +41,7 @@ MULTI_AEP_FIBEX = EXAMPLES_DIR / "SOMEIP_Multiple_AEPs.xml"
 
 
 @pytest.fixture(scope="module")
-def flync_factory():
+def flync_factory() -> FlyncFactory:
     """Parse and convert to FLYNC, returning the FlyncFactory."""
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(MULTI_AEP_FIBEX), verbose=False)
@@ -52,7 +55,7 @@ def flync_factory():
 # ---------------------------------------------------------------------------
 
 
-def test_parse_completes_without_exception():
+def test_parse_completes_without_exception() -> None:
     """parse_file() must not raise TypeError for the bad NEP-REF AEP."""
     factory = FlyncFactory()
     # This would crash before the fix (TypeError from "ipsv4" in None):
@@ -65,9 +68,9 @@ def test_parse_completes_without_exception():
 # ---------------------------------------------------------------------------
 
 
-def _provider_base_sockets(flync_factory):
+def _provider_base_sockets(flync_factory: FlyncFactory) -> list[BaseSocket]:
     """Return all base-level sockets belonging to ECU_PROVIDER."""
-    sockets = []
+    sockets: list[BaseSocket] = []
     base_ecus = flync_factory.base_ecus()
     ecu = base_ecus.get("ECU_PROVIDER")
     if ecu is None:
@@ -78,7 +81,7 @@ def _provider_base_sockets(flync_factory):
     return sockets
 
 
-def test_provider_has_two_sockets(flync_factory):
+def test_provider_has_two_sockets(flync_factory: FlyncFactory) -> None:
     """ECU_PROVIDER must have exactly 2 sockets (AEP_VALID + AEP_EMPTY)."""
     sockets = _provider_base_sockets(flync_factory)
     ports = sorted(s.portnumber() for s in sockets)
@@ -87,7 +90,7 @@ def test_provider_has_two_sockets(flync_factory):
     )
 
 
-def test_valid_aep_has_service(flync_factory):
+def test_valid_aep_has_service(flync_factory: FlyncFactory) -> None:
     """The socket at port 30000 (AEP_VALID) must carry one PSI for SVC_ECHO."""
     sockets = _provider_base_sockets(flync_factory)
     sock_30000 = next((s for s in sockets if s.portnumber() == 30000), None)
@@ -98,7 +101,7 @@ def test_valid_aep_has_service(flync_factory):
     assert svc.serviceid() == 0x1234, f"Expected service 0x1234, got 0x{svc.serviceid():04x}"
 
 
-def test_empty_aep_has_no_services(flync_factory):
+def test_empty_aep_has_no_services(flync_factory: FlyncFactory) -> None:
     """The socket at port 30001 (AEP_EMPTY) must have zero service instances."""
     sockets = _provider_base_sockets(flync_factory)
     sock_30001 = next((s for s in sockets if s.portnumber() == 30001), None)
@@ -112,35 +115,36 @@ def test_empty_aep_has_no_services(flync_factory):
 # ---------------------------------------------------------------------------
 
 
-def _provider_flync_sockets(flync_factory):
+def _provider_flync_sockets(flync_factory: FlyncFactory) -> list[SocketTCP | SocketUDP]:
     """Collect all FLYNC sockets for ECU_PROVIDER."""
-    sockets = []
-    for ecu in flync_factory._SimpleConfigurationFactory__flync_ecus:
+    sockets: list[SocketTCP | SocketUDP] = []
+    for ecu in flync_factory.ecus():
         if ecu.name != "ECU_PROVIDER":
             continue
         for ctrl in ecu.controllers:
-            for eth_iface in ctrl.ethernet_interfaces:
+            for eth_iface in ctrl.ethernet_interfaces or []:
                 for sc in eth_iface.sockets or []:
-                    sockets.extend(sc.sockets)
+                    sockets.extend(sc.sockets or [])
     return sockets
 
 
-def test_flync_provider_has_two_sockets(flync_factory):
+def test_flync_provider_has_two_sockets(flync_factory: FlyncFactory) -> None:
     """FLYNC ECU_PROVIDER must expose exactly 2 sockets after conversion."""
     sockets = _provider_flync_sockets(flync_factory)
     ports = sorted(s.port_no for s in sockets)
     assert ports == [30000, 30001], f"Expected [30000, 30001], got {ports}"
 
 
-def test_flync_valid_aep_has_deployment(flync_factory):
+def test_flync_valid_aep_has_deployment(flync_factory: FlyncFactory) -> None:
     """FLYNC socket at port 30000 must have exactly one deployment."""
     sockets = _provider_flync_sockets(flync_factory)
     sock = next((s for s in sockets if s.port_no == 30000), None)
     assert sock is not None, "FLYNC socket at port 30000 not found"
+    assert sock.deployments is not None
     assert len(sock.deployments) == 1, f"Expected 1 deployment on port 30000, got {len(sock.deployments)}"
 
 
-def test_flync_empty_aep_has_no_deployments(flync_factory):
+def test_flync_empty_aep_has_no_deployments(flync_factory: FlyncFactory) -> None:
     """FLYNC socket at port 30001 must have an empty (not None) deployments list."""
     sockets = _provider_flync_sockets(flync_factory)
     sock = next((s for s in sockets if s.port_no == 30001), None)
@@ -153,7 +157,7 @@ def test_flync_empty_aep_has_no_deployments(flync_factory):
 # ---------------------------------------------------------------------------
 
 
-def test_flync_model_creation_succeeds(tmp_path):
+def test_flync_model_creation_succeeds(tmp_path: Path) -> None:
     """Full FIBEX → FLYNC model creation must not raise any exception."""
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(MULTI_AEP_FIBEX), verbose=False)

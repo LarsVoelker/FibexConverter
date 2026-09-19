@@ -1,4 +1,7 @@
 #!/usr/bin/python
+
+from typing import Any
+
 """Unit tests for configuration base classes."""
 
 import io
@@ -43,7 +46,7 @@ class TestHelperFunctions:
             (17, 3),
         ],
     )
-    def test_bits_to_bytes(self, bits, expected):
+    def test_bits_to_bytes(self, bits: Any, expected: Any) -> None:
         """Test bits_to_bytes function."""
         assert bits_to_bytes(bits) == expected
 
@@ -59,7 +62,7 @@ class TestHelperFunctions:
             ("", False),
         ],
     )
-    def test_is_mcast(self, addr, expected):
+    def test_is_mcast(self, addr: Any, expected: Any) -> None:
         """Test is_mcast function."""
         assert is_mcast(addr) == expected
 
@@ -70,11 +73,11 @@ class TestHelperFunctions:
             ("abd", "None"),
         ],
     )
-    def test_addr_to_key_errors(self, addr, expected):
+    def test_addr_to_key_errors(self, addr: Any, expected: Any) -> None:
         """Test addr_to_key function with errors."""
         assert addr_to_key(addr) == expected
 
-    def test_addr_to_key_print_warning(self):
+    def test_addr_to_key_print_warning(self) -> None:
         """Test addr_to_key function with invalid value - triggers warning print."""
         # This should trigger the warning print statement
         result = addr_to_key("invalid-address")
@@ -87,7 +90,7 @@ class TestHelperFunctions:
             ("10.0.0.1", "ipv4-010.000.000.001"),
         ],
     )
-    def test_addr_to_key_ipv4(self, addr, expected):
+    def test_addr_to_key_ipv4(self, addr: Any, expected: Any) -> None:
         """Test addr_to_key function with IPv4."""
         assert addr_to_key(addr) == expected
 
@@ -98,7 +101,7 @@ class TestHelperFunctions:
             ("123::123", "ipv6-0123:0000:0000:0000:0000:0000:0000:0123"),
         ],
     )
-    def test_addr_to_key_ipv6(self, addr, expected):
+    def test_addr_to_key_ipv6(self, addr: Any, expected: Any) -> None:
         """Test addr_to_key function with IPv6."""
         assert addr_to_key(addr) == expected
 
@@ -109,7 +112,7 @@ class TestHelperFunctions:
             ("FF:FF:FF:FF:FF:FF", "mac-FF-FF-FF-FF-FF-FF"),
         ],
     )
-    def test_addr_to_key_mac(self, addr, expected):
+    def test_addr_to_key_mac(self, addr: Any, expected: Any) -> None:
         """Test addr_to_key function with MAC addresses."""
         assert addr_to_key(addr) == expected
 
@@ -124,7 +127,7 @@ class TestHelperFunctions:
             (None, False),
         ],
     )
-    def test_is_mac(self, mac, expected):
+    def test_is_mac(self, mac: Any, expected: Any) -> None:
         """Test is_mac function."""
         assert is_mac(mac) == expected
 
@@ -137,7 +140,7 @@ class TestHelperFunctions:
             (None, False),
         ],
     )
-    def test_is_mac_mcast(self, mac, expected):
+    def test_is_mac_mcast(self, mac: Any, expected: Any) -> None:
         """Test is_mac_mcast function."""
         assert is_mac_mcast(mac) == expected
 
@@ -145,7 +148,7 @@ class TestHelperFunctions:
         "mac,expected",
         [("01:00:5e:00:00:01", "mac-01-00-5E-00-00-01"), ("33:33:00:00:00:01", "mac-33-33-00-00-00-01"), (None, "None"), ("zzzz", "None")],
     )
-    def test_mac_to_key(self, mac, expected):
+    def test_mac_to_key(self, mac: Any, expected: Any) -> None:
         """Test mac_to_key function."""
         assert mac_to_key(mac) == expected
 
@@ -166,7 +169,7 @@ class TestHelperFunctions:
             (None, False),
         ],
     )
-    def test_is_ip(self, ip, expected):
+    def test_is_ip(self, ip: Any, expected: Any) -> None:
         """Test is_ip function."""
         assert is_ip(ip) == expected
 
@@ -181,7 +184,7 @@ class TestHelperFunctions:
             ("ff02::1", True),
         ],
     )
-    def test_is_ip_mcast(self, ip, expected):
+    def test_is_ip_mcast(self, ip: Any, expected: Any) -> None:
         """Test is_ip_mcast function."""
         assert is_ip_mcast(ip) == expected
 
@@ -193,7 +196,7 @@ class TestHelperFunctions:
             ("zzzz", "None"),
         ],
     )
-    def test_ip_to_key(self, ip, expected):
+    def test_ip_to_key(self, ip: Any, expected: Any) -> None:
         """Test ip_to_key function."""
         assert ip_to_key(ip) == expected
 
@@ -206,19 +209,19 @@ class TestHelperFunctions:
             ("zzzzz", ""),
         ],
     )
-    def test_mcast_addr_to_mac_mcast(self, addr, expected_mac):
+    def test_mcast_addr_to_mac_mcast(self, addr: Any, expected_mac: Any) -> None:
         """Test mcast_addr_to_mac_mcast function."""
         assert mcast_addr_to_mac_mcast(addr) == expected_mac
 
-    def test_mcast_addr_to_mac_mcast_invalid_ip_version(self):
+    def test_mcast_addr_to_mac_mcast_invalid_ip_version(self) -> None:
         """Test mcast_addr_to_mac_mcast with invalid IP version (should print error)."""
 
         # Create a dummy class that pretends to be an IP address with invalid version
         class DummyIP:
-            def __init__(self):
+            def __init__(self) -> None:
                 self.version = 100  # Invalid version
 
-            def packed(self):
+            def packed(self) -> Any:
                 return b"\x00\x00\x00\x00"
 
         # This should trigger the print statement for invalid IP version
@@ -230,7 +233,7 @@ class TestHelperFunctions:
 class TestReadCsvToDict:
     """Test cases for read_csv_to_dict function."""
 
-    def test_read_csv_to_dict_valid(self):
+    def test_read_csv_to_dict_valid(self) -> None:
         """Test reading a valid CSV file (first line is header)."""
         csv_content = "key1,value1\nkey2,value2\n"
         f = io.StringIO(csv_content)
@@ -238,26 +241,26 @@ class TestReadCsvToDict:
         # First line is skipped as header, so only key2,value2 is read
         assert result == {"key2": "value2"}
 
-    def test_read_csv_to_dict_with_header_skip(self):
+    def test_read_csv_to_dict_with_header_skip(self) -> None:
         """Test that header row is skipped."""
         csv_content = "key,value\nmykey,myvalue\n"
         f = io.StringIO(csv_content)
         result = read_csv_to_dict(f)
         assert result == {"mykey": "myvalue"}
 
-    def test_read_csv_to_dict_empty_file(self):
+    def test_read_csv_to_dict_empty_file(self) -> None:
         """Test reading an empty CSV file."""
         f = io.StringIO("")
         result = read_csv_to_dict(f)
         assert result == {}
 
-    def test_read_csv_to_dict_single_line(self):
+    def test_read_csv_to_dict_single_line(self) -> None:
         """Test reading a single line CSV file (header only)."""
         f = io.StringIO("key,value\n")
         result = read_csv_to_dict(f)
         assert result == {}
 
-    def test_read_csv_to_dict_empty_lines(self):
+    def test_read_csv_to_dict_empty_lines(self) -> None:
         """Test handling of empty lines in CSV."""
         csv_content = "key1,value1\n\nkey2,value2\n"
         f = io.StringIO(csv_content)
@@ -265,7 +268,7 @@ class TestReadCsvToDict:
         # Empty lines are skipped, so key2,value2 is read
         assert result == {"key2": "value2"}
 
-    def test_read_csv_to_dict_duplicate_keys(self):
+    def test_read_csv_to_dict_duplicate_keys(self) -> None:
         """Test behavior with duplicate keys - last value wins."""
         csv_content = "key1,value1\nkey1,value2\n"
         f = io.StringIO(csv_content)
@@ -273,7 +276,7 @@ class TestReadCsvToDict:
         # Duplicate keys - last value overwrites
         assert result == {"key1": "value2"}
 
-    def test_read_csv_to_dict_invalid_line_length(self):
+    def test_read_csv_to_dict_invalid_line_length(self) -> None:
         """Test handling of lines with wrong number of fields."""
         csv_content = "key1,value1\nkey2,value2,extra\nkey3,value3\n"
         f = io.StringIO(csv_content)
@@ -281,12 +284,12 @@ class TestReadCsvToDict:
         # Invalid lines are logged and skipped
         assert result == {"key3": "value3"}
 
-    def test_read_csv_to_dict_none_value(self):
+    def test_read_csv_to_dict_none_value(self) -> None:
         """Test handling of None as input - raises TypeError."""
         with pytest.raises(TypeError):
-            read_csv_to_dict(None)
+            read_csv_to_dict(None)  # type: ignore
 
-    def test_read_csv_to_dict_with_verbose(self):
+    def test_read_csv_to_dict_with_verbose(self) -> None:
         """Test handling of empty lines in CSV."""
         csv_content = "key1,value1\n\nkey2,value2\n"
         f = io.StringIO(csv_content)
@@ -294,7 +297,7 @@ class TestReadCsvToDict:
         # Empty lines are skipped, so key2,value2 is read
         assert result == {"key2": "value2"}
 
-    def test_read_csv_to_dict_with_duplicates(self):
+    def test_read_csv_to_dict_with_duplicates(self) -> None:
         """Test handling of empty lines in CSV."""
         csv_content = "key,value\nkey,value1\nkey,value2\n"
         f = io.StringIO(csv_content)
@@ -302,7 +305,7 @@ class TestReadCsvToDict:
         # First result should be kept
         assert result == {"key": "value1"}
 
-    def test_read_csv_to_dict_invalid_line_length_verbose(self):
+    def test_read_csv_to_dict_invalid_line_length_verbose(self) -> None:
         """Test handling of invalid line length with verbose."""
         csv_content = "key1,value1\nkey2,value2,extra\nkey3,value3\n"
         f = io.StringIO(csv_content)
@@ -310,7 +313,7 @@ class TestReadCsvToDict:
         # Invalid lines are logged and skipped
         assert result == {"key3": "value3"}
 
-    def test_read_csv_to_dict_duplicate_keys_verbose(self):
+    def test_read_csv_to_dict_duplicate_keys_verbose(self) -> None:
         """Test handling of duplicate keys with verbose."""
         csv_content = "key1,value1\nkey1,value2\n"
         f = io.StringIO(csv_content)
@@ -326,7 +329,7 @@ class TestBaseItem:
 class TestBaseCoding:
     """Test cases for BaseCoding class."""
 
-    def test_create_coding(self):
+    def test_create_coding(self) -> None:
         """Test create_base_coding method."""
         coding = BaseCoding(
             id="Coding1",
@@ -336,7 +339,7 @@ class TestBaseCoding:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=10,
-            compu_scale=[],
+            compu_scale=[],  # type: ignore
             compu_consts=[],
         )
         assert coding.name() == "CodingName"
@@ -345,7 +348,7 @@ class TestBaseCoding:
 class TestBaseVLAN:
     """Test cases for BaseVLAN class."""
 
-    def test_create_vlan(self):
+    def test_create_vlan(self) -> None:
         """Test create_vlan method."""
         factory = BaseConfigurationFactory()
         vlan = factory.create_vlan("VLAN100", 100, 0)
@@ -353,13 +356,13 @@ class TestBaseVLAN:
         assert vlan.vlanid() == 100
         assert vlan.priority() == 0
 
-    def test_vlanid_str(self):
+    def test_vlanid_str(self) -> None:
         """Test vlanid_str method."""
         factory = BaseConfigurationFactory()
         vlan = factory.create_vlan("VLAN100", 100, 0)
         assert vlan.vlanid_str() == "0x64"
 
-    def test_vlanid_str_none(self):
+    def test_vlanid_str_none(self) -> None:
         """Test vlanid_str method with None."""
         factory = BaseConfigurationFactory()
         vlan = factory.create_vlan("Untagged", None, 0)
@@ -369,7 +372,7 @@ class TestBaseVLAN:
 class TestBaseMulticastPath:
     """Test cases for BaseMulticastPath class."""
 
-    def test_create_multicast_path(self):
+    def test_create_multicast_path(self) -> None:
         """Test create_multicast_path method."""
         factory = BaseConfigurationFactory()
         port1 = factory.create_switch_port("PORT1", None, None, None, [])
@@ -388,7 +391,7 @@ class TestBaseMulticastPath:
         assert mcast.source_addr() == "192.168.1.1"
         assert mcast.mc_addr() == "224.0.0.1"
 
-    def test_multicast_path_switchport_tx_name_none(self):
+    def test_multicast_path_switchport_tx_name_none(self) -> None:
         """Test switchport_tx_name method with None port."""
         factory = BaseConfigurationFactory()
         mcast = factory.create_multicast_path(
@@ -407,13 +410,13 @@ class TestBaseMulticastPath:
 class TestBaseSwitchPort:
     """Test cases for BaseSwitchPort class."""
 
-    def test_create_switch_port(self):
+    def test_create_switch_port(self) -> None:
         """Test create_switch_port method."""
         factory = BaseConfigurationFactory()
         port = factory.create_switch_port(portid="PORT1", ctrl=None, port=None, default_vlan=None, vlans=[])
         assert port.portid() == "PORT1"
 
-    def test_portid_full(self):
+    def test_portid_full(self) -> None:
         """Test portid_full method."""
         factory = BaseConfigurationFactory()
         ecu = factory.create_ecu("ECU1", [])
@@ -425,7 +428,7 @@ class TestBaseSwitchPort:
         assert "Switch1" in result
         assert "PORT1" in result
 
-    def test_portid_generated_with_ctrl(self):
+    def test_portid_generated_with_ctrl(self) -> None:
         """Test portid_generated with connected controller."""
         factory = BaseConfigurationFactory()
         controller = factory.create_controller("Controller1", [])
@@ -433,14 +436,14 @@ class TestBaseSwitchPort:
         result = port.portid_generated()
         assert "Controller1" in result
 
-    def test_portid_generated_fallback(self):
+    def test_portid_generated_fallback(self) -> None:
         """Test portid_generated fallback to portid."""
         factory = BaseConfigurationFactory()
         port = factory.create_switch_port(portid="PORT1", ctrl=None, port=None, default_vlan=None, vlans=[])
         result = port.portid_generated()
         assert result == "PORT1"
 
-    def test_set_connected_port_warning(self):
+    def test_set_connected_port_warning(self) -> None:
         """Test set_connected_port warning when already connected."""
         factory = BaseConfigurationFactory()
         port = factory.create_switch_port(portid="PORT1", ctrl=None, port=None, default_vlan=None, vlans=[])
@@ -451,7 +454,7 @@ class TestBaseSwitchPort:
         port2 = factory.create_switch_port(portid="PORT2", ctrl=None, port=None, default_vlan=None, vlans=[])
         port.set_connected_port(port2)
 
-    def test_set_ethernet_bus_warning(self):
+    def test_set_ethernet_bus_warning(self) -> None:
         """Test set_ethernet_bus warning when already connected."""
         factory = BaseConfigurationFactory()
         port = factory.create_switch_port(portid="PORT1", ctrl=None, port=None, default_vlan=None, vlans=[])
@@ -462,7 +465,7 @@ class TestBaseSwitchPort:
         bus = factory.create_ethernet_bus("Bus1", [], [])
         port.set_ethernet_bus(bus)
 
-    def test_set_connected_ctrl_warning(self):
+    def test_set_connected_ctrl_warning(self) -> None:
         """Test set_connected_ctrl warning when already connected."""
         factory = BaseConfigurationFactory()
         port = factory.create_switch_port(portid="PORT1", ctrl=None, port=None, default_vlan=None, vlans=[])
@@ -477,7 +480,7 @@ class TestBaseSwitchPort:
 class TestBaseSwitch:
     """Test cases for BaseSwitch class."""
 
-    def test_create_switch(self):
+    def test_create_switch(self) -> None:
         """Test create_switch method."""
         factory = BaseConfigurationFactory()
         ecu = factory.create_ecu("ECU1", [])
@@ -489,7 +492,7 @@ class TestBaseSwitch:
 class TestBaseEthernetBus:
     """Test cases for BaseEthernetBus class."""
 
-    def test_create_ethernet_bus(self):
+    def test_create_ethernet_bus(self) -> None:
         """Test create_ethernet_bus method."""
         factory = BaseConfigurationFactory()
         controller = factory.create_controller("Controller1", [])
@@ -499,7 +502,7 @@ class TestBaseEthernetBus:
         assert bus.connected_controllers()[0] == controller
         assert bus.switch_ports() == []
 
-    def test_ethernet_bus_connected_controllers(self):
+    def test_ethernet_bus_connected_controllers(self) -> None:
         """Test connected_controllers method."""
         factory = BaseConfigurationFactory()
         controller1 = factory.create_controller("Controller1", [])
@@ -509,7 +512,7 @@ class TestBaseEthernetBus:
         assert controller1 in bus.connected_controllers()
         assert controller2 in bus.connected_controllers()
 
-    def test_ethernet_bus_switch_ports(self):
+    def test_ethernet_bus_switch_ports(self) -> None:
         """Test switch_ports method."""
         factory = BaseConfigurationFactory()
         bus = factory.create_ethernet_bus("Bus1", [], [])
@@ -519,7 +522,7 @@ class TestBaseEthernetBus:
 class TestBaseECU:
     """Test cases for BaseECU class."""
 
-    def test_create_ecu(self):
+    def test_create_ecu(self) -> None:
         """Test create_ecu method."""
         factory = BaseConfigurationFactory()
         ecu = factory.create_ecu("ECU1", [])
@@ -530,7 +533,7 @@ class TestBaseECU:
 class TestBaseController:
     """Test cases for BaseController class."""
 
-    def test_create_controller(self):
+    def test_create_controller(self) -> None:
         """Test create_controller method."""
         factory = BaseConfigurationFactory()
         controller = factory.create_controller("Controller1", [])
@@ -541,11 +544,17 @@ class TestBaseController:
 class TestBaseInterface:
     """Test cases for BaseInterface class."""
 
-    def test_create_interface(self):
+    def test_create_interface(self) -> None:
         """Test create_interface method."""
         factory = BaseConfigurationFactory()
         interface = factory.create_interface(
-            name="Interface1", vlanid="100", ips=["192.168.1.1"], sockets=[], input_frame_trigs={}, output_frame_trigs={}, fr_channel=None
+            name="Interface1",
+            vlanid="100",  # type: ignore
+            ips=["192.168.1.1"],
+            sockets=[],
+            input_frame_trigs={},
+            output_frame_trigs={},
+            fr_channel=None,
         )
         assert interface.vlanname() == "Interface1"
         assert interface.vlanid() == 100
@@ -554,7 +563,7 @@ class TestBaseInterface:
 class TestBaseSocket:
     """Test cases for BaseSocket class."""
 
-    def test_create_socket(self):
+    def test_create_socket(self) -> None:
         """Test create_socket method."""
         factory = BaseConfigurationFactory()
         socket = factory.create_socket(
@@ -576,13 +585,19 @@ class TestBaseSocket:
 class TestBaseConfigurationFactory:
     """Test cases for BaseConfigurationFactory class."""
 
-    def test_socket_to_sw_port(self):
+    def test_socket_to_sw_port(self) -> None:
         """Test socket_to_sw_port with socket."""
         factory = BaseConfigurationFactory()
         # Create interface first (controller will be set via interface's set_controller)
         controller = factory.create_controller("Controller1", [])
         interface = factory.create_interface(
-            name="Interface1", vlanid="100", ips=["192.168.1.1"], sockets=[], input_frame_trigs={}, output_frame_trigs={}, fr_channel=None
+            name="Interface1",
+            vlanid="100",  # type: ignore
+            ips=["192.168.1.1"],
+            sockets=[],
+            input_frame_trigs={},
+            output_frame_trigs={},
+            fr_channel=None,
         )
         interface.set_controller(controller)
         # Create socket
@@ -606,13 +621,19 @@ class TestBaseConfigurationFactory:
         result = factory.socket_to_sw_port(socket)
         assert result == sw_port
 
-    def test_socket_to_sw_port_none_and_no_bus(self):
+    def test_socket_to_sw_port_none_and_no_bus(self) -> None:
         """Test socket_to_sw_port with socket that has interface without switch port and bus."""
         factory = BaseConfigurationFactory()
         # Create interface first (controller will be set via interface's set_controller)
         controller = factory.create_controller("Controller1", [])
         interface = factory.create_interface(
-            name="Interface1", vlanid="100", ips=["192.168.1.1"], sockets=[], input_frame_trigs={}, output_frame_trigs={}, fr_channel=None
+            name="Interface1",
+            vlanid="100",  # type: ignore
+            ips=["192.168.1.1"],
+            sockets=[],
+            input_frame_trigs={},
+            output_frame_trigs={},
+            fr_channel=None,
         )
         interface.set_controller(controller)
         # Create socket
@@ -630,13 +651,19 @@ class TestBaseConfigurationFactory:
         result = factory.socket_to_sw_port(socket)
         assert result is None
 
-    def test_socket_to_sw_port_none_and_bus(self):
+    def test_socket_to_sw_port_none_and_bus(self) -> None:
         """Test socket_to_sw_port with socket that has interface with bus."""
         factory = BaseConfigurationFactory()
         # Create interface first (controller will be set via interface's set_controller)
         controller = factory.create_controller("Controller1", [])
         interface = factory.create_interface(
-            name="Interface1", vlanid="100", ips=["192.168.1.1"], sockets=[], input_frame_trigs={}, output_frame_trigs={}, fr_channel=None
+            name="Interface1",
+            vlanid="100",  # type: ignore
+            ips=["192.168.1.1"],
+            sockets=[],
+            input_frame_trigs={},
+            output_frame_trigs={},
+            fr_channel=None,
         )
         interface.set_controller(controller)
         # Create socket
@@ -660,13 +687,19 @@ class TestBaseConfigurationFactory:
         result = factory.socket_to_sw_port(socket)
         assert result is not None
 
-    def test_socket_to_sw_port_none_and_bus_no_uplink_port(self):
+    def test_socket_to_sw_port_none_and_bus_no_uplink_port(self) -> None:
         """Test socket_to_sw_port with socket that has interface with bus."""
         factory = BaseConfigurationFactory()
         # Create interface first (controller will be set via interface's set_controller)
         controller = factory.create_controller("Controller1", [])
         interface = factory.create_interface(
-            name="Interface1", vlanid="100", ips=["192.168.1.1"], sockets=[], input_frame_trigs={}, output_frame_trigs={}, fr_channel=None
+            name="Interface1",
+            vlanid="100",  # type: ignore
+            ips=["192.168.1.1"],
+            sockets=[],
+            input_frame_trigs={},
+            output_frame_trigs={},
+            fr_channel=None,
         )
         interface.set_controller(controller)
         # Create socket
@@ -688,34 +721,34 @@ class TestBaseConfigurationFactory:
         result = factory.socket_to_sw_port(socket)
         assert result is None
 
-    def test_add_ipv4_address_config(self):
+    def test_add_ipv4_address_config(self) -> None:
         """Test add_ipv4_address_config method."""
         factory = BaseConfigurationFactory()
         factory.add_ipv4_address_config("192.168.1.1", "255.255.255.0")
 
-    def test_get_ipv4_netmask(self):
+    def test_get_ipv4_netmask(self) -> None:
         """Test get_ipv4_netmask method."""
         factory = BaseConfigurationFactory()
         result = factory.get_ipv4_netmask("192.168.1.1")
         assert result == ""
 
-    def test_add_ipv6_address_config(self):
+    def test_add_ipv6_address_config(self) -> None:
         """Test add_ipv6_address_config method."""
         factory = BaseConfigurationFactory()
-        factory.add_ipv6_address_config("2001:db8::1", 64)
+        factory.add_ipv6_address_config("2001:db8::1", 64)  # type: ignore
 
-    def test_get_ipv6_prefix_length(self):
+    def test_get_ipv6_prefix_length(self) -> None:
         """Test get_ipv6_prefix_length method."""
         factory = BaseConfigurationFactory()
         result = factory.get_ipv6_prefix_length("2001:db8::1")
         assert result == ""
 
-    def test_parsing_done(self):
+    def test_parsing_done(self) -> None:
         """Test parsing_done method."""
         factory = BaseConfigurationFactory()
         factory.parsing_done()
 
-    def test_switch_port_repr(self):
+    def test_switch_port_repr(self) -> None:
         """Test BaseSwitchPort __repr__."""
         factory = BaseConfigurationFactory()
         controller = factory.create_controller("Controller1", [])
@@ -724,7 +757,7 @@ class TestBaseConfigurationFactory:
         # Note: __repr__ returns <unknown>.PORT1 because __switch__ is never set
         assert "PORT1" in repr_str
 
-    def test_create_pdu_route_unicast(self):
+    def test_create_pdu_route_unicast(self) -> None:
         """Test create_pdu_route with unicast socket."""
         factory = BaseConfigurationFactory()
         socket1 = factory.create_socket(
@@ -750,7 +783,7 @@ class TestBaseConfigurationFactory:
         result = factory.create_pdu_route(socket1, socket2, "PDU1", 0x100)
         assert result is True
 
-    def test_create_pdu_route_multicast(self):
+    def test_create_pdu_route_multicast(self) -> None:
         """Test create_pdu_route with multicast socket."""
         factory = BaseConfigurationFactory()
         socket1 = factory.create_socket(
@@ -780,7 +813,7 @@ class TestBaseConfigurationFactory:
 class TestSOMEIPBaseServiceInstance:
     """Test cases for SOMEIPBaseServiceInstance class."""
 
-    def test_create_someip_service_instance(self):
+    def test_create_someip_service_instance(self) -> None:
         """Test create_someip_service_instance method."""
 
         factory = BaseConfigurationFactory()
@@ -814,7 +847,7 @@ class TestSOMEIPBaseServiceInstanceClient:
 class TestSOMEIPBaseServiceEventgroupSender:
     """Test cases for SOMEIPBaseServiceEventgroupSender class."""
 
-    def test_create_someip_service_eventgroup_sender(self):
+    def test_create_someip_service_eventgroup_sender(self) -> None:
         """Test create_someip_service_eventgroup_sender method."""
         factory = BaseConfigurationFactory()
         service = factory.create_someip_service(
@@ -827,7 +860,7 @@ class TestSOMEIPBaseServiceEventgroupSender:
         assert eventgroup_sender.eventgroupreceivers() == []
         assert eventgroup_sender.socket() is None
 
-    def test_eventgroup_sender_addreceiver(self):
+    def test_eventgroup_sender_addreceiver(self) -> None:
         """Test addreceiver method."""
         factory = BaseConfigurationFactory()
         service = factory.create_someip_service(
@@ -838,7 +871,7 @@ class TestSOMEIPBaseServiceEventgroupSender:
         eventgroup_receiver = factory.create_someip_service_eventgroup_receiver(service_instance, 101, eventgroup_sender)
         assert eventgroup_sender.eventgroupreceivers() == [eventgroup_receiver]
 
-    def test_eventgroup_sender_setsocket(self):
+    def test_eventgroup_sender_setsocket(self) -> None:
         """Test setsocket method."""
         factory = BaseConfigurationFactory()
         service = factory.create_someip_service(
@@ -863,7 +896,7 @@ class TestSOMEIPBaseServiceEventgroupSender:
 class TestSOMEIPBaseServiceEventgroupReceiver:
     """Test cases for SOMEIPBaseServiceEventgroupReceiver class."""
 
-    def test_create_someip_service_eventgroup_receiver(self):
+    def test_create_someip_service_eventgroup_receiver(self) -> None:
         """Test create_someip_service_eventgroup_receiver method."""
         factory = BaseConfigurationFactory()
         service = factory.create_someip_service(
@@ -877,7 +910,7 @@ class TestSOMEIPBaseServiceEventgroupReceiver:
         assert eventgroup_receiver.sender() == eventgroup_sender
         assert eventgroup_receiver.socket() is None
 
-    def test_eventgroup_receiver_setsocket(self):
+    def test_eventgroup_receiver_setsocket(self) -> None:
         """Test setsocket method."""
         factory = BaseConfigurationFactory()
         service = factory.create_someip_service(
@@ -903,7 +936,7 @@ class TestSOMEIPBaseServiceEventgroupReceiver:
 class TestSOMEIPBaseService:
     """Test cases for SOMEIPBaseService class."""
 
-    def test_create_someip_service(self):
+    def test_create_someip_service(self) -> None:
         """Test create_someip_service method."""
         factory = BaseConfigurationFactory()
         service = factory.create_someip_service(
@@ -914,7 +947,7 @@ class TestSOMEIPBaseService:
         assert service.majorversion() == 1
         assert service.minorversion() == 0
 
-    def test_service_versionstring(self):
+    def test_service_versionstring(self) -> None:
         """Test versionstring method."""
         factory = BaseConfigurationFactory()
         service = factory.create_someip_service(
@@ -922,12 +955,12 @@ class TestSOMEIPBaseService:
         )
         assert service.versionstring() == "1.2"
 
-    def test_service_methods(self):
+    def test_service_methods(self) -> None:
         """Test methods method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
         method = factory.create_someip_service_method(
-            name="TestMethod", methodid=0x01, calltype="REQUEST_RESPONSE", relia=True, inparams=[basetype], outparams=[basetype]
+            name="TestMethod", methodid=0x01, calltype="REQUEST_RESPONSE", relia=True, inparams=[basetype], outparams=[basetype]  # type: ignore
         )
         service = factory.create_someip_service(
             name="TestService", serviceid=0x1234, majorver=1, minorver=0, methods={0x01: method}, events={}, fields={}, eventgroups={}
@@ -936,11 +969,11 @@ class TestSOMEIPBaseService:
         assert service.method(0x01) == method
         assert service.method(0x02) is None
 
-    def test_service_events(self):
+    def test_service_events(self) -> None:
         """Test events method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
-        event = factory.create_someip_service_event(name="TestEvent", methodid=0x02, relia=True, params=[basetype])
+        event = factory.create_someip_service_event(name="TestEvent", methodid=0x02, relia=True, params=[basetype])  # type: ignore
         service = factory.create_someip_service(
             name="TestService", serviceid=0x1234, majorver=1, minorver=0, methods={}, events={0x02: event}, fields={}, eventgroups={}
         )
@@ -948,7 +981,7 @@ class TestSOMEIPBaseService:
         assert service.event(0x02) == event
         assert service.event(0x03) is None
 
-    def test_service_fields(self):
+    def test_service_fields(self) -> None:
         """Test fields method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -960,7 +993,7 @@ class TestSOMEIPBaseService:
             getterreli=True,
             setterreli=True,
             notifierreli=True,
-            params=[basetype],
+            params=[basetype],  # type: ignore
             getter_debouncereq=-1,
             getter_retentionreq=-1,
             getter_retentionres=-1,
@@ -977,7 +1010,7 @@ class TestSOMEIPBaseService:
         assert service.field(0x01) == field
         assert service.field(0x02) is None
 
-    def test_service_eventgroups(self):
+    def test_service_eventgroups(self) -> None:
         """Test eventgroups method."""
         factory = BaseConfigurationFactory()
         eventgroup = factory.create_someip_service_eventgroup(name="TestEventGroup", eid=0x01, eventids=[], fieldids=[])
@@ -988,7 +1021,7 @@ class TestSOMEIPBaseService:
         # Note: service.eventgroup(0x01) has a bug in the code (uses 'id' instead of 'egid')
         assert service.eventgroup(0x02) is None
 
-    def test_service_add_instance(self):
+    def test_service_add_instance(self) -> None:
         """Test add_instance method."""
         factory = BaseConfigurationFactory()
         service = factory.create_someip_service(
@@ -997,7 +1030,7 @@ class TestSOMEIPBaseService:
         service_instance = factory.create_someip_service_instance(service, 1, 1)
         assert service.instances() == [service_instance]
 
-    def test_service_remove_instance(self):
+    def test_service_remove_instance(self) -> None:
         """Test remove_instance method."""
         factory = BaseConfigurationFactory()
         service = factory.create_someip_service(
@@ -1011,12 +1044,12 @@ class TestSOMEIPBaseService:
 class TestSOMEIPBaseServiceMethod:
     """Test cases for SOMEIPBaseServiceMethod class."""
 
-    def test_create_someip_service_method(self):
+    def test_create_someip_service_method(self) -> None:
         """Test create_someip_service_method method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
         method = factory.create_someip_service_method(
-            name="TestMethod", methodid=0x01, calltype="REQUEST_RESPONSE", relia=True, inparams=[basetype], outparams=[basetype]
+            name="TestMethod", methodid=0x01, calltype="REQUEST_RESPONSE", relia=True, inparams=[basetype], outparams=[basetype]  # type: ignore
         )
         assert method.name() == "TestMethod"
         assert method.calltype() == "REQUEST_RESPONSE"
@@ -1025,11 +1058,11 @@ class TestSOMEIPBaseServiceMethod:
 class TestSOMEIPBaseServiceEvent:
     """Test cases for SOMEIPBaseServiceEvent class."""
 
-    def test_create_someip_service_event(self):
+    def test_create_someip_service_event(self) -> None:
         """Test create_someip_service_event method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
-        event = factory.create_someip_service_event(name="TestEvent", methodid=0x02, relia=True, params=[basetype])
+        event = factory.create_someip_service_event(name="TestEvent", methodid=0x02, relia=True, params=[basetype])  # type: ignore
         assert event.name() == "TestEvent"
         assert event.methodid() == 0x02
         assert event.size_min_out() == 1
@@ -1039,18 +1072,18 @@ class TestSOMEIPBaseServiceEvent:
         assert event.debounce_time() == -1
         assert event.max_buffer_retention_time() == -1
 
-    def test_create_someip_service_event_with_params(self):
+    def test_create_someip_service_event_with_params(self) -> None:
         """Test create_someip_service_event with params."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
-        event = factory.create_someip_service_event(name="TestEvent", methodid=0x02, relia=True, params=[basetype])
+        event = factory.create_someip_service_event(name="TestEvent", methodid=0x02, relia=True, params=[basetype])  # type: ignore
         assert not event.legacy()
 
 
 class TestSOMEIPBaseServiceField:
     """Test cases for SOMEIPBaseServiceField class."""
 
-    def test_create_someip_service_field(self):
+    def test_create_someip_service_field(self) -> None:
         """Test create_someip_service_field method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -1062,7 +1095,7 @@ class TestSOMEIPBaseServiceField:
             getterreli=True,
             setterreli=True,
             notifierreli=True,
-            params=[basetype],
+            params=[basetype],  # type: ignore
             getter_debouncereq=-1,
             getter_retentionreq=-1,
             getter_retentionres=-1,
@@ -1074,7 +1107,7 @@ class TestSOMEIPBaseServiceField:
         )
         assert field.name() == "TestField"
         assert field.getter() is not None
-        assert field.getter().methodid() == 0x01
+        assert field.getter().methodid() == 0x01  # type: ignore
         assert field.setter() is not None
         assert field.notifier() is not None
         assert field.size_min_out() == 1
@@ -1082,7 +1115,7 @@ class TestSOMEIPBaseServiceField:
         assert not field.legacy()
         assert not field.tlv()
 
-    def test_create_someip_service_field_no_ids(self):
+    def test_create_someip_service_field_no_ids(self) -> None:
         """Test create_someip_service_field with no IDs - should trigger error."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -1094,7 +1127,7 @@ class TestSOMEIPBaseServiceField:
             getterreli=True,
             setterreli=True,
             notifierreli=True,
-            params=[basetype],
+            params=[basetype],  # type: ignore
             getter_debouncereq=-1,
             getter_retentionreq=-1,
             getter_retentionres=-1,
@@ -1114,7 +1147,7 @@ class TestSOMEIPBaseServiceField:
 class TestSOMEIPBaseServiceEventgroup:
     """Test cases for SOMEIPBaseServiceEventgroup class."""
 
-    def test_create_someip_service_eventgroup(self):
+    def test_create_someip_service_eventgroup(self) -> None:
         """Test create_someip_service_eventgroup method."""
         factory = BaseConfigurationFactory()
         eventgroup = factory.create_someip_service_eventgroup(name="TestEventGroup", eid=0x01, eventids=[], fieldids=[])
@@ -1125,7 +1158,7 @@ class TestSOMEIPBaseServiceEventgroup:
 class TestSOMEIPBaseParameter:
     """Test cases for SOMEIPBaseParameter class."""
 
-    def test_create_someip_parameter(self):
+    def test_create_someip_parameter(self) -> None:
         """Test create_someip_parameter method."""
         factory = BaseConfigurationFactory()
         param = factory.create_someip_parameter(
@@ -1145,7 +1178,7 @@ class TestSOMEIPBaseParameter:
 class TestSOMEIPBaseParameterBasetype:
     """Test cases for SOMEIPBaseParameterBasetype class."""
 
-    def test_create_someip_parameter_basetype(self):
+    def test_create_someip_parameter_basetype(self) -> None:
         """Test create_someip_parameter_basetype method."""
         factory = BaseConfigurationFactory()
         param = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -1156,7 +1189,7 @@ class TestSOMEIPBaseParameterBasetype:
 class TestSOMEIPBaseParameterString:
     """Test cases for SOMEIPBaseParameterString class."""
 
-    def test_create_someip_parameter_string(self):
+    def test_create_someip_parameter_string(self) -> None:
         """Test create_someip_parameter_string method."""
         factory = BaseConfigurationFactory()
         param = factory.create_someip_parameter_string("String1", "UTF-8", True, 0, 100, "NULL", 32, 0)
@@ -1166,7 +1199,7 @@ class TestSOMEIPBaseParameterString:
 class TestSOMEIPBaseParameterArray:
     """Test cases for SOMEIPBaseParameterArray class."""
 
-    def test_create_someip_parameter_array(self):
+    def test_create_someip_parameter_array(self) -> None:
         """Test create_someip_parameter_array method."""
         factory = BaseConfigurationFactory()
         dim = factory.create_someip_parameter_array_dim(dim=1, lowerlimit=0, upperlimit=10, length_of_length=32, pad_to=0)
@@ -1180,7 +1213,7 @@ class TestSOMEIPBaseParameterArray:
 class TestSOMEIPBaseParameterArrayDim:
     """Test cases for SOMEIPBaseParameterArrayDim class."""
 
-    def test_create_someip_parameter_array_dim(self):
+    def test_create_someip_parameter_array_dim(self) -> None:
         """Test create_someip_parameter_array_dim method."""
         factory = BaseConfigurationFactory()
         dim = factory.create_someip_parameter_array_dim(dim=1, lowerlimit=0, upperlimit=10, length_of_length=32, pad_to=0)
@@ -1190,7 +1223,7 @@ class TestSOMEIPBaseParameterArrayDim:
         assert dim.length_of_length() == 32
         assert dim.pad_to() == 0
 
-    def test_calc_size_min_bits(self):
+    def test_calc_size_min_bits(self) -> None:
         """Test calc_size_min_bits method."""
         factory = BaseConfigurationFactory()
         dim = factory.create_someip_parameter_array_dim(dim=1, lowerlimit=0, upperlimit=10, length_of_length=32, pad_to=0)
@@ -1198,7 +1231,7 @@ class TestSOMEIPBaseParameterArrayDim:
         size = dim.calc_size_min_bits(child.size_min_bits())
         assert size > 0
 
-    def test_calc_size_max_bits(self):
+    def test_calc_size_max_bits(self) -> None:
         """Test calc_size_max_bits method."""
         factory = BaseConfigurationFactory()
         dim = factory.create_someip_parameter_array_dim(dim=1, lowerlimit=0, upperlimit=10, length_of_length=32, pad_to=0)
@@ -1210,7 +1243,7 @@ class TestSOMEIPBaseParameterArrayDim:
 class TestSOMEIPBaseParameterStruct:
     """Test cases for SOMEIPBaseParameterStruct class."""
 
-    def test_create_someip_parameter_struct(self):
+    def test_create_someip_parameter_struct(self) -> None:
         """Test create_someip_parameter_struct method."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_struct_member(
@@ -1228,7 +1261,7 @@ class TestSOMEIPBaseParameterStruct:
 class TestSOMEIPBaseParameterStructMember:
     """Test cases for SOMEIPBaseParameterStructMember class."""
 
-    def test_create_someip_parameter_struct_member(self):
+    def test_create_someip_parameter_struct_member(self) -> None:
         """Test create_someip_parameter_struct_member method."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_struct_member(
@@ -1243,7 +1276,7 @@ class TestSOMEIPBaseParameterStructMember:
         assert member.mandatory()
         assert member.signal() is None
 
-    def test_update_position(self):
+    def test_update_position(self) -> None:
         """Test update_position method."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_struct_member(
@@ -1260,7 +1293,7 @@ class TestSOMEIPBaseParameterStructMember:
 class TestSOMEIPBaseParameterTypedef:
     """Test cases for SOMEIPBaseParameterTypedef class."""
 
-    def test_create_someip_parameter_typedef(self):
+    def test_create_someip_parameter_typedef(self) -> None:
         """Test create_someip_parameter_typedef method."""
         factory = BaseConfigurationFactory()
         typedef = factory.create_someip_parameter_typedef(
@@ -1274,12 +1307,12 @@ class TestSOMEIPBaseParameterTypedef:
 class TestSOMEIPBaseParameterEnumeration:
     """Test cases for SOMEIPBaseParameterEnumeration class."""
 
-    def test_create_someip_parameter_enumeration(self):
+    def test_create_someip_parameter_enumeration(self) -> None:
         """Test create_someip_parameter_enumeration method."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_enumeration_item(value=1, name="OPEN", desc="Door is open")
         enum = factory.create_someip_parameter_enumeration(
-            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         assert enum.name() == "Enum1"
         assert len(enum.items()) == 1
@@ -1291,7 +1324,7 @@ class TestSOMEIPBaseParameterEnumeration:
 class TestSOMEIPBaseParameterEnumerationItem:
     """Test cases for SOMEIPBaseParameterEnumerationItem class."""
 
-    def test_create_someip_parameter_enumeration_item(self):
+    def test_create_someip_parameter_enumeration_item(self) -> None:
         """Test create_someip_parameter_enumeration_item method."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_enumeration_item(value=1, name="OPEN", desc="Door is open")
@@ -1303,7 +1336,7 @@ class TestSOMEIPBaseParameterEnumerationItem:
 class TestSOMEIPBaseParameterUnion:
     """Test cases for SOMEIPBaseParameterUnion class."""
 
-    def test_create_someip_parameter_union(self):
+    def test_create_someip_parameter_union(self) -> None:
         """Test create_someip_parameter_union method."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -1320,7 +1353,7 @@ class TestSOMEIPBaseParameterUnion:
 class TestSOMEIPBaseParameterUnionMember:
     """Test cases for SOMEIPBaseParameterUnionMember class."""
 
-    def test_create_someip_parameter_union_member(self):
+    def test_create_someip_parameter_union_member(self) -> None:
         """Test create_someip_parameter_union_member method."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -1335,12 +1368,12 @@ class TestSOMEIPBaseParameterUnionMember:
 class TestSOMEIPBaseParameterBitfield:
     """Test cases for SOMEIPBaseParameterBitfield class."""
 
-    def test_create_someip_parameter_bitfield(self):
+    def test_create_someip_parameter_bitfield(self) -> None:
         """Test create_someip_parameter_bitfield method."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_bitfield_item(bit_number=0, name="FLAG1")
         bitfield = factory.create_someip_parameter_bitfield(
-            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         assert bitfield.name() == "Bitfield1"
         assert len(bitfield.items()) == 1
@@ -1351,7 +1384,7 @@ class TestSOMEIPBaseParameterBitfield:
 class TestSOMEIPBaseParameterBitfieldItem:
     """Test cases for SOMEIPBaseParameterBitfieldItem class."""
 
-    def test_create_someip_parameter_bitfield_item(self):
+    def test_create_someip_parameter_bitfield_item(self) -> None:
         """Test create_someip_parameter_bitfield_item method."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_bitfield_item(bit_number=0, name="FLAG1")
@@ -1362,7 +1395,7 @@ class TestSOMEIPBaseParameterBitfieldItem:
 class TestBaseSignal:
     """Test cases for BaseSignal class."""
 
-    def test_create_base_signal(self):
+    def test_create_base_signal(self) -> None:
         """Test BaseSignal class."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1373,18 +1406,18 @@ class TestBaseSignal:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
         assert signal.name() == "TestSignal"
@@ -1397,7 +1430,7 @@ class TestBaseSignal:
 class TestBaseSignalInstance:
     """Test cases for BaseSignalInstance class."""
 
-    def test_create_base_signal_instance(self):
+    def test_create_base_signal_instance(self) -> None:
         """Test create_signal_instance method."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1408,21 +1441,21 @@ class TestBaseSignalInstance:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
-        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)
+        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)  # type: ignore
         assert signal_instance.bit_position() == 0
         assert signal_instance.is_high_low_byte_order()
         signal_instance.add_signal(signal)
@@ -1432,7 +1465,7 @@ class TestBaseSignalInstance:
 class TestBaseAbstractPDU:
     """Test cases for BaseAbstractPDU class."""
 
-    def test_create_base_abstract_pdu(self):
+    def test_create_base_abstract_pdu(self) -> None:
         """Test create_pdu method."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1443,22 +1476,28 @@ class TestBaseAbstractPDU:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
-        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)
-        pdu = factory.create_pdu(id="PDU1", short_name="TestPDU", byte_length=8, pdu_type="NORMAL", signal_instances=[signal_instance])
+        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)  # type: ignore
+        pdu = factory.create_pdu(
+            id="PDU1",
+            short_name="TestPDU",
+            byte_length=8,
+            pdu_type="NORMAL",
+            signal_instances=[signal_instance],  # type: ignore
+        )
         assert pdu.name() == "TestPDU"
         assert pdu.id() == "PDU1"
         assert pdu.byte_length() == 8
@@ -1469,11 +1508,17 @@ class TestBaseAbstractPDU:
 class TestBasePDU:
     """Test cases for BasePDU class."""
 
-    def test_create_base_pdu(self):
+    def test_create_base_pdu(self) -> None:
         """Test create_pdu method."""
         factory = BaseConfigurationFactory()
-        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=None, bit_position=0, is_high_low_byte_order=True)
-        pdu = factory.create_pdu(id="PDU1", short_name="TestPDU", byte_length=8, pdu_type="NORMAL", signal_instances=[signal_instance])
+        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=None, bit_position=0, is_high_low_byte_order=True)  # type: ignore
+        pdu = factory.create_pdu(
+            id="PDU1",
+            short_name="TestPDU",
+            byte_length=8,
+            pdu_type="NORMAL",
+            signal_instances=[signal_instance],  # type: ignore
+        )
         assert pdu.name() == "TestPDU"
         assert pdu.id() == "PDU1"
         assert pdu.byte_length() == 8
@@ -1484,7 +1529,7 @@ class TestBasePDU:
 class TestBaseMultiplexPDU:
     """Test cases for BaseMultiplexPDU class."""
 
-    def test_create_base_multiplex_pdu(self):
+    def test_create_base_multiplex_pdu(self) -> None:
         """Test create_multiplex_pdu method."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1495,21 +1540,21 @@ class TestBaseMultiplexPDU:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
-        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)
+        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)  # type: ignore
         switch = factory.create_multiplex_switch(
             id="Switch1",
             short_name="Switch",
@@ -1529,7 +1574,7 @@ class TestBaseMultiplexPDU:
             pdu_type="MULTIPLEX",
             switch=switch,
             seg_pos=[segment_position],
-            pdu_instances=[signal_instance],
+            pdu_instances=[signal_instance],  # type: ignore
             static_segs=[],
             static_pdu=None,
         )
@@ -1542,7 +1587,7 @@ class TestBaseMultiplexPDU:
 class TestBaseMultiplexPDUSwitch:
     """Test cases for BaseMultiplexPDUSwitch class."""
 
-    def test_create_base_multiplex_pdu_switch(self):
+    def test_create_base_multiplex_pdu_switch(self) -> None:
         """Test create_multiplex_switch method."""
         factory = BaseConfigurationFactory()
         switch = factory.create_multiplex_switch(
@@ -1558,7 +1603,7 @@ class TestBaseMultiplexPDUSwitch:
 class TestBaseMultiplexPDUSegmentPosition:
     """Test cases for BaseMultiplexPDUSegmentPosition class."""
 
-    def test_create_base_multiplex_pdu_segment_position(self):
+    def test_create_base_multiplex_pdu_segment_position(self) -> None:
         """Test create_multiplex_segment_position method."""
         factory = BaseConfigurationFactory()
         segment_position = factory.create_multiplex_segment_position(
@@ -1573,7 +1618,7 @@ class TestBaseMultiplexPDUSegmentPosition:
 class TestBaseEthernetPDUInstance:
     """Test cases for BaseEthernetPDUInstance class."""
 
-    def test_create_base_ethernet_pdu_instance(self):
+    def test_create_base_ethernet_pdu_instance(self) -> None:
         """Test create_ethernet_pdu_instance method."""
         factory = BaseConfigurationFactory()
         pdu_instance = factory.create_ethernet_pdu_instance(
@@ -1586,7 +1631,7 @@ class TestBaseEthernetPDUInstance:
 class TestBasePDUInstance:
     """Test cases for BasePDUInstance class."""
 
-    def test_create_base_pdu_instance(self):
+    def test_create_base_pdu_instance(self) -> None:
         """Test create_pdu_instance method."""
         factory = BaseConfigurationFactory()
         pdu_instance = factory.create_pdu_instance(
@@ -1602,7 +1647,7 @@ class TestBasePDUInstance:
 class TestBaseFrame:
     """Test cases for BaseFrame class."""
 
-    def test_create_base_frame(self):
+    def test_create_base_frame(self) -> None:
         """Test create_frame method."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1613,27 +1658,27 @@ class TestBaseFrame:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
-        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)
+        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)  # type: ignore
         frame = factory.create_frame(
             id="Frame1",
             short_name="TestFrame",
             byte_length=8,
             frame_type="NORMAL",
-            pdu_instances=[signal_instance],
+            pdu_instances=[signal_instance],  # type: ignore
         )
         assert frame.name() == "TestFrame"
         assert frame.byte_length() == 8
@@ -1642,7 +1687,7 @@ class TestBaseFrame:
 class TestBaseFrameTriggering:
     """Test cases for BaseFrameTriggering class."""
 
-    def test_create_base_frame_triggering(self):
+    def test_create_base_frame_triggering(self) -> None:
         """Test create_frame_triggering_can method."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1653,27 +1698,27 @@ class TestBaseFrameTriggering:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
-        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)
+        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)  # type: ignore
         frame = factory.create_frame(
             id="Frame1",
             short_name="TestFrame",
             byte_length=8,
             frame_type="NORMAL",
-            pdu_instances=[signal_instance],
+            pdu_instances=[signal_instance],  # type: ignore
         )
         frame_triggering = factory.create_frame_triggering_can(
             id="FT1",
@@ -1691,7 +1736,7 @@ class TestBaseFrameTriggering:
 class TestBaseFrameTriggeringCAN:
     """Test cases for BaseFrameTriggeringCAN class."""
 
-    def test_create_base_frame_triggering_can(self):
+    def test_create_base_frame_triggering_can(self) -> None:
         """Test create_frame_triggering_can method."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1702,27 +1747,27 @@ class TestBaseFrameTriggeringCAN:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
-        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)
+        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)  # type: ignore
         frame = factory.create_frame(
             id="Frame1",
             short_name="TestFrame",
             byte_length=8,
             frame_type="NORMAL",
-            pdu_instances=[signal_instance],
+            pdu_instances=[signal_instance],  # type: ignore
         )
         frame_triggering = factory.create_frame_triggering_can(
             id="FT1",
@@ -1740,7 +1785,7 @@ class TestBaseFrameTriggeringCAN:
 class TestBaseFrameTriggeringFlexRay:
     """Test cases for BaseFrameTriggeringFlexRay class."""
 
-    def test_create_base_frame_triggering_flexray(self):
+    def test_create_base_frame_triggering_flexray(self) -> None:
         """Test create_frame_triggering_flexray method."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1751,27 +1796,27 @@ class TestBaseFrameTriggeringFlexRay:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
-        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)
+        signal_instance = factory.create_signal_instance(id="SI1", signal_ref=signal, bit_position=0, is_high_low_byte_order=True)  # type: ignore
         frame = factory.create_frame(
             id="Frame1",
             short_name="TestFrame",
             byte_length=8,
             frame_type="NORMAL",
-            pdu_instances=[signal_instance],
+            pdu_instances=[signal_instance],  # type: ignore
         )
         frame_triggering = factory.create_frame_triggering_flexray(
             id="FT1",
@@ -1788,7 +1833,7 @@ class TestBaseFrameTriggeringFlexRay:
 class TestSOMEIPBaseParameterStructAdditional:
     """Additional tests for SOMEIPBaseParameterStruct."""
 
-    def test_create_struct_with_tlv(self):
+    def test_create_struct_with_tlv(self) -> None:
         """Test create_someip_parameter_struct with tlv=True."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_struct_member(
@@ -1802,7 +1847,7 @@ class TestSOMEIPBaseParameterStructAdditional:
         assert struct.tlv()
         assert not struct.legacy()
 
-    def test_struct_legacy_with_signal(self):
+    def test_struct_legacy_with_signal(self) -> None:
         """Test struct legacy with signal."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1813,18 +1858,18 @@ class TestSOMEIPBaseParameterStructAdditional:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
         member = factory.create_someip_parameter_struct_member(
@@ -1837,7 +1882,7 @@ class TestSOMEIPBaseParameterStructAdditional:
         struct = factory.create_someip_parameter_struct("Struct1", 32, 0, {0: member}, tlv=False)
         assert struct.legacy()
 
-    def test_struct_legacy_with_signal_child(self):
+    def test_struct_legacy_with_signal_child(self) -> None:
         """Test struct legacy with signal that has legacy child."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1848,22 +1893,22 @@ class TestSOMEIPBaseParameterStructAdditional:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
         # Set legacy on signal
-        signal._BaseSignal__legacy = True
+        signal._BaseSignal__legacy = True  # type: ignore
         member = factory.create_someip_parameter_struct_member(
             position=0,
             name="Member1",
@@ -1878,12 +1923,12 @@ class TestSOMEIPBaseParameterStructAdditional:
 class TestSOMEIPBaseParameterEnumerationAdditional:
     """Additional tests for SOMEIPBaseParameterEnumeration."""
 
-    def test_enumeration_legacy(self):
+    def test_enumeration_legacy(self) -> None:
         """Test enumeration legacy method."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_enumeration_item(value=1, name="OPEN", desc="Door is open")
         enum = factory.create_someip_parameter_enumeration(
-            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         assert not enum.legacy()
 
@@ -1891,7 +1936,7 @@ class TestSOMEIPBaseParameterEnumerationAdditional:
 class TestSOMEIPBaseParameterUnionAdditional:
     """Additional tests for SOMEIPBaseParameterUnion."""
 
-    def test_union_legacy(self):
+    def test_union_legacy(self) -> None:
         """Test union legacy method."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -1904,12 +1949,12 @@ class TestSOMEIPBaseParameterUnionAdditional:
 class TestSOMEIPBaseParameterBitfieldAdditional:
     """Additional tests for SOMEIPBaseParameterBitfield."""
 
-    def test_bitfield_legacy(self):
+    def test_bitfield_legacy(self) -> None:
         """Test bitfield legacy method."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_bitfield_item(bit_number=0, name="FLAG1")
         bitfield = factory.create_someip_parameter_bitfield(
-            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         assert not bitfield.legacy()
 
@@ -1917,7 +1962,7 @@ class TestSOMEIPBaseParameterBitfieldAdditional:
 class TestBaseSignalAdditional:
     """Additional tests for BaseSignal."""
 
-    def test_signal_legacy(self):
+    def test_signal_legacy(self) -> None:
         """Test BaseSignal legacy method."""
         factory = BaseConfigurationFactory()
         coding = BaseCoding(
@@ -1928,18 +1973,18 @@ class TestBaseSignalAdditional:
             coded_termination="NONE",
             coded_bit_length=8,
             coded_max_length=8,
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
         )
         signal = factory.create_signal(
             id="Signal1",
             name="TestSignal",
-            compu_scale=[0, 1, 1],
+            compu_scale=[0, 1, 1],  # type: ignore
             compu_consts=[],
             bit_len=8,
             min_len=8,
             max_len=8,
-            basetype=coding,
+            basetype=coding,  # type: ignore
             basetypelen=8,
         )
         assert not signal.legacy()
@@ -1948,7 +1993,7 @@ class TestBaseSignalAdditional:
 class TestSOMEIPBaseParameterAdditional:
     """Additional tests for SOMEIPBaseParameter classes."""
 
-    def test_parameter_array_eq(self):
+    def test_parameter_array_eq(self) -> None:
         """Test SOMEIPBaseParameterArray __eq__ method."""
         factory = BaseConfigurationFactory()
         dim = factory.create_someip_parameter_array_dim(dim=1, lowerlimit=0, upperlimit=10, length_of_length=32, pad_to=0)
@@ -1959,7 +2004,7 @@ class TestSOMEIPBaseParameterAdditional:
         assert array1 == array2
         assert array1 != array3
 
-    def test_parameter_typedef_eq(self):
+    def test_parameter_typedef_eq(self) -> None:
         """Test SOMEIPBaseParameterTypedef __eq__ method."""
         factory = BaseConfigurationFactory()
         typedef1 = factory.create_someip_parameter_typedef(
@@ -1974,19 +2019,19 @@ class TestSOMEIPBaseParameterAdditional:
         assert typedef1 == typedef2
         assert typedef1 != typedef3
 
-    def test_parameter_enumeration_eq(self):
+    def test_parameter_enumeration_eq(self) -> None:
         """Test SOMEIPBaseParameterEnumeration __eq__ method."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_enumeration_item(value=1, name="OPEN", desc="Door is open")
         enum1 = factory.create_someip_parameter_enumeration(
-            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         enum2 = factory.create_someip_parameter_enumeration(
-            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         assert enum1 == enum2
 
-    def test_parameter_struct_eq(self):
+    def test_parameter_struct_eq(self) -> None:
         """Test SOMEIPBaseParameterStruct __eq__ method."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_struct_member(
@@ -2000,7 +2045,7 @@ class TestSOMEIPBaseParameterAdditional:
         struct2 = factory.create_someip_parameter_struct("Struct1", 32, 0, {0: member}, tlv=False)
         assert struct1 == struct2
 
-    def test_parameter_struct_member_eq(self):
+    def test_parameter_struct_member_eq(self) -> None:
         """Test SOMEIPBaseParameterStructMember __eq__ method."""
         factory = BaseConfigurationFactory()
         member1 = factory.create_someip_parameter_struct_member(
@@ -2019,7 +2064,7 @@ class TestSOMEIPBaseParameterAdditional:
         )
         assert member1 == member2
 
-    def test_parameter_enumeration_item_eq(self):
+    def test_parameter_enumeration_item_eq(self) -> None:
         """Test SOMEIPBaseParameterEnumerationItem __eq__ method."""
         factory = BaseConfigurationFactory()
         item1 = factory.create_someip_parameter_enumeration_item(value=1, name="OPEN", desc="Door is open")
@@ -2028,7 +2073,7 @@ class TestSOMEIPBaseParameterAdditional:
         assert item1 == item2
         assert item1 != item3
 
-    def test_parameter_union_eq(self):
+    def test_parameter_union_eq(self) -> None:
         """Test SOMEIPBaseParameterUnion __eq__ method."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -2038,7 +2083,7 @@ class TestSOMEIPBaseParameterAdditional:
         union2 = factory.create_someip_parameter_union("Union1", 32, 32, 0, {0: member})
         assert union1 == union2
 
-    def test_parameter_union_member_eq(self):
+    def test_parameter_union_member_eq(self) -> None:
         """Test SOMEIPBaseParameterUnionMember __eq__ method."""
         factory = BaseConfigurationFactory()
         member1 = factory.create_someip_parameter_union_member(
@@ -2049,19 +2094,19 @@ class TestSOMEIPBaseParameterAdditional:
         )
         assert member1 == member2
 
-    def test_parameter_bitfield_eq(self):
+    def test_parameter_bitfield_eq(self) -> None:
         """Test SOMEIPBaseParameterBitfield __eq__ method."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_bitfield_item(bit_number=0, name="FLAG1")
         bitfield1 = factory.create_someip_parameter_bitfield(
-            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         bitfield2 = factory.create_someip_parameter_bitfield(
-            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         assert bitfield1 == bitfield2
 
-    def test_parameter_bitfield_item_eq(self):
+    def test_parameter_bitfield_item_eq(self) -> None:
         """Test SOMEIPBaseParameterBitfieldItem __eq__ method."""
         factory = BaseConfigurationFactory()
         item1 = factory.create_someip_parameter_bitfield_item(bit_number=0, name="FLAG1")
@@ -2074,7 +2119,7 @@ class TestSOMEIPBaseParameterAdditional:
 class TestSOMEIPBaseParameterArrayDimAdditional:
     """Additional tests for SOMEIPBaseParameterArrayDim."""
 
-    def test_calc_size_min_bits_with_padto(self):
+    def test_calc_size_min_bits_with_padto(self) -> None:
         """Test calc_size_min_bits with padTo."""
         factory = BaseConfigurationFactory()
         dim = factory.create_someip_parameter_array_dim(dim=1, lowerlimit=0, upperlimit=10, length_of_length=32, pad_to=8)
@@ -2082,7 +2127,7 @@ class TestSOMEIPBaseParameterArrayDimAdditional:
         size = dim.calc_size_min_bits(child.size_min_bits())
         assert size > 0
 
-    def test_calc_size_max_bits_with_padto(self):
+    def test_calc_size_max_bits_with_padto(self) -> None:
         """Test calc_size_max_bits with padTo."""
         factory = BaseConfigurationFactory()
         dim = factory.create_someip_parameter_array_dim(dim=1, lowerlimit=0, upperlimit=10, length_of_length=32, pad_to=8)
@@ -2094,7 +2139,7 @@ class TestSOMEIPBaseParameterArrayDimAdditional:
 class TestSOMEIPBaseParameterArrayAdditional:
     """Additional tests for SOMEIPBaseParameterArray."""
 
-    def test_array_size_min_bits(self):
+    def test_array_size_min_bits(self) -> None:
         """Test array size_min_bits."""
         factory = BaseConfigurationFactory()
         dim = factory.create_someip_parameter_array_dim(dim=1, lowerlimit=0, upperlimit=10, length_of_length=32, pad_to=0)
@@ -2102,7 +2147,7 @@ class TestSOMEIPBaseParameterArrayAdditional:
         array = factory.create_someip_parameter_array("Array1", {1: dim}, child)
         assert array.size_min_bits() > 0
 
-    def test_array_size_max_bits(self):
+    def test_array_size_max_bits(self) -> None:
         """Test array size_max_bits."""
         factory = BaseConfigurationFactory()
         dim = factory.create_someip_parameter_array_dim(dim=1, lowerlimit=0, upperlimit=10, length_of_length=32, pad_to=0)
@@ -2114,7 +2159,7 @@ class TestSOMEIPBaseParameterArrayAdditional:
 class TestSOMEIPBaseParameterStructAdditional2:
     """Additional tests for SOMEIPBaseParameterStruct."""
 
-    def test_struct_size_min_bits(self):
+    def test_struct_size_min_bits(self) -> None:
         """Test struct size_min_bits."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_struct_member(
@@ -2127,7 +2172,7 @@ class TestSOMEIPBaseParameterStructAdditional2:
         struct = factory.create_someip_parameter_struct("Struct1", 32, 0, {0: member}, tlv=False)
         assert struct.size_min_bits() > 0
 
-    def test_struct_size_max_bits(self):
+    def test_struct_size_max_bits(self) -> None:
         """Test struct size_max_bits."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_struct_member(
@@ -2144,7 +2189,7 @@ class TestSOMEIPBaseParameterStructAdditional2:
 class TestSOMEIPBaseParameterUnionAdditional2:
     """Additional tests for SOMEIPBaseParameterUnion."""
 
-    def test_union_size_min_bits(self):
+    def test_union_size_min_bits(self) -> None:
         """Test union size_min_bits."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -2153,7 +2198,7 @@ class TestSOMEIPBaseParameterUnionAdditional2:
         union = factory.create_someip_parameter_union("Union1", 32, 32, 0, {0: member})
         assert union.size_min_bits() > 0
 
-    def test_union_size_max_bits(self):
+    def test_union_size_max_bits(self) -> None:
         """Test union size_max_bits."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -2166,7 +2211,7 @@ class TestSOMEIPBaseParameterUnionAdditional2:
 class TestSOMEIPBaseParameterUnionAdditional3:
     """Additional tests for SOMEIPBaseParameterUnion with padTo."""
 
-    def test_union_size_min_bits_with_padto(self):
+    def test_union_size_min_bits_with_padto(self) -> None:
         """Test union size_min_bits with padTo."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -2176,7 +2221,7 @@ class TestSOMEIPBaseParameterUnionAdditional3:
         size = union.size_min_bits()
         assert size > 0
 
-    def test_union_size_max_bits_with_padto(self):
+    def test_union_size_max_bits_with_padto(self) -> None:
         """Test union size_max_bits with padTo."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -2190,21 +2235,21 @@ class TestSOMEIPBaseParameterUnionAdditional3:
 class TestSOMEIPBaseParameterBitfieldAdditional2:
     """Additional tests for SOMEIPBaseParameterBitfield."""
 
-    def test_bitfield_size_min_bits(self):
+    def test_bitfield_size_min_bits(self) -> None:
         """Test bitfield size_min_bits."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_bitfield_item(bit_number=0, name="FLAG1")
         bitfield = factory.create_someip_parameter_bitfield(
-            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         assert bitfield.size_min_bits() > 0
 
-    def test_bitfield_size_max_bits(self):
+    def test_bitfield_size_max_bits(self) -> None:
         """Test bitfield size_max_bits."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_bitfield_item(bit_number=0, name="FLAG1")
         bitfield = factory.create_someip_parameter_bitfield(
-            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Bitfield1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         assert bitfield.size_max_bits() > 0
 
@@ -2212,7 +2257,7 @@ class TestSOMEIPBaseParameterBitfieldAdditional2:
 class TestSOMEIPBaseParameterTypedefAdditional2:
     """Additional tests for SOMEIPBaseParameterTypedef."""
 
-    def test_typedef_size_min_bits(self):
+    def test_typedef_size_min_bits(self) -> None:
         """Test typedef size_min_bits."""
         factory = BaseConfigurationFactory()
         typedef = factory.create_someip_parameter_typedef(
@@ -2220,7 +2265,7 @@ class TestSOMEIPBaseParameterTypedefAdditional2:
         )
         assert typedef.size_min_bits() > 0
 
-    def test_typedef_size_max_bits(self):
+    def test_typedef_size_max_bits(self) -> None:
         """Test typedef size_max_bits."""
         factory = BaseConfigurationFactory()
         typedef = factory.create_someip_parameter_typedef(
@@ -2232,21 +2277,21 @@ class TestSOMEIPBaseParameterTypedefAdditional2:
 class TestSOMEIPBaseParameterEnumerationAdditional2:
     """Additional tests for SOMEIPBaseParameterEnumeration."""
 
-    def test_enumeration_size_min_bits(self):
+    def test_enumeration_size_min_bits(self) -> None:
         """Test enumeration size_min_bits."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_enumeration_item(value=1, name="OPEN", desc="Door is open")
         enum = factory.create_someip_parameter_enumeration(
-            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         assert enum.size_min_bits() > 0
 
-    def test_enumeration_size_max_bits(self):
+    def test_enumeration_size_max_bits(self) -> None:
         """Test enumeration size_max_bits."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_enumeration_item(value=1, name="OPEN", desc="Door is open")
         enum = factory.create_someip_parameter_enumeration(
-            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)
+            "Enum1", {1: item}, factory.create_someip_parameter_basetype("Child", "A_UINT8", True, 8, 8)  # type: ignore
         )
         assert enum.size_max_bits() > 0
 
@@ -2254,7 +2299,7 @@ class TestSOMEIPBaseParameterEnumerationAdditional2:
 class TestSOMEIPBaseParameterBasetypeAdditional2:
     """Additional tests for SOMEIPBaseParameterBasetype."""
 
-    def test_basetype_bigendian(self):
+    def test_basetype_bigendian(self) -> None:
         """Test basetype bigendian method."""
         factory = BaseConfigurationFactory()
         param = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -2264,16 +2309,22 @@ class TestSOMEIPBaseParameterBasetypeAdditional2:
 class TestSOMEIPBaseServiceMethodLegacy:
     """Tests for SOMEIPBaseServiceMethod legacy methods."""
 
-    def test_method_tlv(self):
+    def test_method_tlv(self) -> None:
         """Test method tlv method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
         method = factory.create_someip_service_method(
-            name="TestMethod", methodid=0x01, calltype="REQUEST_RESPONSE", relia=True, inparams=[basetype], outparams=[basetype], tlv=True
+            name="TestMethod",
+            methodid=0x01,
+            calltype="REQUEST_RESPONSE",
+            relia=True,
+            inparams=[basetype],  # type: ignore
+            outparams=[basetype],  # type: ignore
+            tlv=True,
         )
         assert method.tlv()
 
-    def test_field_legacy_false(self):
+    def test_field_legacy_false(self) -> None:
         """Test field legacy with non-legacy parameters."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)  # legacy=False
@@ -2285,7 +2336,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
             getterreli=True,
             setterreli=True,
             notifierreli=True,
-            params=[basetype],
+            params=[basetype],  # type: ignore
             getter_debouncereq=-1,
             getter_retentionreq=-1,
             getter_retentionres=-1,
@@ -2297,7 +2348,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
         )
         assert not field.legacy()
 
-    def test_field_tlv(self):
+    def test_field_tlv(self) -> None:
         """Test field tlv method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -2309,7 +2360,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
             getterreli=True,
             setterreli=True,
             notifierreli=True,
-            params=[basetype],
+            params=[basetype],  # type: ignore
             getter_debouncereq=-1,
             getter_retentionreq=-1,
             getter_retentionres=-1,
@@ -2322,7 +2373,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
         )
         assert field.tlv()
 
-    def test_field_size_min_in(self):
+    def test_field_size_min_in(self) -> None:
         """Test field size_min_in method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -2334,7 +2385,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
             getterreli=True,
             setterreli=True,
             notifierreli=True,
-            params=[basetype],
+            params=[basetype],  # type: ignore
             getter_debouncereq=-1,
             getter_retentionreq=-1,
             getter_retentionres=-1,
@@ -2346,7 +2397,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
         )
         assert field.size_min_in() >= 0
 
-    def test_field_size_max_in(self):
+    def test_field_size_max_in(self) -> None:
         """Test field size_max_in method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -2358,7 +2409,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
             getterreli=True,
             setterreli=True,
             notifierreli=True,
-            params=[basetype],
+            params=[basetype],  # type: ignore
             getter_debouncereq=-1,
             getter_retentionreq=-1,
             getter_retentionres=-1,
@@ -2370,7 +2421,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
         )
         assert field.size_max_in() >= 0
 
-    def test_field_size_min_out(self):
+    def test_field_size_min_out(self) -> None:
         """Test field size_min_out method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -2382,7 +2433,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
             getterreli=True,
             setterreli=True,
             notifierreli=True,
-            params=[basetype],
+            params=[basetype],  # type: ignore
             getter_debouncereq=-1,
             getter_retentionreq=-1,
             getter_retentionres=-1,
@@ -2394,7 +2445,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
         )
         assert field.size_min_out() >= 0
 
-    def test_field_size_max_out(self):
+    def test_field_size_max_out(self) -> None:
         """Test field size_max_out method."""
         factory = BaseConfigurationFactory()
         basetype = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -2406,7 +2457,7 @@ class TestSOMEIPBaseServiceMethodLegacy:
             getterreli=True,
             setterreli=True,
             notifierreli=True,
-            params=[basetype],
+            params=[basetype],  # type: ignore
             getter_debouncereq=-1,
             getter_retentionreq=-1,
             getter_retentionres=-1,
@@ -2422,11 +2473,19 @@ class TestSOMEIPBaseServiceMethodLegacy:
 class TestSOMEIPBaseParameterStructMemberLegacy:
     """Tests for SOMEIPBaseParameterStructMember legacy methods."""
 
-    def test_struct_member_legacy_with_signal(self):
+    def test_struct_member_legacy_with_signal(self) -> None:
         """Test struct member legacy with signal."""
         factory = BaseConfigurationFactory()
         signal = factory.create_signal(
-            id="Signal1", name="TestSignal", compu_scale=[0, 1, 1], compu_consts=[], bit_len=8, min_len=8, max_len=8, basetype=None, basetypelen=8
+            id="Signal1",
+            name="TestSignal",
+            compu_scale=[0, 1, 1],  # type: ignore
+            compu_consts=[],
+            bit_len=8,
+            min_len=8,
+            max_len=8,
+            basetype=None,  # type: ignore
+            basetypelen=8,
         )
         member = factory.create_someip_parameter_struct_member(
             position=0,
@@ -2437,7 +2496,7 @@ class TestSOMEIPBaseParameterStructMemberLegacy:
         )
         assert member.legacy()
 
-    def test_struct_member_legacy_no_signal(self):
+    def test_struct_member_legacy_no_signal(self) -> None:
         """Test struct member legacy without signal."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_struct_member(
@@ -2453,7 +2512,7 @@ class TestSOMEIPBaseParameterStructMemberLegacy:
 class TestSOMEIPBaseParameterUnionMemberLegacy:
     """Tests for SOMEIPBaseParameterUnionMember legacy methods."""
 
-    def test_union_member_legacy(self):
+    def test_union_member_legacy(self) -> None:
         """Test union member legacy."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -2465,7 +2524,7 @@ class TestSOMEIPBaseParameterUnionMemberLegacy:
 class TestSOMEIPBaseParameterBitfieldItemLegacy:
     """Tests for SOMEIPBaseParameterBitfieldItem legacy methods."""
 
-    def test_bitfield_item_legacy(self):
+    def test_bitfield_item_legacy(self) -> None:
         """Test bitfield item legacy."""
         factory = BaseConfigurationFactory()
         item = factory.create_someip_parameter_bitfield_item(bit_number=0, name="FLAG1")
@@ -2475,7 +2534,7 @@ class TestSOMEIPBaseParameterBitfieldItemLegacy:
 class TestSOMEIPBaseParameterTypedefLegacy:
     """Tests for SOMEIPBaseParameterTypedef legacy methods."""
 
-    def test_typedef_legacy(self):
+    def test_typedef_legacy(self) -> None:
         """Test typedef legacy."""
         factory = BaseConfigurationFactory()
         typedef = factory.create_someip_parameter_typedef(
@@ -2487,7 +2546,7 @@ class TestSOMEIPBaseParameterTypedefLegacy:
 class TestSOMEIPBaseParameterUnionAdditional4:
     """Additional tests for SOMEIPBaseParameterUnion edge cases."""
 
-    def test_union_length_of_length_default(self):
+    def test_union_length_of_length_default(self) -> None:
         """Test union length_of_length default value."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -2496,7 +2555,7 @@ class TestSOMEIPBaseParameterUnionAdditional4:
         union = factory.create_someip_parameter_union("Union1", None, 32, 0, {0: member})
         assert union.length_of_length() == 32
 
-    def test_union_length_of_length_custom(self):
+    def test_union_length_of_length_custom(self) -> None:
         """Test union length_of_length custom value."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -2505,7 +2564,7 @@ class TestSOMEIPBaseParameterUnionAdditional4:
         union = factory.create_someip_parameter_union("Union1", 16, 32, 0, {0: member})
         assert union.length_of_length() == 16
 
-    def test_union_length_of_type_default(self):
+    def test_union_length_of_type_default(self) -> None:
         """Test union length_of_type default value."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -2514,7 +2573,7 @@ class TestSOMEIPBaseParameterUnionAdditional4:
         union = factory.create_someip_parameter_union("Union1", 32, None, 0, {0: member})
         assert union.length_of_type() == 32
 
-    def test_union_length_of_type_custom(self):
+    def test_union_length_of_type_custom(self) -> None:
         """Test union length_of_type custom value."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_union_member(
@@ -2527,7 +2586,7 @@ class TestSOMEIPBaseParameterUnionAdditional4:
 class TestSOMEIPBaseParameterStructAdditional3:
     """Additional tests for SOMEIPBaseParameterStruct edge cases."""
 
-    def test_struct_length_of_length_default(self):
+    def test_struct_length_of_length_default(self) -> None:
         """Test struct length_of_length default value."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_struct_member(
@@ -2540,7 +2599,7 @@ class TestSOMEIPBaseParameterStructAdditional3:
         struct = factory.create_someip_parameter_struct("Struct1", None, 0, {0: member}, tlv=False)
         assert struct.length_of_length() == 0
 
-    def test_struct_length_of_length_custom(self):
+    def test_struct_length_of_length_custom(self) -> None:
         """Test struct length_of_length custom value."""
         factory = BaseConfigurationFactory()
         member = factory.create_someip_parameter_struct_member(
@@ -2557,7 +2616,7 @@ class TestSOMEIPBaseParameterStructAdditional3:
 class TestSOMEIPBaseParameterBasetypeAdditional:
     """Additional tests for SOMEIPBaseParameterBasetype."""
 
-    def test_basetype_name2(self):
+    def test_basetype_name2(self) -> None:
         """Test basetype name2 method."""
         factory = BaseConfigurationFactory()
         param = factory.create_someip_parameter_basetype("Param1", "A_UINT8", True, 8, 8)
@@ -2568,14 +2627,14 @@ class TestSOMEIPBaseParameterBasetypeAdditional:
 class TestSOMEIPBaseParameterStringAdditional:
     """Additional tests for SOMEIPBaseParameterString."""
 
-    def test_string_size_min_bits(self):
+    def test_string_size_min_bits(self) -> None:
         """Test string size_min_bits."""
         factory = BaseConfigurationFactory()
         param = factory.create_someip_parameter_string("String1", "UTF-8", True, 0, 100, "NULL", 32, 0)
         size = param.size_min_bits()
         assert size >= 0
 
-    def test_string_size_max_bits(self):
+    def test_string_size_max_bits(self) -> None:
         """Test string size_max_bits."""
         factory = BaseConfigurationFactory()
         param = factory.create_someip_parameter_string("String1", "UTF-8", True, 0, 100, "NULL", 32, 0)

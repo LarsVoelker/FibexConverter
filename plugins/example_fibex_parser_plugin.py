@@ -18,10 +18,19 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+from configuration_base_classes import BaseConfigurationFactory
+from fibex_parser import FibexParser
+
 
 class FibexParserPlugin:
-    def __init__(self):
+    def __init__(self) -> None:
         print("Creating FibexParserPlugin!")
 
-    def parse_file(self, parser, conf_factory, filename, verbose=False):
+    def parse_file(
+        self,
+        parser: FibexParser,
+        conf_factory: BaseConfigurationFactory,
+        filename: str,
+        verbose: bool = False,
+    ) -> None:
         print("I should be parsing manufacturer extensions, etc.")

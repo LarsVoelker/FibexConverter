@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """E2E round-trip tests: FIBEX → FLYNC workspace → text factory comparison.
 
 For each SOME/IP FIBEX example file the test:
@@ -19,6 +20,7 @@ bindings).  Instead, only the semantically stable parts are compared:
 """
 
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -42,7 +44,7 @@ SOMEIP_FILES = sorted(EXAMPLES_DIR.glob("*.xml"))
 # ---------------------------------------------------------------------------
 
 
-def _parse_fibex_with_text_factory(fibex_path):
+def _parse_fibex_with_text_factory(fibex_path: Path) -> TextFactory:
     """Parse *fibex_path* using the configuration_to_text SimpleConfigurationFactory."""
     factory = TextFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(fibex_path), verbose=False)
@@ -50,7 +52,7 @@ def _parse_fibex_with_text_factory(fibex_path):
     return factory
 
 
-def _fibex_to_flync_workspace(fibex_path, tmp_path):
+def _fibex_to_flync_workspace(fibex_path: Path, tmp_path: Path) -> Path:
     """Convert *fibex_path* to a FLYNC workspace directory inside *tmp_path*."""
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(fibex_path), verbose=False)
@@ -62,7 +64,7 @@ def _fibex_to_flync_workspace(fibex_path, tmp_path):
     return ws_dir
 
 
-def _parse_flync_with_text_factory(ws_dir):
+def _parse_flync_with_text_factory(ws_dir: Path) -> TextFactory:
     """Parse the FLYNC workspace at *ws_dir* using the configuration_to_text SimpleConfigurationFactory."""
     factory = TextFactory()
     FlyncParser().parse_dir(factory, str(ws_dir), verbose=False)
@@ -70,13 +72,13 @@ def _parse_flync_with_text_factory(ws_dir):
     return factory
 
 
-def _service_summary(factory):
+def _service_summary(factory: TextFactory) -> dict[str, Any]:
     """Return a comparable dict of the service structure held in *factory*.
 
     Fields are reduced to a *set* of names rather than a dict keyed by internal
     IDs because the field key choice may differ between FIBEX and FLYNC parsers.
     """
-    result = {}
+    result: dict[str, Any] = {}
     for sid, svc in factory.__services__.items():
         result[sid] = {
             "name": svc.name(),
@@ -95,7 +97,7 @@ def _service_summary(factory):
 
 
 @pytest.mark.parametrize("fibex_file", SOMEIP_FILES, ids=lambda p: p.stem)
-def test_round_trip_services(fibex_file, tmp_path):
+def test_round_trip_services(fibex_file: Path, tmp_path: Path) -> None:
     """Service structure must be identical after a FIBEX → FLYNC → text round-trip."""
     fibex_factory = _parse_fibex_with_text_factory(fibex_file)
     ws_dir = _fibex_to_flync_workspace(fibex_file, tmp_path)
@@ -108,7 +110,7 @@ def test_round_trip_services(fibex_file, tmp_path):
 
 
 @pytest.mark.parametrize("fibex_file", SOMEIP_FILES, ids=lambda p: p.stem)
-def test_round_trip_ecus(fibex_file, tmp_path):
+def test_round_trip_ecus(fibex_file: Path, tmp_path: Path) -> None:
     """ECU names must be identical after a FIBEX → FLYNC → text round-trip."""
     fibex_factory = _parse_fibex_with_text_factory(fibex_file)
     ws_dir = _fibex_to_flync_workspace(fibex_file, tmp_path)
