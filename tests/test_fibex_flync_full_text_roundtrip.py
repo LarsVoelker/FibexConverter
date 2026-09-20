@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """E2E full-text round-trip tests: FIBEX → FLYNC workspace → text comparison.
 
 For each SOME/IP FIBEX example file the test:
@@ -32,7 +33,7 @@ SOMEIP_FILES = sorted(EXAMPLES_DIR.glob("*.xml"))
 # ---------------------------------------------------------------------------
 
 
-def _parse_fibex_with_text_factory(fibex_path):
+def _parse_fibex_with_text_factory(fibex_path: Path) -> TextFactory:
     """Parse *fibex_path* using the configuration_to_text SimpleConfigurationFactory."""
     factory = TextFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(fibex_path), verbose=False)
@@ -40,7 +41,7 @@ def _parse_fibex_with_text_factory(fibex_path):
     return factory
 
 
-def _fibex_to_flync_workspace(fibex_path, tmp_path):
+def _fibex_to_flync_workspace(fibex_path: Path, tmp_path: Path) -> Path:
     """Convert *fibex_path* to a FLYNC workspace directory inside *tmp_path*."""
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(fibex_path), verbose=False)
@@ -52,7 +53,7 @@ def _fibex_to_flync_workspace(fibex_path, tmp_path):
     return ws_dir
 
 
-def _parse_flync_with_text_factory(ws_dir):
+def _parse_flync_with_text_factory(ws_dir: Path) -> TextFactory:
     """Parse the FLYNC workspace at *ws_dir* using the configuration_to_text SimpleConfigurationFactory."""
     factory = TextFactory()
     FlyncParser().parse_dir(factory, str(ws_dir), verbose=False)
@@ -66,7 +67,7 @@ def _parse_flync_with_text_factory(ws_dir):
 
 
 @pytest.mark.parametrize("fibex_file", SOMEIP_FILES, ids=lambda p: p.stem)
-def test_round_trip_full_text(fibex_file, tmp_path):
+def test_round_trip_full_text(fibex_file: Path, tmp_path: Path) -> None:
     """Full text output of configuration_to_text must be identical after FIBEX → FLYNC → text round-trip."""
 
     fibex_factory = _parse_fibex_with_text_factory(fibex_file)

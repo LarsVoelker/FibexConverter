@@ -1,9 +1,20 @@
 #!/usr/bin/python
+
+from typing import Any, cast
+
 """Unit tests for FibexParser core functionality."""
 
 import xml.etree.ElementTree as ET
 
+from lxml.etree import _Element
+
+from configuration_base_classes import BaseConfigurationFactory
 from fibex_parser import FibexParser
+
+
+def _root(xml: str) -> _Element:
+    return cast(_Element, ET.fromstring(xml))
+
 
 # Sample FIBEX XML for testing
 MINIMAL_FIBEX = """<?xml version="1.0" encoding="UTF-8"?>
@@ -163,11 +174,11 @@ FIBEX_WITH_PDU = """<?xml version="1.0" encoding="UTF-8"?>
 class TestFibexParserBasic:
     """Test cases for basic FibexParser functionality."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
 
-    def test_initialization(self):
+    def test_initialization(self) -> None:
         """Test parser initialization."""
         assert self.parser.__ns__ is not None
         assert self.parser.__services__ == {}
@@ -175,15 +186,15 @@ class TestFibexParserBasic:
         assert self.parser.__signals__ == {}
         assert self.parser.__frames__ == {}
 
-    def test_get_attribute_with_namespace(self):
+    def test_get_attribute_with_namespace(self) -> None:
         """Test get_attribute with namespace prefix."""
-        root = ET.fromstring("<fx:ELEMENT xmlns:fx='http://www.asam.net/xml/fbx' fx:ID='test-id'></fx:ELEMENT>")
+        root = _root("<fx:ELEMENT xmlns:fx='http://www.asam.net/xml/fbx' fx:ID='test-id'></fx:ELEMENT>")
         result = self.parser.get_attribute(root, "fx:ID")
         assert result == "test-id"
 
-    def test_get_attribute_without_namespace(self):
+    def test_get_attribute_without_namespace(self) -> None:
         """Test get_attribute without namespace."""
-        root = ET.fromstring("<ELEMENT ID='test-id'></ELEMENT>")
+        root = _root("<ELEMENT ID='test-id'></ELEMENT>")
         result = self.parser.get_attribute(root, "ID")
         assert result == "test-id"
 
@@ -191,11 +202,11 @@ class TestFibexParserBasic:
 class TestFibexParserCodings:
     """Test cases for coding parsing."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
 
-    def test_parse_coding(self):
+    def test_parse_coding(self) -> None:
         """Test parsing a single coding."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx" xmlns:ho="http://www.asam.net/xml">
@@ -209,7 +220,7 @@ class TestFibexParserCodings:
     </fx:CODINGS>
 </fx:FIBEX>"""
 
-        root = ET.fromstring(xml)
+        root = _root(xml)
         self.parser.parse_codings(root)
 
         assert "COD1" in self.parser.__codings__
@@ -218,7 +229,7 @@ class TestFibexParserCodings:
         assert coding["Basetype"] == "A_UINT8"
         assert coding["BitLength"] == 8
 
-    def test_parse_codings_with_multiple(self):
+    def test_parse_codings_with_multiple(self) -> None:
         """Test parsing multiple codings."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx" xmlns:ho="http://www.asam.net/xml">
@@ -238,7 +249,7 @@ class TestFibexParserCodings:
     </fx:CODINGS>
 </fx:FIBEX>"""
 
-        root = ET.fromstring(xml)
+        root = _root(xml)
         self.parser.parse_codings(root)
 
         assert "COD1" in self.parser.__codings__
@@ -248,11 +259,11 @@ class TestFibexParserCodings:
 class TestFibexParserSignals:
     """Test cases for signal parsing."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
 
-    def test_parse_signal(self):
+    def test_parse_signal(self) -> None:
         """Test parsing a single signal."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx" xmlns:ho="http://www.asam.net/xml">
@@ -272,16 +283,27 @@ class TestFibexParserSignals:
     </fx:SIGNALS>
 </fx:FIBEX>"""
 
-        root = ET.fromstring(xml)
+        root = _root(xml)
         self.parser.parse_codings(root)
 
         # Mock a configuration factory
         class MockFactory:
-            def create_signal(self, id, name, compu_scale, compu_consts, bit_len, min_len, max_len, basetype, basetypelen):
+            def create_signal(
+                self,
+                id: Any,
+                name: Any,
+                compu_scale: Any,
+                compu_consts: Any,
+                bit_len: Any,
+                min_len: Any,
+                max_len: Any,
+                basetype: Any,
+                basetypelen: Any,
+            ) -> Any:
                 return type("MockSignal", (), {"id": lambda self: id, "name": lambda self: name})()
 
-        self.parser.__conf_factory__ = MockFactory()
-        result = self.parser.parse_signal(root.find(".//fx:SIGNALS/fx:SIGNAL", self.parser.__ns__))
+        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
+        result: Any = self.parser.parse_signal(cast(_Element, root.find(".//fx:SIGNALS/fx:SIGNAL", self.parser.__ns__)))
 
         assert result is not None
         assert result.id() == "SIG1"
@@ -291,11 +313,11 @@ class TestFibexParserSignals:
 class TestFibexParserPDUs:
     """Test cases for PDU parsing."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
 
-    def test_parse_signal_pdu(self):
+    def test_parse_signal_pdu(self) -> None:
         """Test parsing a simple signal PDU."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx" xmlns:ho="http://www.asam.net/xml">
@@ -308,16 +330,16 @@ class TestFibexParserPDUs:
     </fx:PDUS>
 </fx:FIBEX>"""
 
-        root = ET.fromstring(xml)
-        pdu_element = root.find(".//fx:PDUS/fx:PDU", self.parser.__ns__)
+        root = _root(xml)
+        pdu_element = cast(_Element, root.find(".//fx:PDUS/fx:PDU", self.parser.__ns__))
 
         # Mock factory
         class MockFactory:
-            def create_pdu(self, id, short_name, byte_length, pdu_type, signal_instances):
+            def create_pdu(self, id: Any, short_name: Any, byte_length: Any, pdu_type: Any, signal_instances: Any) -> Any:
                 return type("MockPDU", (), {"id": lambda self: id, "short_name": lambda self: short_name, "byte_length": lambda self: byte_length})()
 
-        self.parser.__conf_factory__ = MockFactory()
-        result = self.parser.parse_signal_pdu(pdu_element, verbose=False)
+        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
+        result: Any = self.parser.parse_signal_pdu(pdu_element, verbose=False)
 
         assert result is not None
         assert result.id() == "PDU1"
@@ -328,11 +350,11 @@ class TestFibexParserPDUs:
 class TestFibexParserFrames:
     """Test cases for frame parsing."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
 
-    def test_parse_frame(self):
+    def test_parse_frame(self) -> None:
         """Test parsing a frame."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx" xmlns:ho="http://www.asam.net/xml">
@@ -345,12 +367,12 @@ class TestFibexParserFrames:
     </fx:FRAMES>
 </fx:FIBEX>"""
 
-        root = ET.fromstring(xml)
-        frame_element = root.find(".//fx:FRAMES/fx:FRAME", self.parser.__ns__)
+        root = _root(xml)
+        frame_element = cast(_Element, root.find(".//fx:FRAMES/fx:FRAME", self.parser.__ns__))
 
         # Mock factory
         class MockFactory:
-            def create_frame(self, id, short_name, byte_length, frame_type, pdu_instances):
+            def create_frame(self, id: Any, short_name: Any, byte_length: Any, frame_type: Any, pdu_instances: Any) -> Any:
                 return type(
                     "MockFrame",
                     (),
@@ -362,8 +384,8 @@ class TestFibexParserFrames:
                     },
                 )()
 
-        self.parser.__conf_factory__ = MockFactory()
-        result = self.parser.parse_frame(frame_element, verbose=False)
+        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
+        result: Any = self.parser.parse_frame(frame_element, verbose=False)
 
         assert result is not None
         assert result.id() == "FRAME1"
@@ -373,11 +395,11 @@ class TestFibexParserFrames:
 class TestFibexParserFrameTriggering:
     """Test cases for frame triggering parsing."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
 
-    def test_parse_can_frame_triggering(self):
+    def test_parse_can_frame_triggering(self) -> None:
         """Test parsing a CAN frame triggering."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx" xmlns:ho="http://www.asam.net/xml">
@@ -391,25 +413,27 @@ class TestFibexParserFrameTriggering:
     </fx:FRAME-TRIGGERINGS>
 </fx:FIBEX>"""
 
-        root = ET.fromstring(xml)
-        ft_element = root.find(".//fx:FRAME-TRIGGERING", self.parser.__ns__)
+        root = _root(xml)
+        ft_element = cast(_Element, root.find(".//fx:FRAME-TRIGGERING", self.parser.__ns__))
 
         # Mock factory
         class MockFactory:
-            def create_frame_triggering_can(self, id, frame, can_id, is_extended_id=False, is_can_fd=False):
+            def create_frame_triggering_can(self, id: Any, frame: Any, can_id: Any, is_extended_id: Any = False, is_can_fd: Any = False) -> Any:
                 return type("MockCANTriggering", (), {"id": lambda self: id, "frame": lambda self: frame, "can_id": lambda self: can_id})()
 
-            def create_frame_triggering_flexray(self, id, frame, slot_id, cycle_counter, base_cycle, cycle_repetition):
+            def create_frame_triggering_flexray(
+                self, id: Any, frame: Any, slot_id: Any, cycle_counter: Any, base_cycle: Any, cycle_repetition: Any
+            ) -> Any:
                 return None  # Not flexray
 
-        self.parser.__conf_factory__ = MockFactory()
-        result = self.parser.parse_frame_triggering(ft_element)
+        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
+        result: Any = self.parser.parse_frame_triggering(ft_element)
 
         assert result is not None
         assert result.id() == "FT1"
         assert result.can_id() == 123
 
-    def test_parse_flexray_frame_triggering(self):
+    def test_parse_flexray_frame_triggering(self) -> None:
         """Test parsing a FlexRay frame triggering."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx" xmlns:ho="http://www.asam.net/xml">
@@ -426,23 +450,25 @@ class TestFibexParserFrameTriggering:
     </fx:FRAME-TRIGGERINGS>
 </fx:FIBEX>"""
 
-        root = ET.fromstring(xml)
-        ft_element = root.find(".//fx:FRAME-TRIGGERING", self.parser.__ns__)
+        root = _root(xml)
+        ft_element = cast(_Element, root.find(".//fx:FRAME-TRIGGERING", self.parser.__ns__))
 
         # Mock factory
         class MockFactory:
-            def create_frame_triggering_can(self, id, frame, can_id):
+            def create_frame_triggering_can(self, id: Any, frame: Any, can_id: Any) -> Any:
                 return None  # Not CAN
 
-            def create_frame_triggering_flexray(self, id, frame, slot_id, cycle_counter, base_cycle, cycle_repetition):
+            def create_frame_triggering_flexray(
+                self, id: Any, frame: Any, slot_id: Any, cycle_counter: Any, base_cycle: Any, cycle_repetition: Any
+            ) -> Any:
                 return type(
                     "MockFlexRayTriggering",
                     (),
                     {"id": lambda self: id, "slot_id": lambda self: slot_id, "cycle_counter": lambda self: cycle_counter},
                 )()
 
-        self.parser.__conf_factory__ = MockFactory()
-        result = self.parser.parse_frame_triggering(ft_element)
+        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
+        result: Any = self.parser.parse_frame_triggering(ft_element)
 
         assert result is not None
         assert result.id() == "FT1"
@@ -453,11 +479,11 @@ class TestFibexParserFrameTriggering:
 class TestFibexParserECUs:
     """Test cases for ECU parsing."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
 
-    def test_parse_channels(self):
+    def test_parse_channels(self) -> None:
         """Test parsing channels."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx" xmlns:ho="http://www.asam.net/xml">
@@ -472,7 +498,7 @@ class TestFibexParserECUs:
     </fx:CHANNELS>
 </fx:FIBEX>"""
 
-        root = ET.fromstring(xml)
+        root = _root(xml)
         self.parser.parse_channels(root)
 
         assert "CHAN1" in self.parser.__channels__
@@ -480,7 +506,7 @@ class TestFibexParserECUs:
         assert channel["name"] == "Ethernet1"
         assert channel["vlanid"] == "100"
 
-    def test_parse_ecus(self):
+    def test_parse_ecus(self) -> None:
         """Test parsing ECUs."""
         xml = """<?xml version="1.0" encoding="UTF-8"?>
 <fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx" xmlns:ho="http://www.asam.net/xml">
@@ -502,24 +528,26 @@ class TestFibexParserECUs:
     </fx:ECUS>
 </fx:FIBEX>"""
 
-        root = ET.fromstring(xml)
+        root = _root(xml)
         self.parser.parse_channels(root)
 
         # Mock factory for ECUs
         class MockFactory:
-            def create_ecu(self, name, controllers):
+            def create_ecu(self, name: Any, controllers: Any) -> Any:
                 return type("MockECU", (), {"name": lambda self: name, "controllers": lambda self: controllers})()
 
-            def create_controller(self, name, vlans):
+            def create_controller(self, name: Any, vlans: Any) -> Any:
                 return type("MockController", (), {"name": lambda self: name, "vlans": lambda self: vlans})()
 
-            def create_interface(self, name, vlanid, ips, sockets, input_frame_trigs, output_frame_trigs, fr_channel):
+            def create_interface(
+                self, name: Any, vlanid: Any, ips: Any, sockets: Any, input_frame_trigs: Any, output_frame_trigs: Any, fr_channel: Any
+            ) -> Any:
                 return type("MockInterface", (), {"name": lambda self: name, "vlanid": lambda self: vlanid, "ips": lambda self: ips})()
 
-            def create_socket(self, name, ip, proto, portnumber, psis, csis, ehs, cegs):
+            def create_socket(self, name: Any, ip: Any, proto: Any, portnumber: Any, psis: Any, csis: Any, ehs: Any, cegs: Any) -> Any:
                 return type("MockSocket", (), {"name": lambda self: name, "ip": lambda self: ip})()
 
-        self.parser.__conf_factory__ = MockFactory()
+        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
         self.parser.parse_ecus(root)
 
         assert len(self.parser.__ecus__) > 0
@@ -529,11 +557,11 @@ class TestFibexParserECUs:
 class TestBasetypeUtils:
     """Test cases for basetype utility functions."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
 
-    def test_basetype_length(self):
+    def test_basetype_length(self) -> None:
         """Test basetype_length function."""
         # Test integer types
         assert self.parser.basetype_length({"Basetype": "A_UINT8"}) == 8
@@ -545,20 +573,20 @@ class TestBasetypeUtils:
         assert self.parser.basetype_length({"Basetype": "A_ASCIISTRING"}) == -1
         assert self.parser.basetype_length({"Basetype": "A_BYTEFIELD"}) == -1
 
-    def test_basetype_is_int(self):
+    def test_basetype_is_int(self) -> None:
         """Test basetype_is_int function."""
         assert self.parser.basetype_is_int({"Basetype": "A_UINT8"})
         assert self.parser.basetype_is_int({"Basetype": "A_INT16"})
         assert not self.parser.basetype_is_int({"Basetype": "A_FLOAT32"})
         assert not self.parser.basetype_is_int({"Basetype": "A_ASCIISTRING"})
 
-    def test_basetype_is_float(self):
+    def test_basetype_is_float(self) -> None:
         """Test basetype_is_float function."""
         assert self.parser.basetype_is_float({"Basetype": "A_FLOAT32"})
         assert self.parser.basetype_is_float({"Basetype": "A_FLOAT64"})
         assert not self.parser.basetype_is_float({"Basetype": "A_UINT32"})
 
-    def test_basetype_is_string(self):
+    def test_basetype_is_string(self) -> None:
         """Test basetype_is_string function."""
         assert self.parser.basetype_is_string({"Basetype": "A_ASCIISTRING"})
         assert self.parser.basetype_is_string({"Basetype": "A_UNICODE2STRING"})
@@ -568,7 +596,7 @@ class TestBasetypeUtils:
 class TestFibexParserIntegration:
     """Integration tests for FibexParser with complete XML files."""
 
-    def test_parse_minimal_fibex(self, tmpdir):
+    def test_parse_minimal_fibex(self, tmpdir: Any) -> None:
         """Test parsing a minimal FIBEX file."""
         # Create a temporary file
         fibex_file = tmpdir.join("minimal.xml")
@@ -584,7 +612,7 @@ class TestFibexParserIntegration:
         # Verify ECUs were parsed
         assert len(factory.__ecus__) > 0
 
-    def test_parse_fibex_with_signals(self, tmpdir):
+    def test_parse_fibex_with_signals(self, tmpdir: Any) -> None:
         """Test parsing a FIBEX file with signals."""
         fibex_file = tmpdir.join("signals.xml")
         fibex_file.write(FIBEX_WITH_SIGNALS)

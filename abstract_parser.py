@@ -19,15 +19,20 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
-import isodate
+from typing import Any, cast
+
+import isodate  # type: ignore[import-untyped]
+from lxml.etree import _Element
+
+from configuration_base_classes import BaseConfigurationFactory
 
 
 class AbstractParser(object):
-    def __init__(self):
-        self.__conf_factory__ = None
-        self.__ns__ = {}
+    def __init__(self) -> None:
+        self.__conf_factory__: BaseConfigurationFactory | None = None
+        self.__ns__: dict[str, str] = {}
 
-    def get_child_text(self, element, childtag):
+    def get_child_text(self, element: _Element | None, childtag: str) -> str | None:
         if element is None:
             return None
 
@@ -37,7 +42,7 @@ class AbstractParser(object):
 
         return c.text
 
-    def get_attribute(self, element, attribkey):
+    def get_attribute(self, element: _Element, attribkey: str) -> str | None:
         if self.__ns__ is not None and len(attribkey.split(":")) > 1:
             prefix, elem = attribkey.split(":")
             if prefix in self.__ns__:
@@ -46,10 +51,10 @@ class AbstractParser(object):
                 print(f"Cannot lookup namespace: {attribkey}")
 
         if attribkey in element.attrib:
-            return element.attrib[attribkey]
+            return cast(str, element.attrib[attribkey])
         return None
 
-    def get_child_attribute(self, element, childtag, attribkey):
+    def get_child_attribute(self, element: _Element, childtag: str | None, attribkey: str | None) -> str | None:
         if childtag is None or attribkey is None:
             return None
 
@@ -58,50 +63,49 @@ class AbstractParser(object):
             # xml.etree.ElementTree.dump(element)
             return None
         if attribkey in c.attrib:
-            return c.attrib[attribkey]
+            return cast(str, c.attrib[attribkey])
         return None
 
     @staticmethod
-    def element_text_to_int(element, default):
-        try:
-            return int(element.text)
-        except AttributeError:
+    def element_text_to_int(element: _Element | None, default: int) -> int:
+        if element is None:
             return default
+        return int(element.text or "")
 
     @staticmethod
-    def element_text(element):
+    def element_text(element: _Element | None) -> str | None:
         if element is None:
             return None
         return element.text
 
     @staticmethod
-    def get_from_dict(d, key, default):
+    def get_from_dict(d: dict[str, Any] | None, key: str | None, default: Any) -> Any:
         if d is None or key is None or key not in d:
             return default
         return d[key]
 
-    def get_from_dict_or_none(self, d, key):
+    def get_from_dict_or_none(self, d: dict[str, Any] | None, key: str) -> Any | None:
         if d is None:
             return None
         return self.get_from_dict(d, key, None)
 
     @staticmethod
-    def dict_to_sorted_set(d):
-        ret = ()
+    def dict_to_sorted_set(d: dict[Any, Any]) -> tuple[Any, ...]:
+        ret: tuple[Any, ...] = ()
 
         for k in sorted(d.keys()):
             ret = ret + (d[k],)
 
         return ret
 
-    def get_child_iso_duration(self, element, childtag):
+    def get_child_iso_duration(self, element: _Element, childtag: str) -> float:
         s = self.get_child_text(element, childtag)
         if s is None:
             return -1
-        return (isodate.parse_duration(s)).total_seconds()
+        return float((isodate.parse_duration(s)).total_seconds())
 
     @staticmethod
-    def value_to_bit(i):
+    def value_to_bit(i: int) -> int | None:
         if i.bit_count() != 1:
             return None
 

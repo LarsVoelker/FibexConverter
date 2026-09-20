@@ -20,6 +20,7 @@
 
 import json
 import os
+from typing import Any, cast
 
 from flync.model.flync_4_ecu.sockets import IPv4AddressEndpoint
 from flync.model.flync_4_signal.pdu import MultiplexedPDU
@@ -35,21 +36,53 @@ from flync.model.flync_4_someip import (
 )
 from flync.sdk.workspace.flync_workspace import FLYNCWorkspace
 
+from configuration_base_classes import (
+    BaseAbstractPDU,
+    BaseConfigurationFactory,
+    BaseController,
+    BaseECU,
+    BaseEthernetPDUInstance,
+    BaseFrame,
+    BaseFrameTriggering,
+    BaseInterface,
+    BaseMultiplexPDU,
+    BaseMultiplexPDUSegmentPosition,
+    BasePDU,
+    BasePDUInstance,
+    BaseSignalInstance,
+    BaseSocket,
+    BaseSwitchPort,
+    BaseVLAN,
+    CallSemantic,
+    SOMEIPBaseDatatype,
+    SOMEIPBaseParameter,
+    SOMEIPBaseParameterUnionMember,
+    SOMEIPBaseService,
+    SOMEIPBaseServiceEvent,
+    SOMEIPBaseServiceEventgroup,
+    SOMEIPBaseServiceEventgroupReceiver,
+    SOMEIPBaseServiceEventgroupSender,
+    SOMEIPBaseServiceField,
+    SOMEIPBaseServiceInstance,
+    SOMEIPBaseServiceInstanceClient,
+    SOMEIPBaseServiceMethod,
+)
+
 
 class FlyncParser:
-    def __init__(self):
+    def __init__(self) -> None:
         # Populated by _parse_channels; declared here so _parse_ecus can rely on it
         # without a hasattr/getattr dance.
-        self._ft_by_can_id = {}
-        self._can_frame_triggerings_by_ecu = {}
-        self._services_by_id = {}
-        self._ecu_by_name = {}
-        self._base_pdu_by_name = {}
-        self._pdu_header_id_by_name = {}
-        self._eth_pdu_header_id_counter = 0
-        self._container_pdu_meta = {}
+        self._ft_by_can_id: dict[tuple[str, int], BaseFrameTriggering] = {}
+        self._can_frame_triggerings_by_ecu: dict[str, list[BaseFrameTriggering]] = {}
+        self._services_by_id: dict[tuple[int, int], SOMEIPBaseService] = {}
+        self._ecu_by_name: dict[str, BaseECU] = {}
+        self._base_pdu_by_name: dict[str, BaseAbstractPDU] = {}
+        self._pdu_header_id_by_name: dict[str, int] = {}
+        self._eth_pdu_header_id_counter: int = 0
+        self._container_pdu_meta: dict[str, tuple[int, dict[str, BaseSignalInstance]]] = {}
 
-    def parse_dir(self, conf_factory, directory, verbose=False):
+    def parse_dir(self, conf_factory: BaseConfigurationFactory, directory: str, verbose: bool = False) -> None:
         """Parse a FLYNC workspace directory and populate conf_factory."""
         if not os.path.isdir(directory):
             raise FileNotFoundError(f"FLYNC workspace directory not found: {directory}")
@@ -76,7 +109,7 @@ class FlyncParser:
         self._parse_switches(conf_factory, flync_model, verbose)
 
     @staticmethod
-    def _compu_scale_for(sig):
+    def _compu_scale_for(sig: Any) -> tuple[float, float, float] | None:
         """Return (offset, factor, 1.0) for a FLYNC signal, or None if scaling is identity.
 
         Returns None and logs a warning if offset/factor cannot be coerced to float.
@@ -95,7 +128,7 @@ class FlyncParser:
         return (offset, factor, 1.0)
 
     @staticmethod
-    def _compu_consts_for(sig):
+    def _compu_consts_for(sig: Any) -> list[object]:
         enc = getattr(sig, "value_encoding", None)
         if enc is None:
             return []
@@ -118,12 +151,12 @@ class FlyncParser:
         "xcp_runtime_configured": "XCP_RUNTIME_CONFIGURED",
     }
 
-    def _map_pdu_usage(self, pdu):
+    def _map_pdu_usage(self, pdu: Any) -> str:
         if pdu is None:
             return "APPLICATION"
         return self._FLYNC_TO_FIBEX_USAGE_MAPPING.get(pdu.pdu_usage, "APPLICATION")
 
-    def _map_frame_usage(self, frame):
+    def _map_frame_usage(self, frame: Any) -> str:
         if frame is None:
             return "APPLICATION"
         return self._FLYNC_TO_FIBEX_USAGE_MAPPING.get(frame.frame_usage, "APPLICATION")
@@ -141,18 +174,18 @@ class FlyncParser:
         SignalDataType.FLOAT64: "float64",
     }
 
-    def _parse_channels(self, conf_factory, flync_model, verbose=False):
+    def _parse_channels(self, conf_factory: BaseConfigurationFactory, flync_model: Any, verbose: bool = False) -> None:
         """Parse FLYNC CAN channel config back into the TextFactory."""
         if not (flync_model.communication and flync_model.communication.channels):
             return
         channels = flync_model.communication.channels
 
         # Pass 1: parse all standard (non-multiplex) PDUs
-        base_pdu_by_name = {}
+        base_pdu_by_name: dict[str, BaseAbstractPDU] = {}
         for flync_pdu in channels.pdus or []:
             if isinstance(flync_pdu, MultiplexedPDU):
                 continue
-            sig_insts = {}
+            sig_insts: dict[str, BaseSignalInstance] = {}
             for si in flync_pdu.signals:
                 sig = si.signal
                 basetype = self._SIGNAL_DATA_TYPE_TO_FIBEX.get(sig.data_type, "A_UINT8")
@@ -183,7 +216,7 @@ class FlyncParser:
                 flync_pdu.name,
                 flync_pdu.length,
                 self._map_pdu_usage(flync_pdu),
-                sig_insts,
+                cast(dict[int, BaseSignalInstance], sig_insts),
             )
             base_pdu_by_name[flync_pdu.name] = base_pdu
 
@@ -191,23 +224,23 @@ class FlyncParser:
         for flync_pdu in channels.pdus or []:
             if not isinstance(flync_pdu, MultiplexedPDU):
                 continue
-            base_pdu = self._parse_multiplex_pdu(flync_pdu, conf_factory, base_pdu_by_name)
-            base_pdu_by_name[flync_pdu.name] = base_pdu
+            mux_pdu = self._parse_multiplex_pdu(flync_pdu, conf_factory, base_pdu_by_name)
+            base_pdu_by_name[flync_pdu.name] = mux_pdu
 
         # Build frames and frame triggerings; populate per-ECU maps.
         # The FLYNC model may carry the same logical frame more than once (one
         # entry per CAN ID that uses it). Deduplicate identical frames (same
         # name) onto a single base frame and create one CAN frame triggering
         # per entry so every CAN ID still gets its own triggering.
-        base_frame_by_name = {}
+        base_frame_by_name: dict[str, BaseFrame] = {}
         for bus in channels.can_buses or []:
             for flync_frame in bus.frames:
                 base_frame = base_frame_by_name.get(flync_frame.name)
                 if base_frame is None:
-                    pdu_insts = {}
+                    pdu_insts: dict[str, BasePDUInstance] = {}
                     for pi in flync_frame.packed_pdus:
-                        base_pdu = base_pdu_by_name.get(pi.pdu_ref)
-                        if base_pdu is None:
+                        frame_pdu = base_pdu_by_name.get(pi.pdu_ref)
+                        if frame_pdu is None:
                             continue
                         pi_id = pi.pdu_ref + "_pi"
                         pi_obj = conf_factory.create_pdu_instance(
@@ -217,7 +250,7 @@ class FlyncParser:
                             False,
                             None,
                         )
-                        pi_obj.add_pdu(base_pdu)
+                        pi_obj.add_pdu(frame_pdu)
                         pdu_insts[pi_id] = pi_obj
                     base_frame = conf_factory.create_frame(
                         flync_frame.name,
@@ -243,10 +276,10 @@ class FlyncParser:
         # Parse Ethernet container PDUs (no frame triggerings — frames/PDUs are registered directly).
         for container_pdu in channels.ethernet_pdu_containers or []:
             pdu_insts = {}
-            sig_insts_for_container = {}
+            sig_insts_for_container: dict[str, BaseSignalInstance] = {}
             for cpdu_ref in container_pdu.contained_pdus:
-                base_pdu = base_pdu_by_name.get(cpdu_ref.pdu_ref)
-                if base_pdu is None:
+                cont_pdu = base_pdu_by_name.get(cpdu_ref.pdu_ref)
+                if cont_pdu is None:
                     continue
                 pi_id = cpdu_ref.pdu_ref + "_pi"
                 pi_obj = conf_factory.create_pdu_instance(
@@ -256,11 +289,12 @@ class FlyncParser:
                     False,
                     None,
                 )
-                pi_obj.add_pdu(base_pdu)
+                pi_obj.add_pdu(cont_pdu)
                 pdu_insts[pi_id] = pi_obj
                 # Collect signal instances from contained PDUs for the container-level BasePDU.
-                if hasattr(base_pdu, "signal_instances") and callable(base_pdu.signal_instances):
-                    for si_key, si_obj in (base_pdu.signal_instances() or {}).items():
+                cont_base_pdu = cast(BasePDU, cont_pdu)
+                if hasattr(cont_base_pdu, "signal_instances") and callable(cont_base_pdu.signal_instances):
+                    for si_key, si_obj in (cont_base_pdu.signal_instances() or {}).items():
                         sig_insts_for_container[f"{cpdu_ref.pdu_ref}_{si_key}"] = si_obj
             conf_factory.create_frame(
                 container_pdu.name,
@@ -291,7 +325,12 @@ class FlyncParser:
                 self._pdu_header_id_by_name[pdu_name] = self._eth_pdu_header_id_counter
                 self._eth_pdu_header_id_counter += 1
 
-    def _parse_multiplex_pdu(self, flync_pdu, conf_factory, base_pdu_by_name):
+    def _parse_multiplex_pdu(
+        self,
+        flync_pdu: Any,
+        conf_factory: BaseConfigurationFactory,
+        base_pdu_by_name: dict[str, BaseAbstractPDU],
+    ) -> BaseMultiplexPDU:
         """Reconstruct a BaseMultiplexPDU from a FLYNC MultiplexedPDU.
 
         Segment layout and sub-PDU name mapping are read from the JSON-encoded description.
@@ -309,7 +348,7 @@ class FlyncParser:
                     f"{flync_pdu.name!r}: {e}; segment geometry will be inferred from defaults"
                 )
 
-        mux_pdu_refs = {}
+        mux_pdu_refs: dict[int, str] = {}
         for k, v in meta.get("mux_pdu_refs", {}).items():
             try:
                 mux_pdu_refs[int(k)] = v
@@ -329,7 +368,7 @@ class FlyncParser:
             sel.signal.name + "_switch",
             sel.signal.name,
             sel.bit_position or 0,
-            sel_is_high_low,
+            cast(bool, sel_is_high_low),
             sel.signal.bit_length,
         )
 
@@ -342,14 +381,14 @@ class FlyncParser:
 
         # Build sub-PDUs from mux group signals (absolute → sub-PDU-relative positions).
         # The sub-PDU name is taken from group.pdu.name (set during FIBEX→FLYNC conversion).
-        pdu_instances = {}
+        pdu_instances: dict[str, BasePDU] = {}
         if seg_bit_len <= 0:
             raise ValueError(f"Invalid multiplex segment bit length {seg_bit_len} in PDU {flync_pdu.name!r}")
         for group in flync_pdu.mux_groups:
             switch_code = group.selector_value
             sub_pdu_name = group.pdu.name or mux_pdu_refs.get(switch_code) or f"{flync_pdu.name}_mux{switch_code}"
             sub_byte_len = max(1, seg_bit_len // 8)
-            sig_insts = {}
+            sig_insts: dict[str, BaseSignalInstance] = {}
             for si in getattr(group.pdu, "signals", []):
                 sig = si.signal
                 basetype = self._SIGNAL_DATA_TYPE_TO_FIBEX.get(sig.data_type, "A_UINT8")
@@ -369,13 +408,15 @@ class FlyncParser:
                 si_obj = conf_factory.create_signal_instance(si_id, si_id, sub_bit_pos, si_is_high_low)
                 si_obj.add_signal(base_sig)
                 sig_insts[si_id] = si_obj
-            pdu_instances[switch_code] = conf_factory.create_pdu(sub_pdu_name, sub_pdu_name, sub_byte_len, self._map_pdu_usage(group.pdu), sig_insts)
+            pdu_instances[switch_code] = conf_factory.create_pdu(
+                sub_pdu_name, sub_pdu_name, sub_byte_len, self._map_pdu_usage(group.pdu), cast(dict[int, BaseSignalInstance], sig_insts)
+            )
 
         # Reconstruct static PDU and segment from static_group if present
-        static_base_pdu = None
-        static_segs = []
+        static_base_pdu: BasePDU | None = None
+        static_segs: list[BaseMultiplexPDUSegmentPosition] = []
         if flync_pdu.static_group is not None:
-            static_sig_insts = {}
+            static_sig_insts: dict[str, BaseSignalInstance] = {}
             static_pdu_name = flync_pdu.static_group.name
             static_byte_len = max(1, meta.get("static_seg_bit_len", flync_pdu.static_group.length * 8) // 8)
             static_seg_bit_pos = meta.get("static_seg_bit_pos", 0)
@@ -393,7 +434,11 @@ class FlyncParser:
                 si_obj.add_signal(base_sig)
                 static_sig_insts[si_id] = si_obj
             static_base_pdu = conf_factory.create_pdu(
-                static_pdu_name, static_pdu_name, static_byte_len, self._map_pdu_usage(flync_pdu.static_group), static_sig_insts
+                static_pdu_name,
+                static_pdu_name,
+                static_byte_len,
+                self._map_pdu_usage(flync_pdu.static_group),
+                cast(dict[int, BaseSignalInstance], static_sig_insts),
             )
             static_seg = conf_factory.create_multiplex_segment_position(static_seg_bit_pos, static_seg_is_high_low, static_seg_bit_len)
             static_segs = [static_seg]
@@ -405,12 +450,12 @@ class FlyncParser:
             self._map_pdu_usage(flync_pdu),
             switch,
             [seg_pos],
-            pdu_instances,
+            cast(list[BasePDUInstance] | None, pdu_instances),
             static_segs,
             static_base_pdu,
         )
 
-    def _parse_services(self, conf_factory, flync_model, verbose=False):
+    def _parse_services(self, conf_factory: BaseConfigurationFactory, flync_model: Any, verbose: bool = False) -> None:
         if flync_model.communication is None:
             return
         if flync_model.communication.someip_config is None:
@@ -434,11 +479,11 @@ class FlyncParser:
             )
             self._services_by_id[(svc.id, svc.major_version)] = svc_obj
 
-    def _parse_methods(self, conf_factory, flync_methods):
-        methods = {}
+    def _parse_methods(self, conf_factory: BaseConfigurationFactory, flync_methods: Any) -> dict[int, SOMEIPBaseServiceMethod]:
+        methods: dict[int, SOMEIPBaseServiceMethod] = {}
         for method in flync_methods:
             if isinstance(method, SOMEIPRequestResponseMethod):
-                calltype = "REQUEST_RESPONSE"
+                calltype: CallSemantic = "REQUEST_RESPONSE"
                 outparams = [self._parse_parameter(conf_factory, p, i) for i, p in enumerate(method.output_parameters or [])]
             else:
                 calltype = "FIRE_AND_FORGET"
@@ -455,8 +500,8 @@ class FlyncParser:
             methods[method.id] = m
         return methods
 
-    def _parse_events(self, conf_factory, flync_events):
-        events = {}
+    def _parse_events(self, conf_factory: BaseConfigurationFactory, flync_events: Any) -> dict[int, SOMEIPBaseServiceEvent]:
+        events: dict[int, SOMEIPBaseServiceEvent] = {}
         for event in flync_events:
             params = [self._parse_parameter(conf_factory, p, i) for i, p in enumerate(event.parameters or [])]
             e = conf_factory.create_someip_service_event(
@@ -468,8 +513,8 @@ class FlyncParser:
             events[event.id] = e
         return events
 
-    def _parse_fields(self, conf_factory, flync_fields):
-        fields = {}
+    def _parse_fields(self, conf_factory: BaseConfigurationFactory, flync_fields: Any) -> dict[int, SOMEIPBaseServiceField]:
+        fields: dict[int, SOMEIPBaseServiceField] = {}
         for field in flync_fields:
             params = [self._parse_parameter(conf_factory, p, i) for i, p in enumerate(field.parameters or [])]
             f = conf_factory.create_someip_service_field(
@@ -495,8 +540,8 @@ class FlyncParser:
                 fields[key] = f
         return fields
 
-    def _parse_eventgroups(self, conf_factory, flync_eventgroups):
-        eventgroups = {}
+    def _parse_eventgroups(self, conf_factory: BaseConfigurationFactory, flync_eventgroups: Any) -> dict[int, SOMEIPBaseServiceEventgroup]:
+        eventgroups: dict[int, SOMEIPBaseServiceEventgroup] = {}
         for eg in flync_eventgroups:
             eventids = set()
             fieldids = set()
@@ -515,7 +560,7 @@ class FlyncParser:
             eventgroups[eg.id] = eg_obj
         return eventgroups
 
-    def _parse_parameter(self, conf_factory, param, position):
+    def _parse_parameter(self, conf_factory: BaseConfigurationFactory, param: Any, position: int) -> SOMEIPBaseParameter:
         datatype = self._convert_datatype(conf_factory, param.datatype)
         return conf_factory.create_someip_parameter(
             position,
@@ -527,7 +572,7 @@ class FlyncParser:
         )
 
     @staticmethod
-    def _normalize_string_encoding(encoding):
+    def _normalize_string_encoding(encoding: str) -> tuple[str, bool]:
         """Map FLYNC encoding names to (chartype, bigendian) as expected by the text factory.
 
         FLYNC stores directional UTF-16 names ("UTF-16BE", "UTF-16LE") while FIBEX uses
@@ -540,7 +585,7 @@ class FlyncParser:
         else:
             return encoding, True
 
-    def _convert_datatype(self, conf_factory, dt):
+    def _convert_datatype(self, conf_factory: BaseConfigurationFactory, dt: Any) -> SOMEIPBaseDatatype:
         bigendian = getattr(dt, "endianness", "BE") == "BE"
 
         match dt.type:
@@ -605,7 +650,7 @@ class FlyncParser:
                     "int32": 32,
                     "int64": 64,
                 }
-                child = conf_factory.create_someip_parameter_basetype(
+                child: SOMEIPBaseDatatype = conf_factory.create_someip_parameter_basetype(
                     base.name,
                     base.type,
                     base_bigendian,
@@ -627,20 +672,20 @@ class FlyncParser:
                     members[pos] = m_obj
                 return conf_factory.create_someip_parameter_struct(dt.name, dt.length_of_length_field, dt.bit_alignment, members)
             case "union":
-                members = {}
+                union_members: dict[int, SOMEIPBaseParameterUnionMember] = {}
                 # Union members carry an explicit discriminator `index` (used at runtime
                 # to select which member is active); structs use positional `enumerate`.
                 for m in dt.members or []:
-                    m_obj = conf_factory.create_someip_parameter_union_member(
+                    u_obj = conf_factory.create_someip_parameter_union_member(
                         m.index, m.name, m.mandatory, self._convert_datatype(conf_factory, m.type)
                     )
-                    members[m.index] = m_obj
+                    union_members[m.index] = u_obj
                 return conf_factory.create_someip_parameter_union(
                     dt.name,
                     dt.length_of_length_field,
                     dt.length_of_type_field,
                     dt.bit_alignment,
-                    members,
+                    union_members,
                 )
             case "array":
                 dims = {}
@@ -659,7 +704,7 @@ class FlyncParser:
                 child = self._convert_datatype(conf_factory, dt.element_type)
                 return conf_factory.create_someip_parameter_array(dt.name, dims, child)
             case "bitfield":
-                items = [conf_factory.create_someip_parameter_bitfield_item(entry.bitposition, entry.name) for entry in (dt.fields or [])]
+                bitfield_items = [conf_factory.create_someip_parameter_bitfield_item(entry.bitposition, entry.name) for entry in (dt.fields or [])]
                 # Create a basetype child based on bitfield length
                 length = getattr(dt, "length", None)
                 if length is None:
@@ -673,7 +718,7 @@ class FlyncParser:
                 else:
                     raise ValueError(f"Unsupported bitfield length {length} for {dt.name!r}; expected 8, 16, or 32")
 
-                return conf_factory.create_someip_parameter_bitfield(dt.name, items, child)
+                return conf_factory.create_someip_parameter_bitfield(dt.name, bitfield_items, child)
             case "typedef":
                 child = self._convert_datatype(conf_factory, dt.datatyperef)
                 return conf_factory.create_someip_parameter_typedef(dt.name, dt.name, child)
@@ -681,17 +726,17 @@ class FlyncParser:
                 # Fallback for unknown types: treat as UINT8
                 return conf_factory.create_someip_parameter_basetype(getattr(dt, "name", "unknown"), "uint8", True, 8, 8)
 
-    def _parse_ecus(self, conf_factory, flync_model, verbose=False):
+    def _parse_ecus(self, conf_factory: BaseConfigurationFactory, flync_model: Any, verbose: bool = False) -> None:
         for ecu in flync_model.ecus:
             if verbose:
                 print(f"  Parsing ECU: {ecu.name}")
-            controllers = []
+            controllers: list[BaseController] = []
             for controller in ecu.controllers:
-                interfaces = []
+                interfaces: list[BaseInterface] = []
                 for eth_iface in controller.ethernet_interfaces or []:
                     ctrl_iface = eth_iface.interface_config
                     for virt_iface in ctrl_iface.virtual_interfaces:
-                        ips = []
+                        ips: list[str] = []
                         for addr in virt_iface.addresses:
                             ip_str = str(addr.address)
                             ips.append(ip_str)
@@ -714,8 +759,8 @@ class FlyncParser:
                 # Reconstruct CAN frame triggerings from can_interfaces.
                 # CANFrameRef references frames by (bus_ref, CAN ID).
                 for can_iface in controller.can_interfaces or []:
-                    out_fts = {}
-                    in_fts = {}
+                    out_fts: dict[str, BaseFrameTriggering] = {}
+                    in_fts: dict[str, BaseFrameTriggering] = {}
                     for fr in can_iface.sender_frames or []:
                         ft = self._ft_by_can_id.get((fr.bus_ref, fr.frame_ref))
                         if ft:
@@ -740,17 +785,17 @@ class FlyncParser:
             self._ecu_by_name[ecu.name] = base_ecu
 
     @staticmethod
-    def _deployment_service_id(dep):
+    def _deployment_service_id(dep: Any) -> int | None:
         """Resolve a deployment's service ID, returning None if not coercible."""
         svc = dep.service
         if hasattr(svc, "id"):
-            return svc.id
+            return cast(int | None, svc.id)
         try:
             return int(svc)
         except (TypeError, ValueError):
             return None
 
-    def _resolve_pdu(self, conf_factory, pdu_ref):
+    def _resolve_pdu(self, conf_factory: BaseConfigurationFactory, pdu_ref: Any) -> BaseAbstractPDU | None:
         """Look up a PDU by name, creating it on demand for container PDUs.
 
         Standard and multiplexed PDUs are registered in _base_pdu_by_name during
@@ -765,12 +810,18 @@ class FlyncParser:
         if meta is None:
             return None
         length, sig_insts = meta
-        base_pdu = conf_factory.create_pdu(pdu_ref, pdu_ref, length, "APPLICATION", sig_insts)
+        base_pdu = conf_factory.create_pdu(pdu_ref, pdu_ref, length, "APPLICATION", cast(dict[int, BaseSignalInstance], sig_insts))
         self._base_pdu_by_name[pdu_ref] = base_pdu
         return base_pdu
 
-    def _parse_sockets_for_vlan(self, conf_factory, eth_iface, vlanid, virt_ips=None):
-        sockets = []
+    def _parse_sockets_for_vlan(
+        self,
+        conf_factory: BaseConfigurationFactory,
+        eth_iface: Any,
+        vlanid: Any,
+        virt_ips: set[str] | None = None,
+    ) -> list[BaseSocket]:
+        sockets: list[BaseSocket] = []
         for socket_container in eth_iface.sockets or []:
             if socket_container.vlan_id != vlanid:
                 continue
@@ -782,12 +833,12 @@ class FlyncParser:
                     if str(socket.endpoint_address) not in virt_ips:
                         continue
                 proto = socket.protocol
-                serviceinstances = []
-                serviceinstanceclients = []
-                eventhandlers = []
-                eventgroupreceivers = []
-                incoming_pdus = []
-                outgoing_pdus = []
+                serviceinstances: list[SOMEIPBaseServiceInstance] = []
+                serviceinstanceclients: list[SOMEIPBaseServiceInstanceClient] = []
+                eventhandlers: list[SOMEIPBaseServiceEventgroupSender] = []
+                eventgroupreceivers: list[SOMEIPBaseServiceEventgroupReceiver] = []
+                incoming_pdus: list[BaseEthernetPDUInstance] = []
+                outgoing_pdus: list[BaseEthernetPDUInstance] = []
 
                 for dep_union in socket.deployments or []:
                     dep = dep_union.root
@@ -821,7 +872,9 @@ class FlyncParser:
                                 consumed_names = dep.consumed_eventgroups
                                 for eg in svc_obj.eventgroups().values():
                                     if consumed_names is None or eg.name() in consumed_names:
-                                        receiver = conf_factory.create_someip_service_eventgroup_receiver(sic, eg.id(), None)
+                                        receiver = conf_factory.create_someip_service_eventgroup_receiver(
+                                            cast(SOMEIPBaseServiceInstance, sic), eg.id(), None
+                                        )
                                         eventgroupreceivers.append(receiver)
                             except (ValueError, TypeError, AttributeError) as e:
                                 print(f"WARNING: Could not create service instance client: {type(e).__name__}: {e}")
@@ -852,14 +905,14 @@ class FlyncParser:
                 )
 
                 for pdu_inst in incoming_pdus:
-                    s.add_incoming_pdu(pdu_inst)
+                    s.add_incoming_pdu(cast(BaseAbstractPDU, pdu_inst))
                 for pdu_inst in outgoing_pdus:
-                    s.add_outgoing_pdu(pdu_inst)
+                    s.add_outgoing_pdu(cast(BaseAbstractPDU, pdu_inst))
 
                 sockets.append(s)
         return sockets
 
-    def _find_unused_controller(self, base_ecu):
+    def _find_unused_controller(self, base_ecu: BaseECU) -> BaseController | None:
         """Find a controller on the ECU that is not yet connected to a switch port.
         Returns the controller or None if all are used."""
         for ctrl in base_ecu.controllers():
@@ -867,13 +920,13 @@ class FlyncParser:
                 return ctrl
         return None
 
-    def _parse_switches(self, conf_factory, flync_model, verbose=False):
+    def _parse_switches(self, conf_factory: BaseConfigurationFactory, flync_model: Any, verbose: bool = False) -> None:
         """Parse FLYNC switches and reconstruct BaseSwitchPort connections."""
         # Pass 1: Create all BaseSwitchPorts (unconnected) and BaseSwitches.
         # swport_map: (ecu_name, switch_name, sp_name) -> BaseSwitchPort
         # Port names are only unique within a single switch, so we must
         # disambiguate by the owning switch when an ECU has multiple switches.
-        swport_map = {}
+        swport_map: dict[tuple[str, str, str], BaseSwitchPort] = {}
 
         for ecu in flync_model.ecus:
             if not ecu.switches:
@@ -884,10 +937,10 @@ class FlyncParser:
             for sw in ecu.switches:
                 if verbose:
                     print(f"  Parsing switch: {sw.name} in ECU {ecu.name}")
-                sp_list = []
+                sp_list: list[BaseSwitchPort] = []
                 for flync_sp in sw.ports:
                     # Collect VLAN memberships for this port from the switch's VLANEntry list.
-                    vlans = []
+                    vlans: list[BaseVLAN] = []
                     for vlan_entry in sw.vlans or []:
                         if flync_sp.name in (vlan_entry.ports or []):
                             # Convert FLYNC's VLAN ID 0 (untagged) to None for FIBEX compatibility
@@ -920,7 +973,9 @@ class FlyncParser:
                             if unused_ctrl is not None:
                                 base_sp.set_connected_ctrl(unused_ctrl)
                             elif verbose:
-                                print(f"WARNING: No unused controller available for switch port {base_sp.name()} on ECU {base_ecu.name()}")
+                                print(
+                                    f"WARNING: No unused controller available for switch port {cast(Any, base_sp).name()} on ECU {base_ecu.name()}"
+                                )
 
                     elif comp.type == "controller_interface":
                         # CPU/management port wired via SwitchPortToControllerInterface.
@@ -936,7 +991,9 @@ class FlyncParser:
                                         base_sp.set_connected_ctrl(base_ctrl)
                                         break
                             elif verbose:
-                                print(f"WARNING: Could not resolve controller for CPU switch port {base_sp.name()} on ECU {base_ecu.name()}")
+                                print(
+                                    f"WARNING: Could not resolve controller for CPU switch port {cast(Any, base_sp).name()} on ECU {base_ecu.name()}"
+                                )
 
                     elif comp.type == "switch_port":
                         # switch_to_switch_same_ecu: peer is a SwitchPort on the same ECU.
@@ -999,5 +1056,6 @@ class FlyncParser:
                                         base_sp.set_connected_ctrl(unused_ctrl)
                                     elif verbose:
                                         print(
-                                            f"WARNING: No unused controller available for switch port {base_sp.name()} on ECU {peer_base_ecu.name()}"
+                                            f"WARNING: No unused controller available for switch port "
+                                            f"{cast(Any, base_sp).name()} on ECU {peer_base_ecu.name()}"
                                         )

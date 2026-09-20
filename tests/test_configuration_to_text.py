@@ -1,4 +1,7 @@
 #!/usr/bin/python
+
+from typing import Any
+
 """Unit tests for configuration_to_text module."""
 
 import configuration_to_text
@@ -13,22 +16,22 @@ from configuration_to_text import (
 class TestECUAndController:
     """Tests for ECU and Controller string representations."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def test_ecu_str(self):
+    def test_ecu_str(self) -> None:
         ecu = self.factory.create_ecu("TestECU", [])
         text = ecu.str(0, self.factory)
         assert "TestECU" in text
 
-    def test_ecu_with_controller(self):
+    def test_ecu_with_controller(self) -> None:
         controller = self.factory.create_controller("Controller1", [])
         ecu = self.factory.create_ecu("ECU1", [controller])
         text = ecu.str(0, self.factory)
         assert "ECU ECU1" in text
         assert "CTRL Controller1" in text
 
-    def test_ecu_with_switch(self):
+    def test_ecu_with_switch(self) -> None:
         switch = self.factory.create_switch("TestSwitch", None, [])
         ecu = self.factory.create_ecu("TestECU", [])
         ecu.add_switch(switch)
@@ -36,7 +39,7 @@ class TestECUAndController:
         assert "TestECU" in text
         assert "TestSwitch" in text
 
-    def test_controller_str(self):
+    def test_controller_str(self) -> None:
         controller = self.factory.create_controller("TestCtrl", [])
         text = controller.str(0, self.factory)
         assert "TestCtrl" in text
@@ -45,29 +48,29 @@ class TestECUAndController:
 class TestSwitchAndPort:
     """Tests for Switch and SwitchPort string representations."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def test_switch_str(self):
+    def test_switch_str(self) -> None:
         switch = self.factory.create_switch("TestSwitch", None, [])
         text = switch.str(0, self.factory)
         assert "TestSwitch" in text
 
-    def test_switch_str_with_ecu_name(self):
+    def test_switch_str_with_ecu_name(self) -> None:
         ecu = self.factory.create_ecu("TestECU", [])
         switch = self.factory.create_switch("TestSwitch", ecu, [])
         text = switch.str(0, self.factory, print_ecu_name=True)
         assert "TestSwitch" in text
         assert "TestECU" in text
 
-    def test_switch_port_str_no_port_no_ctrl(self):
+    def test_switch_port_str_no_port_no_ctrl(self) -> None:
         """SwitchPort with neither port nor controller connected."""
         configuration_to_text.g_gen_portid = False
         port = SwitchPort("port1", None, None, 0, [])
         text = port.str(0, self.factory)
         assert "SwitchPort" in text
 
-    def test_switch_port_str_with_ctrl(self):
+    def test_switch_port_str_with_ctrl(self) -> None:
         """SwitchPort connected to a controller."""
         configuration_to_text.g_gen_portid = False
         controller = self.factory.create_controller("TestCtrl", [])
@@ -76,7 +79,7 @@ class TestSwitchAndPort:
         text = port.str(0, self.factory)
         assert "TestCtrl" in text
 
-    def test_switch_port_str_with_port_ref(self):
+    def test_switch_port_str_with_port_ref(self) -> None:
         """SwitchPort connected to another SwitchPort (inter-switch link)."""
         configuration_to_text.g_gen_portid = False
         other_port = SwitchPort("other_port", None, None, 0, [])
@@ -86,7 +89,7 @@ class TestSwitchAndPort:
         text = port.str(0, self.factory)
         assert "OtherSwitch" in text
 
-    def test_switch_port_vlan_str(self):
+    def test_switch_port_vlan_str(self) -> None:
         """SwitchPort with a VLAN shows VLAN info via str_vlans()."""
         configuration_to_text.g_gen_portid = False
         vlan = BaseVLAN("VLAN10", 10, 5)
@@ -99,10 +102,10 @@ class TestSwitchAndPort:
 class TestInterface:
     """Tests for Interface string representations."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def test_interface_str(self):
+    def test_interface_str(self) -> None:
         interface = self.factory.create_interface(
             name="EthIf1",
             vlanid=0,
@@ -115,7 +118,7 @@ class TestInterface:
         text = interface.str(0, self.factory)
         assert "EthIf1" in text
 
-    def test_interface_str_with_vlan(self):
+    def test_interface_str_with_vlan(self) -> None:
         interface = self.factory.create_interface(
             name="EthIf1",
             vlanid=10,
@@ -129,7 +132,7 @@ class TestInterface:
         assert "VLAN" in text
         assert "0xa" in text
 
-    def test_interface_str_with_multicast_ip(self):
+    def test_interface_str_with_multicast_ip(self) -> None:
         """Multicast IPs are not shown in interface output."""
         interface = self.factory.create_interface(
             name="EthIf1",
@@ -143,7 +146,7 @@ class TestInterface:
         text = interface.str(0, self.factory)
         assert "EthIf1" in text
 
-    def test_interface_str_with_input_frames(self):
+    def test_interface_str_with_input_frames(self) -> None:
         frame = self.factory.create_frame(
             id="FRAME1",
             short_name="TestFrame",
@@ -164,7 +167,7 @@ class TestInterface:
         text = interface.str(0, self.factory)
         assert "Input Frames" in text
 
-    def test_interface_str_with_output_frames(self):
+    def test_interface_str_with_output_frames(self) -> None:
         frame = self.factory.create_frame(
             id="FRAME1",
             short_name="TestFrame",
@@ -185,7 +188,7 @@ class TestInterface:
         text = interface.str(0, self.factory)
         assert "Output Frames" in text
 
-    def test_interface_str_with_ip_netmask(self):
+    def test_interface_str_with_ip_netmask(self) -> None:
         """IP is shown with netmask suffix when configured in the factory."""
         self.factory.add_ipv4_address_config("10.0.0.1", "255.255.255.0")
         interface = self.factory.create_interface(
@@ -204,10 +207,10 @@ class TestInterface:
 class TestSocket:
     """Tests for Socket string representations."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def test_socket_str(self):
+    def test_socket_str(self) -> None:
         socket = self.factory.create_socket(
             name="Socket1",
             ip="192.168.1.1",
@@ -223,7 +226,7 @@ class TestSocket:
         assert "192.168.1.1" in text
         assert "30401" in text
 
-    def test_socket_with_pdus(self):
+    def test_socket_with_pdus(self) -> None:
         """Socket with incoming and outgoing EthernetPDUInstances."""
         pdu = self.factory.create_pdu(
             id="P1",
@@ -232,8 +235,8 @@ class TestSocket:
             pdu_type="SIGNAL",
             signal_instances={},
         )
-        eth_pdu_in = self.factory.create_ethernet_pdu_instance(pdu_ref=pdu, header_id=0x0001)
-        eth_pdu_out = self.factory.create_ethernet_pdu_instance(pdu_ref=pdu, header_id=0x0002)
+        eth_pdu_in = self.factory.create_ethernet_pdu_instance(pdu_ref=pdu, header_id=0x0001)  # type: ignore
+        eth_pdu_out = self.factory.create_ethernet_pdu_instance(pdu_ref=pdu, header_id=0x0002)  # type: ignore
         socket = self.factory.create_socket(
             name="Socket1",
             ip="192.168.1.1",
@@ -244,8 +247,8 @@ class TestSocket:
             eventhandlers=[],
             eventgroupreceivers=[],
         )
-        socket.add_incoming_pdu(eth_pdu_in)
-        socket.add_outgoing_pdu(eth_pdu_out)
+        socket.add_incoming_pdu(eth_pdu_in)  # type: ignore
+        socket.add_outgoing_pdu(eth_pdu_out)  # type: ignore
         text = socket.str(0)
         assert "PDUs in" in text
         assert "PDUs out" in text
@@ -254,10 +257,10 @@ class TestSocket:
 class TestFrameAndPDU:
     """Tests for Frame, PDU, PDUInstance, EthernetPDUInstance, and MultiplexPDU."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def test_frame_str(self):
+    def test_frame_str(self) -> None:
         frame = self.factory.create_frame(
             id="F1",
             short_name="TestFrame",
@@ -268,7 +271,7 @@ class TestFrameAndPDU:
         text = frame.str(0)
         assert "TestFrame" in text
 
-    def test_frame_duplicate_name_handling(self):
+    def test_frame_duplicate_name_handling(self) -> None:
         """Duplicate frame names receive an incremented suffix."""
         frame1 = self.factory.create_frame(
             id="F1",
@@ -287,7 +290,7 @@ class TestFrameAndPDU:
         )
         assert frame2.name() == "DuplicateFrame__duplicate1"
 
-    def test_pdu_str(self):
+    def test_pdu_str(self) -> None:
         pdu = self.factory.create_pdu(
             id="P1",
             short_name="TestPDU",
@@ -299,7 +302,7 @@ class TestFrameAndPDU:
         assert "TestPDU" in text
         assert "SIGNAL" in text
 
-    def test_pdu_str_without_signals(self):
+    def test_pdu_str_without_signals(self) -> None:
         pdu = self.factory.create_pdu(
             id="P1",
             short_name="TestPDU",
@@ -310,7 +313,7 @@ class TestFrameAndPDU:
         text = pdu.str(0, show_signals=False)
         assert "TestPDU" in text
 
-    def test_pdu_str_with_signal_instance(self):
+    def test_pdu_str_with_signal_instance(self) -> None:
         """PDU.str() renders contained signal instances by default."""
         signal = self.factory.create_signal("S1", "MySig", None, [], 8, 1, 8, "UINT8", 8)
         signal_inst = self.factory.create_signal_instance("SI1", "S1", 0, True)
@@ -320,7 +323,7 @@ class TestFrameAndPDU:
         assert "SigPDU" in text
         assert "MySig" in text
 
-    def test_pdu_warning_on_duplicate(self, capsys):
+    def test_pdu_warning_on_duplicate(self, capsys: Any) -> None:
         """Creating a PDU with a duplicate ID prints a WARNING."""
         self.factory.create_pdu(
             id="P1",
@@ -339,7 +342,7 @@ class TestFrameAndPDU:
         captured = capsys.readouterr()
         assert "WARNING" in captured.out
 
-    def test_pdu_instance_str(self):
+    def test_pdu_instance_str(self) -> None:
         """PDUInstance.str() shows bit-position range and the PDU name."""
         pdu = self.factory.create_pdu("P1", "TestPDU", 1, "SIGNAL", {})
         pdu_inst = self.factory.create_pdu_instance("PI1", "P1", 0, True, None)
@@ -348,7 +351,7 @@ class TestFrameAndPDU:
         assert "Bit pos." in text
         assert "TestPDU" in text
 
-    def test_ethernet_pdu_instance_str(self):
+    def test_ethernet_pdu_instance_str(self) -> None:
         pdu = self.factory.create_pdu(
             id="P1",
             short_name="EthPDU",
@@ -356,16 +359,16 @@ class TestFrameAndPDU:
             pdu_type="ETHERNET",
             signal_instances={},
         )
-        eth_inst = self.factory.create_ethernet_pdu_instance(pdu_ref=pdu, header_id=0x1234)
+        eth_inst = self.factory.create_ethernet_pdu_instance(pdu_ref=pdu, header_id=0x1234)  # type: ignore
         text = eth_inst.str(0)
         assert "0x1234" in text
 
-    def test_ethernet_pdu_instance_str_no_pdu(self):
-        eth_inst = self.factory.create_ethernet_pdu_instance(pdu_ref=None, header_id=0x5678)
+    def test_ethernet_pdu_instance_str_no_pdu(self) -> None:
+        eth_inst = self.factory.create_ethernet_pdu_instance(pdu_ref=None, header_id=0x5678)  # type: ignore
         text = eth_inst.str(0)
         assert "0x5678" in text
 
-    def test_multiplex_pdu_switch_str_high_low(self):
+    def test_multiplex_pdu_switch_str_high_low(self) -> None:
         mux_switch = self.factory.create_multiplex_switch(
             id="mux1",
             short_name="MuxSwitch",
@@ -377,7 +380,7 @@ class TestFrameAndPDU:
         assert "MuxSwitch" in text
         assert "high low" in text
 
-    def test_multiplex_pdu_switch_str_low_high(self):
+    def test_multiplex_pdu_switch_str_low_high(self) -> None:
         mux_switch = self.factory.create_multiplex_switch(
             id="mux1",
             short_name="MuxSwitch",
@@ -388,7 +391,7 @@ class TestFrameAndPDU:
         text = mux_switch.str(0)
         assert "low high" in text
 
-    def test_multiplex_segment_position_str(self):
+    def test_multiplex_segment_position_str(self) -> None:
         seg_pos = self.factory.create_multiplex_segment_position(
             bit_position=4,
             is_high_low_byte_order=True,
@@ -397,7 +400,7 @@ class TestFrameAndPDU:
         text = seg_pos.str(0)
         assert "Segment" in text
 
-    def test_multiplex_segment_position_str_with_prefix(self):
+    def test_multiplex_segment_position_str_with_prefix(self) -> None:
         seg_pos = self.factory.create_multiplex_segment_position(
             bit_position=4,
             is_high_low_byte_order=True,
@@ -406,7 +409,7 @@ class TestFrameAndPDU:
         text = seg_pos.str(0, prefix="Dynamic")
         assert "Dynamic" in text
 
-    def test_multiplex_pdu_str(self):
+    def test_multiplex_pdu_str(self) -> None:
         """MultiplexPDU.str() with switch, dynamic segment, and PDU instances."""
         mux_switch = self.factory.create_multiplex_switch("mux1", "MuxSw", 0, True, 4)
         seg_pos = self.factory.create_multiplex_segment_position(4, True, 8)
@@ -419,7 +422,7 @@ class TestFrameAndPDU:
             pdu_type="MULTIPLEX",
             switch=mux_switch,
             seg_pos=[seg_pos],
-            pdu_instances={0: dyn_pdu0, 1: dyn_pdu1},
+            pdu_instances={0: dyn_pdu0, 1: dyn_pdu1},  # type: ignore
             static_segs=[],
             static_pdu=None,
         )
@@ -429,7 +432,7 @@ class TestFrameAndPDU:
         assert "Dynamic" in text
         assert "Switch Code" in text
 
-    def test_multiplex_pdu_str_with_static(self):
+    def test_multiplex_pdu_str_with_static(self) -> None:
         """MultiplexPDU.str() with static segment and static PDU."""
         mux_switch = self.factory.create_multiplex_switch("mux2", "MuxSw2", 0, True, 4)
         seg_pos = self.factory.create_multiplex_segment_position(4, True, 8)
@@ -443,7 +446,7 @@ class TestFrameAndPDU:
             pdu_type="MULTIPLEX",
             switch=mux_switch,
             seg_pos=[seg_pos],
-            pdu_instances={0: dyn_pdu},
+            pdu_instances={0: dyn_pdu},  # type: ignore
             static_segs=[static_seg],
             static_pdu=static_pdu,
         )
@@ -456,15 +459,15 @@ class TestFrameAndPDU:
 class TestSignalAndSignalInstance:
     """Tests for Signal and SignalInstance string representations."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def test_signal_str(self):
+    def test_signal_str(self) -> None:
         signal = self.factory.create_signal("S1", "TestSignal", None, [], 8, 1, 8, "A_UINT8", 8)
         text = signal.str(0)
         assert "TestSignal" in text
 
-    def test_signal_str_with_basetype(self):
+    def test_signal_str_with_basetype(self) -> None:
         configuration_to_text.g_show_datatype = True
         signal = self.factory.create_signal("S1", "TestSignal", None, [], 8, 1, 8, "A_UINT8", 8)
         text = signal.str(0)
@@ -472,19 +475,19 @@ class TestSignalAndSignalInstance:
         assert "A_UINT8" in text
         configuration_to_text.g_show_datatype = False
 
-    def test_signal_str_with_compu_scale(self):
-        signal = self.factory.create_signal("S1", "ScaledSignal", [1.0, 2.0, 3.0], [], 8, 1, 8, "A_UINT8", 8)
+    def test_signal_str_with_compu_scale(self) -> None:
+        signal = self.factory.create_signal("S1", "ScaledSignal", [1.0, 2.0, 3.0], [], 8, 1, 8, "A_UINT8", 8)  # type: ignore
         text = signal.str(0)
         assert "f(x)" in text
 
-    def test_signal_str_compu_scale_not_three_elements(self):
+    def test_signal_str_compu_scale_not_three_elements(self) -> None:
         """compu_scale with length != 3 adds default f(x)."""
-        signal = self.factory.create_signal("S1", "Sig", [1.0, 0.0], [], 8, 1, 8, "A_UINT8", 8)
+        signal = self.factory.create_signal("S1", "Sig", [1.0, 0.0], [], 8, 1, 8, "A_UINT8", 8)  # type: ignore
         text = signal.str(0)
         assert "Sig" in text
         assert "f(x)" in text
 
-    def test_signal_str_with_compu_consts(self):
+    def test_signal_str_with_compu_consts(self) -> None:
         signal = self.factory.create_signal(
             "S1",
             "EnumSignal",
@@ -501,7 +504,7 @@ class TestSignalAndSignalInstance:
         assert "OFF" in text
         assert "ON" in text
 
-    def test_signal_instance_str(self):
+    def test_signal_instance_str(self) -> None:
         """SignalInstance.str() shows bit-position range and signal name."""
         signal = self.factory.create_signal("S1", "MySig", None, [], 16, 2, 2, "UINT16", 16)
         signal_inst = self.factory.create_signal_instance("SI1", "S1", 8, True)
@@ -511,7 +514,7 @@ class TestSignalAndSignalInstance:
         assert "MySig" in text
         assert "8..23" in text  # bit 8, length 16 → end bit 23
 
-    def test_signal_instance_str_with_start_offset(self):
+    def test_signal_instance_str_with_start_offset(self) -> None:
         """start_offset shifts the bit position displayed."""
         signal = self.factory.create_signal("S1", "MySig", None, [], 8, 1, 1, "UINT8", 8)
         signal_inst = self.factory.create_signal_instance("SI1", "S1", 0, True)
@@ -519,7 +522,7 @@ class TestSignalAndSignalInstance:
         text = signal_inst.str(0, start_offset=16)
         assert "16..23" in text  # 0 + 16 = 16, end = 16 + 8 - 1 = 23
 
-    def test_signal_instance_str_negative_bit_length(self):
+    def test_signal_instance_str_negative_bit_length(self) -> None:
         """bit_length == -1 shows a single bit position without a range."""
         signal = self.factory.create_signal("S1", "VarSig", None, [], -1, 0, 0, "UINT8", 8)
         signal_inst = self.factory.create_signal_instance("SI1", "S1", 4, True)
@@ -532,10 +535,10 @@ class TestSignalAndSignalInstance:
 class TestFrameTriggering:
     """Tests for CAN and FlexRay frame triggering string representations."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def test_frame_triggering_can_str(self):
+    def test_frame_triggering_can_str(self) -> None:
         frame = self.factory.create_frame(
             id="F1",
             short_name="CANFrame",
@@ -548,12 +551,18 @@ class TestFrameTriggering:
         assert "CAN-ID" in text
         assert "0x123" in text or "291" in text
 
-    def test_frame_triggering_can_str_no_frame(self):
-        frame_trigger = self.factory.create_frame_triggering_can(id="t1", frame_ref=None, can_id=0x456, is_extended_id=True, is_can_fd=True)
+    def test_frame_triggering_can_str_no_frame(self) -> None:
+        frame_trigger = self.factory.create_frame_triggering_can(
+            id="t1",
+            frame_ref=None,  # type: ignore
+            can_id=0x456,
+            is_extended_id=True,
+            is_can_fd=True,
+        )
         text = frame_trigger.str(0)
         assert "undefined" in text
 
-    def test_frame_triggering_flexray_str_cycle_counter(self):
+    def test_frame_triggering_flexray_str_cycle_counter(self) -> None:
         frame = self.factory.create_frame(
             id="F1",
             short_name="FRFrame",
@@ -573,7 +582,7 @@ class TestFrameTriggering:
         assert "Slot ID" in text
         assert "Cycle Counter" in text
 
-    def test_frame_triggering_flexray_str_base_cycle(self):
+    def test_frame_triggering_flexray_str_base_cycle(self) -> None:
         frame = self.factory.create_frame(
             id="F1",
             short_name="FRFrame",
@@ -592,10 +601,10 @@ class TestFrameTriggering:
         text = frame_trigger.str(0)
         assert "Base Cycle" in text
 
-    def test_frame_triggering_flexray_str_undefined_timing(self):
+    def test_frame_triggering_flexray_str_undefined_timing(self) -> None:
         frame_trigger = self.factory.create_frame_triggering_flexray(
             id="t1",
-            frame_ref=None,
+            frame_ref=None,  # type: ignore
             slot_id=10,
             cycle_counter=None,
             base_cycle=None,
@@ -608,10 +617,10 @@ class TestFrameTriggering:
 class TestSOMEIPService:
     """Tests for SOME/IP service, method, event, field, and eventgroup."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def _make_service(self, serviceid=0x1234, name="TestService"):
+    def _make_service(self, serviceid: Any = 0x1234, name: Any = "TestService") -> Any:
         return self.factory.create_someip_service(
             name=name,
             serviceid=serviceid,
@@ -623,17 +632,17 @@ class TestSOMEIPService:
             eventgroups={},
         )
 
-    def test_service_str(self):
+    def test_service_str(self) -> None:
         service = self._make_service()
         text = service.str(0)
         assert "TestService" in text
         assert "0x1234" in text
 
-    def test_service_str_with_method(self):
+    def test_service_str_with_method(self) -> None:
         method = self.factory.create_someip_service_method(
             name="GetValue",
             methodid=0x0001,
-            calltype="REQUEST",
+            calltype="REQUEST",  # type: ignore
             relia=True,
             inparams=[],
             outparams=[],
@@ -651,11 +660,11 @@ class TestSOMEIPService:
         text = service.str(0)
         assert "GetValue" in text
 
-    def test_method_str(self):
+    def test_method_str(self) -> None:
         method = self.factory.create_someip_service_method(
             name="GetValue",
             methodid=0x0001,
-            calltype="REQUEST",
+            calltype="REQUEST",  # type: ignore
             relia=True,
             inparams=[],
             outparams=[],
@@ -664,7 +673,7 @@ class TestSOMEIPService:
         assert "GetValue" in text
         assert "0x0001" in text
 
-    def test_method_str_with_in_params(self):
+    def test_method_str_with_in_params(self) -> None:
         param = self.factory.create_someip_parameter(
             position=0,
             name="InputParam",
@@ -676,7 +685,7 @@ class TestSOMEIPService:
         method = self.factory.create_someip_service_method(
             name="SetValue",
             methodid=0x0002,
-            calltype="REQUEST",
+            calltype="REQUEST",  # type: ignore
             relia=True,
             inparams=[param],
             outparams=[],
@@ -684,7 +693,7 @@ class TestSOMEIPService:
         text = method.str(0)
         assert "In Parameters" in text
 
-    def test_method_str_with_out_params(self):
+    def test_method_str_with_out_params(self) -> None:
         param = self.factory.create_someip_parameter(
             position=0,
             name="OutputParam",
@@ -696,7 +705,7 @@ class TestSOMEIPService:
         method = self.factory.create_someip_service_method(
             name="GetResult",
             methodid=0x0003,
-            calltype="REQUEST",
+            calltype="REQUEST",  # type: ignore
             relia=True,
             inparams=[],
             outparams=[param],
@@ -704,28 +713,28 @@ class TestSOMEIPService:
         text = method.str(0)
         assert "Out Parameters" in text
 
-    def test_method_str_with_timings(self):
+    def test_method_str_with_timings(self) -> None:
         method = self.factory.create_someip_service_method(
             name="TimedMethod",
             methodid=0x0004,
-            calltype="REQUEST",
+            calltype="REQUEST",  # type: ignore
             relia=True,
             inparams=[],
             outparams=[],
-            reqdebounce=0.100,
-            reqmaxretention=0.05,
-            resmaxretention=0.05,
+            reqdebounce=0.100,  # type: ignore
+            reqmaxretention=0.05,  # type: ignore
+            resmaxretention=0.05,  # type: ignore
         )
         text = method.str(0)
         assert "debounce" in text
         assert "max_request_retention" in text
         assert "max_response_retention" in text
 
-    def test_method_str_with_tlv(self):
+    def test_method_str_with_tlv(self) -> None:
         method = self.factory.create_someip_service_method(
             name="TLVMethod",
             methodid=0x0005,
-            calltype="REQUEST",
+            calltype="REQUEST",  # type: ignore
             relia=True,
             inparams=[],
             outparams=[],
@@ -734,7 +743,7 @@ class TestSOMEIPService:
         text = method.str(0)
         assert "TLV" in text
 
-    def test_event_str(self):
+    def test_event_str(self) -> None:
         event = self.factory.create_someip_service_event(
             name="StatusEvent",
             methodid=0x8001,
@@ -745,19 +754,19 @@ class TestSOMEIPService:
         assert "StatusEvent" in text
         assert "0x8001" in text
 
-    def test_event_str_with_debounce(self):
+    def test_event_str_with_debounce(self) -> None:
         event = self.factory.create_someip_service_event(
             name="DebouncedEvent",
             methodid=0x8002,
             relia=False,
             params=[],
-            debounce=0.050,
-            maxretention=0.100,
+            debounce=0.050,  # type: ignore
+            maxretention=0.100,  # type: ignore
         )
         text = event.str(0)
         assert "debounce" in text
 
-    def test_event_str_with_tlv(self):
+    def test_event_str_with_tlv(self) -> None:
         event = self.factory.create_someip_service_event(
             name="TLVEvent",
             methodid=0x8003,
@@ -768,7 +777,7 @@ class TestSOMEIPService:
         text = event.str(0)
         assert "TLV" in text
 
-    def test_event_str_legacy(self):
+    def test_event_str_legacy(self) -> None:
         """Event carrying a signal-bound parameter is shown as Legacy PDU."""
         signal = self.factory.create_signal("S1", "LegacySig", None, [], 8, 1, 8, "UINT8", 8)
         param = self.factory.create_someip_parameter(
@@ -788,7 +797,7 @@ class TestSOMEIPService:
         text = event.str(0)
         assert "Legacy PDU" in text
 
-    def test_eventgroup_str(self):
+    def test_eventgroup_str(self) -> None:
         eg = self.factory.create_someip_service_eventgroup(
             name="TestEventgroup",
             eid=0x1000,
@@ -799,7 +808,7 @@ class TestSOMEIPService:
         assert "TestEventgroup" in text
         assert "0x1000" in text
 
-    def test_eventgroup_str_with_events(self):
+    def test_eventgroup_str_with_events(self) -> None:
         eg = self.factory.create_someip_service_eventgroup(
             name="EG",
             eid=0x1001,
@@ -809,7 +818,7 @@ class TestSOMEIPService:
         text = eg.str(0)
         assert "Events:" in text
 
-    def test_eventgroup_str_with_fields(self):
+    def test_eventgroup_str_with_fields(self) -> None:
         eg = self.factory.create_someip_service_eventgroup(
             name="FieldEG",
             eid=0x1002,
@@ -819,7 +828,7 @@ class TestSOMEIPService:
         text = eg.str(0)
         assert "Notifiers:" in text
 
-    def test_field_with_getter_only(self):
+    def test_field_with_getter_only(self) -> None:
         field = self.factory.create_someip_service_field(
             name="GetterField",
             getterid=0x0001,
@@ -829,9 +838,9 @@ class TestSOMEIPService:
             setterreli=True,
             notifierreli=True,
             params=[],
-            getter_debouncereq=0.100,
-            getter_retentionreq=0.05,
-            getter_retentionres=0.05,
+            getter_debouncereq=0.100,  # type: ignore
+            getter_retentionreq=0.05,  # type: ignore
+            getter_retentionres=0.05,  # type: ignore
             setter_debouncereq=-1,
             setter_retentionreq=-1,
             setter_retentionres=-1,
@@ -845,7 +854,7 @@ class TestSOMEIPService:
         assert "max_request_retention" in text
         assert "max_response_retention" in text
 
-    def test_field_with_setter_only(self):
+    def test_field_with_setter_only(self) -> None:
         field = self.factory.create_someip_service_field(
             name="SetterField",
             getterid=None,
@@ -867,7 +876,7 @@ class TestSOMEIPService:
         text = field.str(0)
         assert "Setter" in text
 
-    def test_field_with_notifier_only(self):
+    def test_field_with_notifier_only(self) -> None:
         field = self.factory.create_someip_service_field(
             name="NotifyField",
             getterid=None,
@@ -889,7 +898,7 @@ class TestSOMEIPService:
         text = field.str(0)
         assert "Notifier" in text
 
-    def test_field_with_all_three(self):
+    def test_field_with_all_three(self) -> None:
         field = self.factory.create_someip_service_field(
             name="FullField",
             getterid=0x0001,
@@ -913,7 +922,7 @@ class TestSOMEIPService:
         assert "Setter" in text
         assert "Notifier" in text
 
-    def test_field_with_all_three_and_timings(self):
+    def test_field_with_all_three_and_timings(self) -> None:
         field = self.factory.create_someip_service_field(
             name="FullField",
             getterid=0x0001,
@@ -945,7 +954,7 @@ class TestSOMEIPService:
         assert "debounce:7s" in text
         assert "max_retention:8s" in text
 
-    def test_field_with_tlv(self):
+    def test_field_with_tlv(self) -> None:
         field = self.factory.create_someip_service_field(
             name="TLVField",
             getterid=0x0001,
@@ -968,7 +977,7 @@ class TestSOMEIPService:
         text = field.str(0)
         assert "TLV" in text
 
-    def test_field_with_getter_debounce(self):
+    def test_field_with_getter_debounce(self) -> None:
         field = self.factory.create_someip_service_field(
             name="DebounceField",
             getterid=0x0001,
@@ -994,10 +1003,10 @@ class TestSOMEIPService:
 class TestSOMEIPServiceInstances:
     """Tests for SOME/IP service instance, client, eventgroup sender, and receiver."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def _make_instance(self, serviceid=0x1234, instanceid=0x0001):
+    def _make_instance(self, serviceid: Any = 0x1234, instanceid: Any = 0x0001) -> Any:
         service = self.factory.create_someip_service(
             name="TestService",
             serviceid=serviceid,
@@ -1014,13 +1023,13 @@ class TestSOMEIPServiceInstances:
             protover=1,
         )
 
-    def test_service_instance_str(self):
+    def test_service_instance_str(self) -> None:
         service, instance = self._make_instance()
         text = instance.str(0)
         assert "0x1234" in text
         assert "0x0001" in text
 
-    def test_service_instance_client_str(self):
+    def test_service_instance_client_str(self) -> None:
         service, server = self._make_instance(serviceid=0x2000, instanceid=0x0001)
         client = self.factory.create_someip_service_instance_client(
             service=service,
@@ -1032,7 +1041,7 @@ class TestSOMEIPServiceInstances:
         assert "ServiceInstanceClient" in text
         assert "0x2000" in text
 
-    def test_eventgroup_sender_str(self):
+    def test_eventgroup_sender_str(self) -> None:
         _, instance = self._make_instance(serviceid=0x3000)
         sender = self.factory.create_someip_service_eventgroup_sender(
             serviceinstance=instance,
@@ -1042,7 +1051,7 @@ class TestSOMEIPServiceInstances:
         assert "EventgroupSender" in text
         assert "0x1000" in text
 
-    def test_eventgroup_receiver_str(self):
+    def test_eventgroup_receiver_str(self) -> None:
         _, instance = self._make_instance(serviceid=0x4000)
         sender = self.factory.create_someip_service_eventgroup_sender(
             serviceinstance=instance,
@@ -1061,13 +1070,13 @@ class TestSOMEIPServiceInstances:
 class TestSOMEIPParameters:
     """Tests for all SOME/IP parameter type string representations."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def _make_basetype(self, name="BT", datatype="UINT32", bigendian=True, bits=32):
+    def _make_basetype(self, name: Any = "BT", datatype: Any = "UINT32", bigendian: Any = True, bits: Any = 32) -> Any:
         return self.factory.create_someip_parameter_basetype(name, datatype, bigendian, bits, bits)
 
-    def test_parameter_str(self):
+    def test_parameter_str(self) -> None:
         param = self.factory.create_someip_parameter(
             position=0,
             name="TestParam",
@@ -1080,7 +1089,7 @@ class TestSOMEIPParameters:
         assert "TestParam" in text
         assert "mandatory: True" in text
 
-    def test_parameter_str_with_datatype(self):
+    def test_parameter_str_with_datatype(self) -> None:
         configuration_to_text.g_show_datatype = True
         bt = self._make_basetype()
         param = self.factory.create_someip_parameter(
@@ -1096,7 +1105,7 @@ class TestSOMEIPParameters:
         assert "UINT32" in text
         configuration_to_text.g_show_datatype = False
 
-    def test_parameter_str_with_signal(self):
+    def test_parameter_str_with_signal(self) -> None:
         """Parameter with a signal reference renders the signal."""
         signal = self.factory.create_signal("S1", "ParamSig", None, [], 8, 1, 8, "UINT8", 8)
         param = self.factory.create_someip_parameter(
@@ -1111,7 +1120,7 @@ class TestSOMEIPParameters:
         assert "SigParam" in text
         assert "ParamSig" in text
 
-    def test_basetype_str_big_endian_with_datatype(self):
+    def test_basetype_str_big_endian_with_datatype(self) -> None:
         configuration_to_text.g_show_datatype = True
         bt = self._make_basetype(datatype="UINT32", bigendian=True)
         text = bt.str(0)
@@ -1119,12 +1128,12 @@ class TestSOMEIPParameters:
         assert "BE" in text
         configuration_to_text.g_show_datatype = False
 
-    def test_basetype_str_little_endian(self):
+    def test_basetype_str_little_endian(self) -> None:
         bt = self._make_basetype(datatype="UINT16", bigendian=False, bits=16)
         text = bt.str(0)
         assert "LE" in text
 
-    def test_string_param_str(self):
+    def test_string_param_str(self) -> None:
         sp = self.factory.create_someip_parameter_string(
             name="MyStr",
             chartype="UTF-8",
@@ -1139,7 +1148,7 @@ class TestSOMEIPParameters:
         assert "MyStr" in text
         assert "UTF-8" in text
 
-    def test_string_param_str_little_endian(self):
+    def test_string_param_str_little_endian(self) -> None:
         sp = self.factory.create_someip_parameter_string(
             name="LEStr",
             chartype="UTF-16",
@@ -1153,14 +1162,14 @@ class TestSOMEIPParameters:
         text = sp.str(0)
         assert "LE" in text
 
-    def test_array_str(self):
+    def test_array_str(self) -> None:
         child = self._make_basetype(name="Child", datatype="UINT8", bits=8)
         array = self.factory.create_someip_parameter_array(name="TestArray", dims={}, child=child)
         text = array.str(0)
         assert "TestArray" in text
         assert "Array" in text
 
-    def test_array_str_with_dim(self):
+    def test_array_str_with_dim(self) -> None:
         dim = self.factory.create_someip_parameter_array_dim(
             dim=0,
             lowerlimit=0,
@@ -1173,12 +1182,12 @@ class TestSOMEIPParameters:
         text = array.str(0)
         assert "Dimension" in text
 
-    def test_array_str_no_child(self):
-        array = self.factory.create_someip_parameter_array(name="EmptyArray", dims={}, child=None)
+    def test_array_str_no_child(self) -> None:
+        array = self.factory.create_someip_parameter_array(name="EmptyArray", dims={}, child=None)  # type: ignore
         text = array.str(0)
         assert "EmptyArray" in text
 
-    def test_array_dim_str(self):
+    def test_array_dim_str(self) -> None:
         dim = self.factory.create_someip_parameter_array_dim(
             dim=0,
             lowerlimit=0,
@@ -1189,7 +1198,7 @@ class TestSOMEIPParameters:
         text = dim.str(0)
         assert "Dimension" in text
 
-    def test_struct_str(self):
+    def test_struct_str(self) -> None:
         struct = self.factory.create_someip_parameter_struct(
             name="TestStruct",
             length_of_length=2,
@@ -1200,7 +1209,7 @@ class TestSOMEIPParameters:
         assert "TestStruct" in text
         assert "Struct" in text
 
-    def test_struct_str_tlv(self):
+    def test_struct_str_tlv(self) -> None:
         struct = self.factory.create_someip_parameter_struct(
             name="TLVStruct",
             length_of_length=2,
@@ -1211,7 +1220,7 @@ class TestSOMEIPParameters:
         text = struct.str(0)
         assert "TLV" in text
 
-    def test_struct_str_with_member(self):
+    def test_struct_str_with_member(self) -> None:
         child = self._make_basetype(name="MemberBT")
         member = self.factory.create_someip_parameter_struct_member(
             position=0,
@@ -1229,7 +1238,7 @@ class TestSOMEIPParameters:
         text = struct.str(0)
         assert "M1" in text
 
-    def test_struct_member_str(self):
+    def test_struct_member_str(self) -> None:
         child = self._make_basetype()
         member = self.factory.create_someip_parameter_struct_member(
             position=0,
@@ -1242,13 +1251,13 @@ class TestSOMEIPParameters:
         assert "StructMember" in text
         assert "mandatory: True" in text
 
-    def test_typedef_str(self):
+    def test_typedef_str(self) -> None:
         child = self._make_basetype()
         typedef = self.factory.create_someip_parameter_typedef(name="MyTypedef", name2="UINT32", child=child)
         text = typedef.str(0)
         assert "MyTypedef" in text
 
-    def test_enumeration_str(self):
+    def test_enumeration_str(self) -> None:
         child = self._make_basetype(name="Child", datatype="UINT8", bits=8)
         item = self.factory.create_someip_parameter_enumeration_item(value=0, name="ZERO", desc="zero")
         enum = self.factory.create_someip_parameter_enumeration(name="TestEnum", items=[item], child=child)
@@ -1256,13 +1265,13 @@ class TestSOMEIPParameters:
         assert "TestEnum" in text
         assert "Enumeration" in text
 
-    def test_enumeration_item_str(self):
+    def test_enumeration_item_str(self) -> None:
         item = self.factory.create_someip_parameter_enumeration_item(value=5, name="VALUE_FIVE", desc="five")
         text = item.str(0)
         assert "VALUE_FIVE" in text
         assert "5:" in text
 
-    def test_union_str(self):
+    def test_union_str(self) -> None:
         union = self.factory.create_someip_parameter_union(
             name="TestUnion",
             length_of_length=1,
@@ -1274,7 +1283,7 @@ class TestSOMEIPParameters:
         assert "TestUnion" in text
         assert "Union" in text
 
-    def test_union_str_with_member(self):
+    def test_union_str_with_member(self) -> None:
         child = self._make_basetype()
         member = self.factory.create_someip_parameter_union_member(
             index=0,
@@ -1292,7 +1301,7 @@ class TestSOMEIPParameters:
         text = union.str(0)
         assert "UnionMember" in text
 
-    def test_union_member_str(self):
+    def test_union_member_str(self) -> None:
         child = self._make_basetype()
         member = self.factory.create_someip_parameter_union_member(
             index=0,
@@ -1303,7 +1312,7 @@ class TestSOMEIPParameters:
         text = member.str(0)
         assert "UnionMember" in text
 
-    def test_bitfield_str(self):
+    def test_bitfield_str(self) -> None:
         child = self._make_basetype(name="Child", datatype="UINT8", bits=8)
         item = self.factory.create_someip_parameter_bitfield_item(bit_number=0, name="Bit0")
         bitfield = self.factory.create_someip_parameter_bitfield(
@@ -1315,7 +1324,7 @@ class TestSOMEIPParameters:
         assert "TestBitfield" in text
         assert "Bitfield" in text
 
-    def test_bitfield_item_str(self):
+    def test_bitfield_item_str(self) -> None:
         item = self.factory.create_someip_parameter_bitfield_item(bit_number=3, name="Bit3")
         text = item.str(0)
         assert "Bit 3" in text
@@ -1325,10 +1334,10 @@ class TestSOMEIPParameters:
 class TestFactoryManagement:
     """Tests for SimpleConfigurationFactory service registry, IP config, and __str__."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
 
-    def test_add_service_and_get_without_minorver(self):
+    def test_add_service_and_get_without_minorver(self) -> None:
         service = self.factory.create_someip_service(
             name="Svc",
             serviceid=0xAAAA,
@@ -1341,7 +1350,7 @@ class TestFactoryManagement:
         )
         assert self.factory.get_service(0xAAAA, 1) is service
 
-    def test_add_service_and_get_with_minorver(self):
+    def test_add_service_and_get_with_minorver(self) -> None:
         service = self.factory.create_someip_service(
             name="Svc",
             serviceid=0xBBBB,
@@ -1354,11 +1363,11 @@ class TestFactoryManagement:
         )
         assert self.factory.get_service(0xBBBB, 2, 5) is service
 
-    def test_get_service_not_found_returns_none(self):
+    def test_get_service_not_found_returns_none(self) -> None:
         assert self.factory.get_service(0xDEAD, 1) is None
         assert self.factory.get_service(0xDEAD, 1, 0) is None
 
-    def test_add_service_duplicate_same_version(self, capsys):
+    def test_add_service_duplicate_same_version(self, capsys: Any) -> None:
         """Duplicate service ID+major+minor: add_service returns False and prints ERROR."""
         self.factory.create_someip_service(
             name="Svc1",
@@ -1370,12 +1379,12 @@ class TestFactoryManagement:
             fields={},
             eventgroups={},
         )
-        result = self.factory.add_service(0xCCCC, 1, 0, object())
+        result = self.factory.add_service(0xCCCC, 1, 0, object())  # type: ignore
         captured = capsys.readouterr()
         assert result is False
         assert "ERROR" in captured.out
 
-    def test_add_service_duplicate_major_different_minor(self, capsys):
+    def test_add_service_duplicate_major_different_minor(self, capsys: Any) -> None:
         """Same service ID+major but different minor: add_service returns False and prints ERROR."""
         self.factory.create_someip_service(
             name="Svc1",
@@ -1387,40 +1396,40 @@ class TestFactoryManagement:
             fields={},
             eventgroups={},
         )
-        result = self.factory.add_service(0xDDDD, 1, 1, object())
+        result = self.factory.add_service(0xDDDD, 1, 1, object())  # type: ignore
         captured = capsys.readouterr()
         assert result is False
         assert "ERROR" in captured.out
 
-    def test_ipv4_config(self):
+    def test_ipv4_config(self) -> None:
         self.factory.add_ipv4_address_config("10.0.0.1", "255.255.255.0")
         assert self.factory.get_ipv4_netmask("10.0.0.1") == "255.255.255.0"
 
-    def test_ipv4_config_unknown_returns_none(self):
+    def test_ipv4_config_unknown_returns_none(self) -> None:
         assert self.factory.get_ipv4_netmask("1.2.3.4") is None
 
-    def test_ipv6_config(self):
-        self.factory.add_ipv6_address_config("::1", 64)
-        assert self.factory.get_ipv6_prefix_length("::1") == 64
+    def test_ipv6_config(self) -> None:
+        self.factory.add_ipv6_address_config("::1", 64)  # type: ignore
+        assert self.factory.get_ipv6_prefix_length("::1") == 64  # type: ignore
 
-    def test_ipv6_config_unknown_returns_none(self):
+    def test_ipv6_config_unknown_returns_none(self) -> None:
         assert self.factory.get_ipv6_prefix_length("::2") is None
 
-    def test_ip_suffix_ipv4(self):
+    def test_ip_suffix_ipv4(self) -> None:
         self.factory.add_ipv4_address_config("192.168.1.1", "255.255.255.0")
         suffix = self.factory.get_ipv4_netmask_or_ipv6_prefix_length("192.168.1.1")
         assert suffix == "/255.255.255.0"
 
-    def test_ip_suffix_ipv6(self):
-        self.factory.add_ipv6_address_config("fe80::1", 64)
+    def test_ip_suffix_ipv6(self) -> None:
+        self.factory.add_ipv6_address_config("fe80::1", 64)  # type: ignore
         suffix = self.factory.get_ipv4_netmask_or_ipv6_prefix_length("fe80::1")
         assert suffix == "/64"
 
-    def test_ip_suffix_no_config(self):
+    def test_ip_suffix_no_config(self) -> None:
         suffix = self.factory.get_ipv4_netmask_or_ipv6_prefix_length("10.0.0.99")
         assert suffix == ""
 
-    def test_factory_str(self):
+    def test_factory_str(self) -> None:
         """str(factory) contains all major section headers and registered objects."""
         self.factory.create_someip_service(
             name="SvcStr",

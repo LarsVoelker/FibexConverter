@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """Tests for SOMEIP_Nonstandard_Netmask.xml — verifying that non-standard
 IPv4 netmasks (e.g. /25 = 255.255.255.128) are correctly preserved throughout
 the FIBEX → text and FIBEX → FLYNC conversion pipelines.
@@ -18,6 +19,7 @@ Topology used:
 
 import ipaddress
 from pathlib import Path
+from typing import Any, cast
 
 import pytest
 
@@ -42,7 +44,7 @@ NETMASK = "255.255.255.128"
 
 
 @pytest.fixture(scope="module")
-def text_factory():
+def text_factory() -> TextFactory:
     factory = TextFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(NONSTANDARD_NETMASK_FIBEX), verbose=False)
     factory.parsing_done()
@@ -50,7 +52,7 @@ def text_factory():
 
 
 @pytest.fixture(scope="module")
-def flync_factory():
+def flync_factory() -> FlyncFactory:
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(NONSTANDARD_NETMASK_FIBEX), verbose=False)
     factory.parsing_done()
@@ -63,26 +65,26 @@ def flync_factory():
 # ---------------------------------------------------------------------------
 
 
-def test_text_factory_get_ipv4_netmask_str(text_factory):
+def test_text_factory_get_ipv4_netmask_str(text_factory: TextFactory) -> None:
     """get_ipv4_netmask() must work when called with a plain string key."""
     assert text_factory.get_ipv4_netmask(PROVIDER_IP) == NETMASK
     assert text_factory.get_ipv4_netmask(CONSUMER_IP) == NETMASK
 
 
-def test_text_factory_get_ipv4_netmask_ipv4address(text_factory):
+def test_text_factory_get_ipv4_netmask_ipv4address(text_factory: TextFactory) -> None:
     """get_ipv4_netmask() must work when called with an IPv4Address object."""
-    assert text_factory.get_ipv4_netmask(ipaddress.IPv4Address(PROVIDER_IP)) == NETMASK
-    assert text_factory.get_ipv4_netmask(ipaddress.IPv4Address(CONSUMER_IP)) == NETMASK
+    assert text_factory.get_ipv4_netmask(cast("str", ipaddress.IPv4Address(PROVIDER_IP))) == NETMASK
+    assert text_factory.get_ipv4_netmask(cast("str", ipaddress.IPv4Address(CONSUMER_IP))) == NETMASK
 
 
-def test_flync_factory_get_ipv4_netmask_str(flync_factory):
+def test_flync_factory_get_ipv4_netmask_str(flync_factory: FlyncFactory) -> None:
     """FlyncFactory.get_ipv4_netmask() must work with a plain string key."""
     assert flync_factory.get_ipv4_netmask(PROVIDER_IP) == NETMASK
 
 
-def test_flync_factory_get_ipv4_netmask_ipv4address(flync_factory):
+def test_flync_factory_get_ipv4_netmask_ipv4address(flync_factory: FlyncFactory) -> None:
     """FlyncFactory.get_ipv4_netmask() must work with an IPv4Address object."""
-    assert flync_factory.get_ipv4_netmask(ipaddress.IPv4Address(PROVIDER_IP)) == NETMASK
+    assert flync_factory.get_ipv4_netmask(cast("str", ipaddress.IPv4Address(PROVIDER_IP))) == NETMASK
 
 
 # ---------------------------------------------------------------------------
@@ -90,7 +92,7 @@ def test_flync_factory_get_ipv4_netmask_ipv4address(flync_factory):
 # ---------------------------------------------------------------------------
 
 
-def test_text_output_provider_cidr(text_factory):
+def test_text_output_provider_cidr(text_factory: TextFactory) -> None:
     """Text output must include 10.10.10.10/255.255.255.128 for the provider."""
     text = str(text_factory)
     assert f"{PROVIDER_IP}/{NETMASK}" in text, f"Expected '{PROVIDER_IP}/{NETMASK}' in text output.\n" f"Got (relevant lines):\n" + "\n".join(
@@ -98,7 +100,7 @@ def test_text_output_provider_cidr(text_factory):
     )
 
 
-def test_text_output_consumer_cidr(text_factory):
+def test_text_output_consumer_cidr(text_factory: TextFactory) -> None:
     """Text output must include 10.10.10.11/255.255.255.128 for the consumer."""
     text = str(text_factory)
     assert f"{CONSUMER_IP}/{NETMASK}" in text, f"Expected '{CONSUMER_IP}/{NETMASK}' in text output."
@@ -109,22 +111,22 @@ def test_text_output_consumer_cidr(text_factory):
 # ---------------------------------------------------------------------------
 
 
-def _get_flync_addresses(flync_factory):
+def _get_flync_addresses(flync_factory: FlyncFactory) -> list[tuple[str, Any]]:
     """Collect (ecu_name, address_obj) tuples from built FLYNC ECUs."""
-    results = []
-    for ecu in flync_factory._SimpleConfigurationFactory__flync_ecus:
+    results: list[tuple[str, Any]] = []
+    for ecu in flync_factory.ecus():
         for ctrl in ecu.controllers:
-            for eth_iface in ctrl.ethernet_interfaces:
+            for eth_iface in ctrl.ethernet_interfaces or []:
                 iface = eth_iface.interface_config
                 if iface is None:
                     continue
-                for vi in iface.virtual_interfaces:
+                for vi in iface.virtual_interfaces or []:
                     for addr in vi.addresses:
                         results.append((ecu.name, addr))
     return results
 
 
-def test_flync_provider_netmask(flync_factory):
+def test_flync_provider_netmask(flync_factory: FlyncFactory) -> None:
     """FLYNC IPv4AddressEndpoint for provider must use 255.255.255.128."""
     addresses = _get_flync_addresses(flync_factory)
     provider_addrs = [addr for name, addr in addresses if name == "ECU_PROVIDER"]
@@ -134,7 +136,7 @@ def test_flync_provider_netmask(flync_factory):
     assert str(addr.ipv4netmask) == NETMASK, f"Expected netmask {NETMASK}, got {addr.ipv4netmask}. " "Likely falling back to default 255.255.255.0."
 
 
-def test_flync_consumer_netmask(flync_factory):
+def test_flync_consumer_netmask(flync_factory: FlyncFactory) -> None:
     """FLYNC IPv4AddressEndpoint for consumer must use 255.255.255.128."""
     addresses = _get_flync_addresses(flync_factory)
     consumer_addrs = [addr for name, addr in addresses if name == "ECU_CONSUMER"]
@@ -149,7 +151,7 @@ def test_flync_consumer_netmask(flync_factory):
 # ---------------------------------------------------------------------------
 
 
-def test_flync_model_creation_succeeds(tmp_path):
+def test_flync_model_creation_succeeds(tmp_path: Path) -> None:
     """Full FIBEX → FLYNC model creation must not raise any exception."""
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(NONSTANDARD_NETMASK_FIBEX), verbose=False)

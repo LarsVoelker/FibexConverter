@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """E2E full-text round-trip tests with --generate-switch-port-names enabled.
 
 Mirrors test_fibex_flync_full_text_roundtrip.py, but enables generated switch
@@ -8,6 +9,7 @@ round-trip.  Both the FIBEX→TEXT and FIBEX→FLYNC→TEXT outputs must remain
 identical when generated port names are used.
 """
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
@@ -25,7 +27,7 @@ SOMEIP_FILES = sorted(EXAMPLES_DIR.glob("*.xml"))
 
 
 @pytest.fixture(autouse=True)
-def _enable_generated_port_names():
+def _enable_generated_port_names() -> Iterator[None]:
     """Enable --generate-switch-port-names for both text and flync modules."""
     prev_text = configuration_to_text.g_gen_portid
     prev_flync = configuration_to_flync.g_gen_portid
@@ -38,14 +40,14 @@ def _enable_generated_port_names():
         configuration_to_flync.g_gen_portid = prev_flync
 
 
-def _parse_fibex_with_text_factory(fibex_path):
+def _parse_fibex_with_text_factory(fibex_path: Path) -> TextFactory:
     factory = TextFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(fibex_path), verbose=False)
     factory.parsing_done()
     return factory
 
 
-def _fibex_to_flync_workspace(fibex_path, tmp_path):
+def _fibex_to_flync_workspace(fibex_path: Path, tmp_path: Path) -> Path:
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(fibex_path), verbose=False)
     factory.parsing_done()
@@ -56,7 +58,7 @@ def _fibex_to_flync_workspace(fibex_path, tmp_path):
     return ws_dir
 
 
-def _parse_flync_with_text_factory(ws_dir):
+def _parse_flync_with_text_factory(ws_dir: Path) -> TextFactory:
     factory = TextFactory()
     FlyncParser().parse_dir(factory, str(ws_dir), verbose=False)
     factory.parsing_done()
@@ -64,7 +66,7 @@ def _parse_flync_with_text_factory(ws_dir):
 
 
 @pytest.mark.parametrize("fibex_file", SOMEIP_FILES, ids=lambda p: p.stem)
-def test_round_trip_full_text_with_generated_port_names(fibex_file, tmp_path):
+def test_round_trip_full_text_with_generated_port_names(fibex_file: Path, tmp_path: Path) -> None:
     """FIBEX→TEXT and FIBEX→FLYNC→TEXT must match with generated switch port names."""
 
     fibex_factory = _parse_fibex_with_text_factory(fibex_file)

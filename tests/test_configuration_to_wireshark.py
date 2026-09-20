@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """Unit tests for configuration_to_wireshark_config module."""
 
 from configuration_base_classes import BaseConfigurationFactory
@@ -7,11 +8,11 @@ from configuration_base_classes import BaseConfigurationFactory
 class TestWiresharkConfig:
     """Test cases for Wireshark configuration generation."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         """Set up test fixtures."""
         self.factory = BaseConfigurationFactory()
 
-    def test_create_socket(self):
+    def test_create_socket(self) -> None:
         """Test socket creation."""
         socket = self.factory.create_socket(
             name="Socket1",
@@ -28,13 +29,13 @@ class TestWiresharkConfig:
         assert socket.proto() == "udp"
         assert socket.portnumber() == 30000
 
-    def test_create_vlan(self):
+    def test_create_vlan(self) -> None:
         """Test VLAN creation."""
         vlan = self.factory.create_vlan("VLAN100", 100, 0)
         assert vlan.name() == "VLAN100"
         assert vlan.vlanid() == 100
 
-    def test_create_switch(self):
+    def test_create_switch(self) -> None:
         """Test switch creation."""
         ecu = self.factory.create_ecu("ECU1", [])
         switch = self.factory.create_switch("Switch1", ecu, [])
@@ -44,7 +45,7 @@ class TestWiresharkConfig:
 class TestWiresharkConfigHelper:
     """Test helper functions for Wireshark config."""
 
-    def test_format_ip_for_wireshark(self):
+    def test_format_ip_for_wireshark(self) -> None:
         """Test formatting IP addresses for Wireshark."""
         from configuration_base_classes import is_ip
 
@@ -53,7 +54,7 @@ class TestWiresharkConfigHelper:
         assert is_ip("10.0.0.1")
         assert is_ip("172.16.0.1")
 
-    def test_format_port_for_wireshark(self):
+    def test_format_port_for_wireshark(self) -> None:
         """Test port formatting."""
         # SOME/IP default ports
         default_ports = [30000, 30001, 30002, 30003]

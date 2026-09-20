@@ -16,3 +16,6 @@ for i in ${params} ; do
 	echo ""
 done
 
+echo "--> mypy"
+mypy .
+

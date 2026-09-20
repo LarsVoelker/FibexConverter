@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+
 """
 FIBEX XML Schema Validator
 
@@ -10,6 +11,7 @@ Move the 4.1.2 schema files into the 4.1.2 folder.
 
 import sys
 from pathlib import Path
+from typing import Any, cast
 
 from lxml import etree
 
@@ -37,7 +39,7 @@ def validate_xml_file(xml_path: Path, schema: etree.XMLSchema) -> tuple[bool, li
         if schema.validate(doc):
             return True, []
         else:
-            for error in schema.error_log:
+            for error in cast(Any, schema.error_log):
                 errors.append(f"Line {error.line}: {error.message} (Level: {error.level})")
             return False, errors
 
@@ -46,7 +48,7 @@ def validate_xml_file(xml_path: Path, schema: etree.XMLSchema) -> tuple[bool, li
         return False, errors
 
 
-def main():
+def main() -> None:
     """Main validation entry point."""
     base_dir = Path(__file__).parent
     xml_dir = base_dir / ".." / "examples"

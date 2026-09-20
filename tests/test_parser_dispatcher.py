@@ -1,7 +1,10 @@
 #!/usr/bin/python
+
 """Unit tests for parser_dispatcher module."""
 
+import argparse
 import os
+from typing import Any, cast
 
 import pytest
 
@@ -11,72 +14,72 @@ from parser_dispatcher import is_file_or_dir_valid, is_file_valid, parse_input_f
 class MockParser:
     """Mock parser object."""
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Init."""
-        self.msg = None
+        self.msg: str | None = None
 
-    def error(self, msg):
+    def error(self, msg: str) -> None:
         self.msg = msg
 
 
 class TestIsFileOrDirValid:
     """Test cases for is_file_or_dir_valid function."""
 
-    def test_existing_directory(self, tmpdir):
+    def test_existing_directory(self, tmpdir: Any) -> None:
         """Test with existing directory."""
         dir_path = tmpdir.mkdir("testdir")
-        result = is_file_or_dir_valid(None, str(dir_path))
+        result = is_file_or_dir_valid(cast(argparse.ArgumentParser, None), str(dir_path))
         assert result == str(dir_path)
 
-    def test_existing_file(self, tmpdir):
+    def test_existing_file(self, tmpdir: Any) -> None:
         """Test with existing file."""
         file_path = tmpdir.join("testfile.txt")
         file_path.write("content")
-        result = is_file_or_dir_valid(None, str(file_path))
+        result = is_file_or_dir_valid(cast(argparse.ArgumentParser, None), str(file_path))
         assert result == str(file_path)
 
-    def test_nonexistent_path(self, tmpdir):
+    def test_nonexistent_path(self, tmpdir: Any) -> None:
         """Test with nonexistent path."""
         mp = MockParser()
 
         path = str(tmpdir.join("nonexistent"))
-        is_file_or_dir_valid(mp, str(path))
+        is_file_or_dir_valid(cast(argparse.ArgumentParser, mp), str(path))
         assert mp.msg is not None
 
 
 class TestIsFileValid:
     """Test cases for is_file_valid function."""
 
-    def test_existing_file(self, tmpdir):
+    def test_existing_file(self, tmpdir: Any) -> None:
         """Test with existing file."""
         file_path = tmpdir.join("testfile.txt")
         file_path.write("content")
-        result = is_file_valid(None, str(file_path))
+        result = is_file_valid(cast(argparse.ArgumentParser, None), str(file_path))
         assert result == str(file_path)
 
-    def test_directory_instead_of_file(self, tmpdir):
+    def test_directory_instead_of_file(self, tmpdir: Any) -> None:
         """Test with directory instead of file."""
         dir_path = tmpdir.mkdir("testdir")
         assert os.path.exists(dir_path)
 
         mp = MockParser()
-        is_file_valid(mp, str(dir_path))
+        is_file_valid(cast(argparse.ArgumentParser, mp), str(dir_path))
         assert mp.msg is not None
 
-    def test_nonexistent_file(self, tmpdir):
+    def test_nonexistent_file(self, tmpdir: Any) -> None:
         """Test with nonexistent file."""
         path = str(tmpdir.join("nonexistent.txt"))
         assert not os.path.exists(path)
 
         mp = MockParser()
-        is_file_or_dir_valid(mp, str(path))
+        is_file_or_dir_valid(cast(argparse.ArgumentParser, mp), str(path))
         assert mp.msg is not None
 
 
 class TestParseInputFiles:
     """Test cases for parse_input_files function."""
 
-    def test_parse_directory_with_fibex_files(self, tmpdir):
+    def test_parse_directory_with_fibex_files(self, tmpdir: Any) -> None:
         """Test parsing a directory with FIBEX files."""
         # Create a directory with FIBEX XML files
         test_dir = tmpdir.mkdir("testproject")
@@ -96,7 +99,7 @@ class TestParseInputFiles:
         result = parse_input_files(filename=str(test_dir), t="FIBEX", conf_factory=factory, print_filename=True, verbose=False)
         assert result == str(test_dir)
 
-    def test_parse_single_file(self, tmpdir):
+    def test_parse_single_file(self, tmpdir: Any) -> None:
         """Test parsing a single file."""
         test_dir = tmpdir.mkdir("testproject")
         fibex_file = test_dir.join("test.xml")
@@ -117,7 +120,7 @@ class TestParseInputFiles:
         expected = str(test_dir.join("test"))
         assert result == expected
 
-    def test_parse_invalid_type(self, tmpdir):
+    def test_parse_invalid_type(self, tmpdir: Any) -> None:
         """Test parsing with invalid type."""
         file_path = tmpdir.join("test.xml")
         file_path.write("<root/>")
@@ -129,7 +132,7 @@ class TestParseInputFiles:
         with pytest.raises(SystemExit):
             parse_input_files(filename=str(file_path), t="INVALID", conf_factory=factory, print_filename=False, verbose=False)
 
-    def test_parse_nonexistent_file(self, tmpdir):
+    def test_parse_nonexistent_file(self, tmpdir: Any) -> None:
         """Test parsing nonexistent file."""
         from configuration_to_text import SimpleConfigurationFactory
 
@@ -138,7 +141,7 @@ class TestParseInputFiles:
         with pytest.raises(SystemExit):
             parse_input_files(filename=str(tmpdir.join("nonexistent.xml")), t="FIBEX", conf_factory=factory, print_filename=False, verbose=False)
 
-    def test_parse_directory_with_file_filter(self, tmpdir):
+    def test_parse_directory_with_file_filter(self, tmpdir: Any) -> None:
         """Test parsing with file filter."""
         test_dir = tmpdir.mkdir("testproject")
 

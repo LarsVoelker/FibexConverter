@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """Integration tests for FibexParser using real generated FIBEX files."""
 
 from pathlib import Path
@@ -18,18 +19,18 @@ SOMEIP_FILE = str(Path(__file__).parent.parent / "examples" / "SOMEIP_simple_ser
 class TestEthernetTopologyFibexParser:
     """Parse ethernet_topology.xml and verify ECU/channel/switch results."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
         self.parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
         self.parser.parse_file(self.factory, TOPOLOGY_FILE, verbose=False)
 
-    def test_ecus_parsed(self):
+    def test_ecus_parsed(self) -> None:
         """All nine ECUs (six endpoints + three switch hosts) must be found."""
         ecus = self.factory.__ecus__
         expected = {"ECU_A", "ECU_B", "ECU_C", "ECU_D", "ECU_E", "ECU_F", "ECU_SW1", "ECU_SW2", "ECU_SW3"}
         assert expected.issubset(set(ecus.keys()))
 
-    def test_channels_with_correct_vlan_ids(self):
+    def test_channels_with_correct_vlan_ids(self) -> None:
         """All five VLANs must be parsed with their numeric identifiers."""
         channels = self.parser.__channels__
         expected = {
@@ -50,17 +51,17 @@ class TestEthernetTopologyFibexParser:
             else:
                 assert False, f"Channel {chan_id} has no vlanid"
 
-    def test_vlan_channel_names(self):
+    def test_vlan_channel_names(self) -> None:
         """Channel short-names are stored correctly."""
         assert self.parser.__channels__["CHAN_VLAN10"]["name"] == "VLAN10"
         assert self.parser.__channels__["CHAN_VLAN20"]["name"] == "VLAN20"
 
-    def test_switch_present_in_factory(self):
+    def test_switch_present_in_factory(self) -> None:
         """All three switches must appear in the factory."""
         expected_switches = {"Switch1", "Switch2", "Switch3"}
         assert expected_switches.issubset(set(self.factory.__switches__.keys()))
 
-    def test_switch_has_expected_ports(self):
+    def test_switch_has_expected_ports(self) -> None:
         """Each switch must expose the expected number of coupling ports."""
         switch1 = self.factory.__switches__["Switch1"]
         assert len(switch1.__ports__) == 5
@@ -69,13 +70,13 @@ class TestEthernetTopologyFibexParser:
         switch3 = self.factory.__switches__["Switch3"]
         assert len(switch3.__ports__) == 3
 
-    def test_switch_is_associated_with_ecu(self):
+    def test_switch_is_associated_with_ecu(self) -> None:
         """Each switch must reference its host ECU."""
-        assert self.factory.__switches__["Switch1"].ecu().name() == "ECU_SW1"
-        assert self.factory.__switches__["Switch2"].ecu().name() == "ECU_SW2"
-        assert self.factory.__switches__["Switch3"].ecu().name() == "ECU_SW3"
+        assert self.factory.__switches__["Switch1"].ecu().name() == "ECU_SW1"  # type: ignore
+        assert self.factory.__switches__["Switch2"].ecu().name() == "ECU_SW2"  # type: ignore
+        assert self.factory.__switches__["Switch3"].ecu().name() == "ECU_SW3"  # type: ignore
 
-    def test_switch_ports_reference_ecu_controllers(self):
+    def test_switch_ports_reference_ecu_controllers(self) -> None:
         """Ports that connect to ECUs must have a non-None controller."""
         # Switch1: ports 1,2,4,5 have controllers (ECU_A, ECU_B, ECU_C, Switch1_Mgmt) => 4
         switch1 = self.factory.__switches__["Switch1"]
@@ -90,7 +91,7 @@ class TestEthernetTopologyFibexParser:
         ctrls3 = [p.__ctrl__ for p in switch3.__ports__ if p.__ctrl__ is not None]
         assert len(ctrls3) == 2
 
-    def test_switch_port_controller_names(self):
+    def test_switch_port_controller_names(self) -> None:
         """Switch port controllers must match the expected ECU controller short-names."""
         switch1 = self.factory.__switches__["Switch1"]
         names1 = {p.__ctrl__.name() for p in switch1.__ports__ if p.__ctrl__ is not None}
@@ -113,91 +114,91 @@ class TestEthernetTopologyFibexParser:
 class TestSomeIPServiceFibexParser:
     """Parse someip_service.xml and verify service/instance results."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory = SimpleConfigurationFactory()
         self.parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
         self.parser.parse_file(self.factory, SOMEIP_FILE, verbose=False)
 
     # --- Service interface ---
 
-    def test_service_is_parsed(self):
+    def test_service_is_parsed(self) -> None:
         """The SVC_ECHO service interface must be present in parser state."""
         assert len(self.parser.__services__) > 0
         assert "SVC_ECHO" in self.parser.__services__
 
-    def test_service_id(self):
+    def test_service_id(self) -> None:
         """Service identifier must be 0x1234 (4660 decimal)."""
         service = self.parser.__services__["SVC_ECHO"]
         assert service.serviceid() == 0x1234
 
-    def test_service_version(self):
+    def test_service_version(self) -> None:
         """Service version must be major=1, minor=0."""
         service = self.parser.__services__["SVC_ECHO"]
         assert service.__major__ == 1
         assert service.__minor__ == 0
 
-    def test_service_has_method_getvalue(self):
+    def test_service_has_method_getvalue(self) -> None:
         """GetValue method (id=1) must be present in the service."""
         service = self.parser.__services__["SVC_ECHO"]
         assert 1 in service.methods()
 
-    def test_method_getvalue_name(self):
+    def test_method_getvalue_name(self) -> None:
         """GetValue method must have the correct short-name."""
         service = self.parser.__services__["SVC_ECHO"]
         assert service.methods()[1].name() == "GetValue"
 
-    def test_method_getvalue_call_type(self):
+    def test_method_getvalue_call_type(self) -> None:
         """GetValue must be REQUEST_RESPONSE."""
         service = self.parser.__services__["SVC_ECHO"]
         assert service.methods()[1].calltype() == "REQUEST_RESPONSE"
 
-    def test_service_has_event_status(self):
+    def test_service_has_event_status(self) -> None:
         """StatusEvent (id=0x8001 = 32769) must be present in the service."""
         service = self.parser.__services__["SVC_ECHO"]
         assert 0x8001 in service.events()
 
-    def test_event_status_name(self):
+    def test_event_status_name(self) -> None:
         """StatusEvent must have the correct short-name."""
         service = self.parser.__services__["SVC_ECHO"]
         assert service.events()[0x8001].name() == "StatusEvent"
 
     # --- Service instances ---
 
-    def test_provider_service_instance_created(self):
+    def test_provider_service_instance_created(self) -> None:
         """PSI_ECHO must produce a service instance in the parser."""
         assert "PSI_ECHO" in self.parser.__ServiceInstances__
 
-    def test_provider_instance_id(self):
+    def test_provider_instance_id(self) -> None:
         """Provided service instance must have instance-id=1."""
         si = self.parser.__ServiceInstances__["PSI_ECHO"]
         assert si.instanceid() == 1
 
-    def test_provider_instance_references_service(self):
+    def test_provider_instance_references_service(self) -> None:
         """Service instance must reference the correct service."""
         si = self.parser.__ServiceInstances__["PSI_ECHO"]
         assert si.service().serviceid() == 0x1234
 
     # --- ECUs ---
 
-    def test_provider_ecu_parsed(self):
+    def test_provider_ecu_parsed(self) -> None:
         """ECU_PROVIDER must appear in the factory ECU registry."""
         assert "ECU_PROVIDER" in self.factory.__ecus__
 
-    def test_consumer_ecu_parsed(self):
+    def test_consumer_ecu_parsed(self) -> None:
         """ECU_CONSUMER must appear in the factory ECU registry."""
         assert "ECU_CONSUMER" in self.factory.__ecus__
 
-    def test_provider_ecu_has_one_controller(self):
+    def test_provider_ecu_has_one_controller(self) -> None:
         """ECU_PROVIDER must have exactly one controller."""
         ecu = self.factory.__ecus__["ECU_PROVIDER"]
         assert len(ecu.controllers()) == 1
 
-    def test_consumer_ecu_has_one_controller(self):
+    def test_consumer_ecu_has_one_controller(self) -> None:
         """ECU_CONSUMER must have exactly one controller."""
         ecu = self.factory.__ecus__["ECU_CONSUMER"]
         assert len(ecu.controllers()) == 1
 
-    def test_channel_has_correct_vlan(self):
+    def test_channel_has_correct_vlan(self) -> None:
         """CHAN_VLAN100 must have VLAN identifier 100."""
         assert "CHAN_VLAN100" in self.parser.__channels__
         assert self.parser.__channels__["CHAN_VLAN100"]["vlanid"] == "100"

@@ -19,24 +19,26 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import argparse
 import glob
 import os.path
 import sys
 
+from configuration_base_classes import BaseConfigurationFactory
 from fibex_parser import FibexParser
 from flync_parser import FlyncParser
 
-parser_formats = ["FIBEX", "FLYNC"]
+parser_formats: list[str] = ["FIBEX", "FLYNC"]
 
 
-def is_file_or_dir_valid(parser, arg):
+def is_file_or_dir_valid(parser: argparse.ArgumentParser, arg: str) -> str:
     if not os.path.exists(arg):
         parser.error(f"File or directory does not exist: {arg}")
 
     return arg
 
 
-def is_file_valid(parser, arg):
+def is_file_valid(parser: argparse.ArgumentParser, arg: str) -> str:
     if not os.path.isfile(arg):
         parser.error(f"File does not exist: {arg}")
 
@@ -44,22 +46,22 @@ def is_file_valid(parser, arg):
 
 
 def parse_input_files(
-    filename,
-    t,
-    conf_factory,
-    plugin_file=None,
-    ecu_name_replacement=None,
-    print_filename=True,
-    file_filter="",
-    verbose=False,
-):
+    filename: str,
+    t: str,
+    conf_factory: BaseConfigurationFactory,
+    plugin_file: str | None = None,
+    ecu_name_replacement: dict[str, str] | None = None,
+    print_filename: bool = True,
+    file_filter: str = "",
+    verbose: bool = False,
+) -> str | None:
     if t.upper() == "FLYNC":
         if not os.path.isdir(filename):
             print(f"FLYNC type requires a workspace directory, not a file: {filename}")
             sys.exit(-2)
         output_dir = filename.rstrip(os.sep) + "_output"
-        parser = FlyncParser()
-        parser.parse_dir(conf_factory, filename, verbose=verbose)
+        flync_parser: FlyncParser = FlyncParser()
+        flync_parser.parse_dir(conf_factory, filename, verbose=verbose)
         conf_factory.parsing_done()
         return output_dir
 
@@ -81,11 +83,11 @@ def parse_input_files(
         return None
 
     if t.upper() == "FIBEX":
-        parser = FibexParser(plugin_file, ecu_name_replacement)
+        fb_parser: FibexParser = FibexParser(plugin_file, ecu_name_replacement)
         for f in files:
             if print_filename:
                 print(f"\nFile: {f}")
-            parser.parse_file(conf_factory, f, verbose=verbose)
+            fb_parser.parse_file(conf_factory, f, verbose=verbose)
     else:
         print(f"Type {t} not known/supported!")
         sys.exit(-2)

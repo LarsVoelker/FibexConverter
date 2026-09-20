@@ -1,4 +1,7 @@
 #!/usr/bin/python
+
+from typing import Any
+
 """Integration tests for configuration_to_text using real generated FIBEX files."""
 
 from pathlib import Path
@@ -14,7 +17,7 @@ TOPOLOGY_FILE = str(Path(__file__).parent.parent / "examples" / "Ethernet_Topolo
 SOMEIP_FILE = str(Path(__file__).parent.parent / "examples" / "SOMEIP_simple_service.xml")
 
 
-def _parse(filepath):
+def _parse(filepath: Any) -> Any:
     factory = SimpleConfigurationFactory()
     parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
     parser.parse_file(factory, filepath, verbose=False)
@@ -29,31 +32,31 @@ def _parse(filepath):
 class TestEthernetTopologyTextOutput:
     """Verify str(factory) content after parsing ethernet_topology.xml."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory, self.text = _parse(TOPOLOGY_FILE)
 
-    def test_ecu_a_in_output(self):
+    def test_ecu_a_in_output(self) -> None:
         assert "ECU_A" in self.text
 
-    def test_ecu_b_in_output(self):
+    def test_ecu_b_in_output(self) -> None:
         assert "ECU_B" in self.text
 
-    def test_ecu_c_in_output(self):
+    def test_ecu_c_in_output(self) -> None:
         assert "ECU_C" in self.text
 
-    def test_ecu_switch_in_output(self):
+    def test_ecu_switch_in_output(self) -> None:
         """Switch hosting ECUs must appear in the output."""
         assert "ECU_SW1" in self.text
         assert "ECU_SW2" in self.text
         assert "ECU_SW3" in self.text
 
-    def test_ecus_section_present(self):
+    def test_ecus_section_present(self) -> None:
         assert "ECUs:" in self.text
 
-    def test_ethernet_topology_section_present(self):
+    def test_ethernet_topology_section_present(self) -> None:
         assert "Ethernet Topology:" in self.text
 
-    def test_switch_in_topology_section(self):
+    def test_switch_in_topology_section(self) -> None:
         """All switches must appear inside the Ethernet Topology section."""
         topology_idx = self.text.index("Ethernet Topology:")
         section = self.text[topology_idx:]
@@ -61,29 +64,29 @@ class TestEthernetTopologyTextOutput:
         assert "Switch2" in section
         assert "Switch3" in section
 
-    def test_vlan10_in_output(self):
+    def test_vlan10_in_output(self) -> None:
         """VLAN10 channel name must appear in the Channels section."""
         assert "VLAN10" in self.text
 
-    def test_vlan18_in_output(self):
+    def test_vlan18_in_output(self) -> None:
         """VLAN18 channel name must appear in the Channels section."""
         assert "VLAN18" in self.text
 
-    def test_channels_section_present(self):
+    def test_channels_section_present(self) -> None:
         assert "Channels/Busses/VLANs:" in self.text
 
-    def test_switch_ports_listed(self):
+    def test_switch_ports_listed(self) -> None:
         """SwitchPort entries must appear for each of the three ports."""
         assert self.text.count("SwitchPort") >= 3
 
-    def test_switch_port_references_ecu_a_controller(self):
+    def test_switch_port_references_ecu_a_controller(self) -> None:
         """Text must mention ECU_A's controller name near the switch."""
         assert "ECU_A_Ctrl" in self.text
 
-    def test_switch_port_references_ecu_b_controller(self):
+    def test_switch_port_references_ecu_b_controller(self) -> None:
         assert "ECU_B_Ctrl" in self.text
 
-    def test_switch_port_references_ecu_c_controller(self):
+    def test_switch_port_references_ecu_c_controller(self) -> None:
         assert "ECU_C_Ctrl" in self.text
 
 
@@ -95,49 +98,49 @@ class TestEthernetTopologyTextOutput:
 class TestSomeIPServiceTextOutput:
     """Verify str(factory) content after parsing someip_service.xml."""
 
-    def setup_method(self):
+    def setup_method(self) -> None:
         self.factory, self.text = _parse(SOMEIP_FILE)
 
-    def test_services_section_present(self):
+    def test_services_section_present(self) -> None:
         assert "Services:" in self.text
 
-    def test_service_name_in_output(self):
+    def test_service_name_in_output(self) -> None:
         """SVC_ECHO service name must appear in the Services section."""
         assert "SVC_ECHO" in self.text
 
-    def test_service_id_in_output(self):
+    def test_service_id_in_output(self) -> None:
         """Service ID 0x1234 must appear in the formatted output."""
         assert "0x1234" in self.text
 
-    def test_method_name_in_output(self):
+    def test_method_name_in_output(self) -> None:
         """GetValue method name must be listed under the service."""
         assert "GetValue" in self.text
 
-    def test_event_name_in_output(self):
+    def test_event_name_in_output(self) -> None:
         """StatusEvent name must be listed under the service."""
         assert "StatusEvent" in self.text
 
-    def test_ecus_section_present(self):
+    def test_ecus_section_present(self) -> None:
         assert "ECUs:" in self.text
 
-    def test_provider_ecu_in_output(self):
+    def test_provider_ecu_in_output(self) -> None:
         assert "ECU_PROVIDER" in self.text
 
-    def test_consumer_ecu_in_output(self):
+    def test_consumer_ecu_in_output(self) -> None:
         assert "ECU_CONSUMER" in self.text
 
-    def test_provider_ip_in_output(self):
+    def test_provider_ip_in_output(self) -> None:
         """Provider IP address must appear in the ECU/socket section."""
         assert "192.168.1.1" in self.text
 
-    def test_consumer_ip_in_output(self):
+    def test_consumer_ip_in_output(self) -> None:
         """Consumer IP address must appear in the ECU/socket section."""
         assert "192.168.1.2" in self.text
 
-    def test_service_instance_in_output(self):
+    def test_service_instance_in_output(self) -> None:
         """ServiceInstance entry must appear in the socket section."""
         assert "ServiceInstance" in self.text
 
-    def test_vlan100_in_output(self):
+    def test_vlan100_in_output(self) -> None:
         """VLAN100 channel must appear in the Channels section."""
         assert "VLAN100" in self.text

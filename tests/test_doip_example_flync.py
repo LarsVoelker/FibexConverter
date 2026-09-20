@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """Tests for DoIP_example.xml — a single ECU on untagged Ethernet with TCP:13400.
 
 Scenario:
@@ -17,6 +18,7 @@ from pathlib import Path
 
 import pytest
 
+from configuration_base_classes import BaseSocket
 from configuration_to_flync import SimpleConfigurationFactory as FlyncFactory
 from fibex_parser import FibexParser
 
@@ -30,7 +32,7 @@ DOIP_FIBEX = EXAMPLES_DIR / "DoIP_example.xml"
 
 
 @pytest.fixture(scope="module")
-def flync_factory():
+def flync_factory() -> FlyncFactory:
     """Parse DoIP_example.xml and convert to FLYNC, returning the FlyncFactory."""
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(DOIP_FIBEX), verbose=False)
@@ -39,9 +41,9 @@ def flync_factory():
     return factory
 
 
-def _doip_sockets(flync_factory):
+def _doip_sockets(flync_factory: FlyncFactory) -> list[BaseSocket]:
     """Return all base-level sockets belonging to ECU_DOIP."""
-    sockets = []
+    sockets: list[BaseSocket] = []
     ecu = flync_factory.base_ecus().get("ECU_DOIP")
     if ecu is None:
         return sockets
@@ -56,7 +58,7 @@ def _doip_sockets(flync_factory):
 # ---------------------------------------------------------------------------
 
 
-def test_parse_completes_without_exception():
+def test_parse_completes_without_exception() -> None:
     """parse_file() must not raise for DoIP_example.xml."""
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(DOIP_FIBEX), verbose=False)
@@ -68,7 +70,7 @@ def test_parse_completes_without_exception():
 # ---------------------------------------------------------------------------
 
 
-def test_doip_ecu_has_one_socket(flync_factory):
+def test_doip_ecu_has_one_socket(flync_factory: FlyncFactory) -> None:
     """ECU_DOIP must have exactly one socket (AEP_DOIP on TCP:13400)."""
     sockets = _doip_sockets(flync_factory)
     assert len(sockets) == 1, f"Expected 1 socket, got {len(sockets)}: {[s.portnumber() for s in sockets]}"
@@ -79,7 +81,7 @@ def test_doip_ecu_has_one_socket(flync_factory):
 # ---------------------------------------------------------------------------
 
 
-def test_doip_socket_is_tcp_port_13400(flync_factory):
+def test_doip_socket_is_tcp_port_13400(flync_factory: FlyncFactory) -> None:
     """The single socket must use TCP protocol on port 13400."""
     sockets = _doip_sockets(flync_factory)
     sock = next(iter(sockets), None)
@@ -93,7 +95,7 @@ def test_doip_socket_is_tcp_port_13400(flync_factory):
 # ---------------------------------------------------------------------------
 
 
-def test_doip_interface_has_no_vlan(flync_factory):
+def test_doip_interface_has_no_vlan(flync_factory: FlyncFactory) -> None:
     """The Ethernet interface must report vlanid == 0 (untagged channel)."""
     ecu = flync_factory.base_ecus().get("ECU_DOIP")
     assert ecu is not None, "ECU_DOIP not found"
@@ -107,7 +109,7 @@ def test_doip_interface_has_no_vlan(flync_factory):
 # ---------------------------------------------------------------------------
 
 
-def test_doip_socket_has_no_services(flync_factory):
+def test_doip_socket_has_no_services(flync_factory: FlyncFactory) -> None:
     """The DoIP socket must carry no SOME/IP service instances."""
     sockets = _doip_sockets(flync_factory)
     sock = next(iter(sockets), None)

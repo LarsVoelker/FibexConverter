@@ -1,4 +1,7 @@
 #!/usr/bin/python
+
+from typing import Any
+
 """Smoke tests: run every configuration_to_* tool against every example XML file.
 
 Each test verifies only that the tool exits with return code 0.  The input file
@@ -28,17 +31,17 @@ TOOLS = [
 EXAMPLE_FILES = sorted(EXAMPLES_DIR.glob("*.xml"))
 
 
-def _tool_ids():
+def _tool_ids() -> Any:
     return [Path(t).stem for t in TOOLS]
 
 
-def _file_ids():
+def _file_ids() -> Any:
     return [f.name for f in EXAMPLE_FILES]
 
 
 @pytest.mark.parametrize("example_file", EXAMPLE_FILES, ids=_file_ids())
 @pytest.mark.parametrize("tool", TOOLS, ids=_tool_ids())
-def test_tool_exits_cleanly(tool, example_file):
+def test_tool_exits_cleanly(tool: Any, example_file: Any) -> None:
     """Each tool must exit with code 0 on every example file."""
     with tempfile.TemporaryDirectory() as tmp_dir:
         tmp_file = Path(tmp_dir) / example_file.name

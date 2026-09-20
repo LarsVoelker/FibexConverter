@@ -1,4 +1,5 @@
 #!/usr/bin/python
+
 """IPv6-specific tests for SOMEIP_IPv6_service.xml.
 
 Verifies that:
@@ -9,6 +10,7 @@ Verifies that:
 
 import ipaddress
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -24,7 +26,7 @@ IPV6_FIBEX = EXAMPLES_DIR / "SOMEIP_IPv6_service.xml"
 
 
 @pytest.fixture(scope="module")
-def flync_factory():
+def flync_factory() -> FlyncFactory:
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(IPV6_FIBEX), verbose=False)
     factory.parsing_done()
@@ -33,7 +35,7 @@ def flync_factory():
 
 
 @pytest.fixture(scope="module")
-def text_factory():
+def text_factory() -> TextFactory:
     factory = TextFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(IPV6_FIBEX), verbose=False)
     factory.parsing_done()
@@ -45,12 +47,12 @@ def text_factory():
 # ---------------------------------------------------------------------------
 
 
-def test_ipv6_prefix_length_provider(flync_factory):
+def test_ipv6_prefix_length_provider(flync_factory: FlyncFactory) -> None:
     prefix = flync_factory.get_ipv6_prefix_length("2001:db8::1")
     assert prefix == "64", f"Expected prefix '64', got {prefix!r}"
 
 
-def test_ipv6_prefix_length_consumer(flync_factory):
+def test_ipv6_prefix_length_consumer(flync_factory: FlyncFactory) -> None:
     prefix = flync_factory.get_ipv6_prefix_length("2001:db8::2")
     assert prefix == "64", f"Expected prefix '64', got {prefix!r}"
 
@@ -60,22 +62,22 @@ def test_ipv6_prefix_length_consumer(flync_factory):
 # ---------------------------------------------------------------------------
 
 
-def _get_all_addresses(flync_factory):
+def _get_all_addresses(flync_factory: FlyncFactory) -> list[tuple[str, Any, Any]]:
     """Collect all (ecu_name, ip_obj, prefix) tuples from built FLYNC ECUs."""
-    results = []
-    for ecu in flync_factory._SimpleConfigurationFactory__flync_ecus:
+    results: list[tuple[str, Any, Any]] = []
+    for ecu in flync_factory.ecus():
         for ctrl in ecu.controllers:
-            for eth_iface in ctrl.ethernet_interfaces:
+            for eth_iface in ctrl.ethernet_interfaces or []:
                 iface = eth_iface.interface_config
                 if iface is None:
                     continue
-                for vi in iface.virtual_interfaces:
+                for vi in iface.virtual_interfaces or []:
                     for addr in vi.addresses:
                         results.append((ecu.name, addr.address, getattr(addr, "ipv6prefix", None)))
     return results
 
 
-def test_provider_ipv6_address(flync_factory):
+def test_provider_ipv6_address(flync_factory: FlyncFactory) -> None:
     addresses = _get_all_addresses(flync_factory)
     provider_addrs = [(ip, pfx) for name, ip, pfx in addresses if name == "ECU_PROVIDER6"]
     assert provider_addrs, "No addresses found for ECU_PROVIDER6"
@@ -85,7 +87,7 @@ def test_provider_ipv6_address(flync_factory):
     assert pfx == 64
 
 
-def test_consumer_ipv6_address(flync_factory):
+def test_consumer_ipv6_address(flync_factory: FlyncFactory) -> None:
     addresses = _get_all_addresses(flync_factory)
     consumer_addrs = [(ip, pfx) for name, ip, pfx in addresses if name == "ECU_CONSUMER6"]
     assert consumer_addrs, "No addresses found for ECU_CONSUMER6"
@@ -100,12 +102,12 @@ def test_consumer_ipv6_address(flync_factory):
 # ---------------------------------------------------------------------------
 
 
-def test_text_output_contains_provider_cidr(text_factory):
+def test_text_output_contains_provider_cidr(text_factory: TextFactory) -> None:
     text = str(text_factory)
     assert "2001:db8::1/64" in text, "Expected '2001:db8::1/64' in text output"
 
 
-def test_text_output_contains_consumer_cidr(text_factory):
+def test_text_output_contains_consumer_cidr(text_factory: TextFactory) -> None:
     text = str(text_factory)
     assert "2001:db8::2/64" in text, "Expected '2001:db8::2/64' in text output"
 
@@ -115,7 +117,7 @@ def test_text_output_contains_consumer_cidr(text_factory):
 # ---------------------------------------------------------------------------
 
 
-def test_flync_model_creation_succeeds(tmp_path):
+def test_flync_model_creation_succeeds(tmp_path: Path) -> None:
     """Full FIBEX → FLYNC model creation must not raise any exception."""
     factory = FlyncFactory()
     FibexParser(plugin_file=None, ecu_name_replacement=None).parse_file(factory, str(IPV6_FIBEX), verbose=False)

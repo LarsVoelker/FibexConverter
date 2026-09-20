@@ -1,4 +1,7 @@
 #!/usr/bin/python
+
+from typing import Any
+
 """Validate that all FIBEX XML example files pass schema validation.
 
 These tests are skipped when the FIBEX 4.1.2 XSD schemas are absent from
@@ -26,7 +29,7 @@ _xml_files = sorted(EXAMPLES_DIR.glob("*.xml"))
 
 
 @pytest.fixture(scope="module")
-def schema():
+def schema() -> Any:
     etree = pytest.importorskip("lxml.etree")
     with open(SCHEMA_PATH, "rb") as f:
         schema_doc = etree.parse(f)
@@ -34,7 +37,7 @@ def schema():
 
 
 @pytest.mark.parametrize("xml_file", _xml_files, ids=[f.name for f in _xml_files])
-def test_xml_schema_valid(xml_file, schema):
+def test_xml_schema_valid(xml_file: Any, schema: Any) -> None:
     """Each example XML file must validate against the FIBEX 4.1.2 XSD schema."""
     from lxml import etree
 
