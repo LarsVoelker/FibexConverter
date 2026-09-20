@@ -22,6 +22,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os.path
 import time
 from typing import Any, Protocol, TextIO, cast
@@ -57,12 +58,13 @@ from configuration_base_classes import (
 )
 from parser_dispatcher import is_file_or_dir_valid, is_file_valid, parse_input_files, parser_formats
 
+logger = logging.getLogger(__name__)
+
 g_gen_portid: bool = False
 
 
 class _PeachDatatype(Protocol):
     def peachout(self, f: TextIO, *args: Any) -> None: ...
-
 
 class PeachConfigurationFactory(BaseConfigurationFactory):
     def __init__(self) -> None:
@@ -88,8 +90,7 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
         eventgroups: dict[int, SOMEIPBaseServiceEventgroup],
     ) -> SOMEIPBaseService:
         ret = SOMEIPBaseService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
-        print("Adding Service(ID: 0x%04x Ver: %d.%d)" % (serviceid, majorver, minorver))
-        #        assert(self.add_service(serviceid, majorver, minorver, ret))
+        logger.debug("Adding Service(Name: %s ID: 0x%04x Ver: %d.%d)", name, serviceid, majorver, minorver)
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 

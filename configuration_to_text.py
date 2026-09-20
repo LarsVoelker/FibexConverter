@@ -1,7 +1,7 @@
 #!/usr/bin/python
 
 # Automotive configuration file scripts
-# Copyright (C) 2015-2026  Dr. Lars Voelker
+# Copyright (C) 2015-2025  Dr. Lars Voelker
 # Copyright (C) 2018-2019  Dr. Lars Voelker, BMW AG
 # Copyright (C) 2020-2025  Dr. Lars Voelker, Technica Engineering GmbH
 
@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import ipaddress
+import logging
 import os.path
 import time
 from typing import Any, cast
@@ -90,8 +91,10 @@ g_gen_portid = False
 g_show_datatype = False
 g_skip_signal_based_communication = False
 
+logger = logging.getLogger(__name__)
 
 class SimpleConfigurationFactory(BaseConfigurationFactory):
+    """Factory for creating configuration objects with text output formatting."""
 
     def __init__(self) -> None:
         self.__services__: dict[str, SOMEIPService] = dict()
@@ -151,10 +154,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         channel = self.__channels__.setdefault(name, {})
         frame_triggerings = channel.setdefault("frametriggerings", {})
 
-        for key, value in input_frame_trigs.items():
-            frame_triggerings[key] = value
-        for key, value in output_frame_trigs.items():
-            frame_triggerings[key] = value
+        frame_triggerings.update(input_frame_trigs)
+        frame_triggerings.update(output_frame_trigs)
 
         return ret
 
@@ -490,9 +491,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         if short_name in self.__frames__:
             i = 1
             tmp_name = f"{short_name}__duplicate{i}"
-            while i == 1 or tmp_name in self.__frames__:
-                tmp_name = f"{short_name}__duplicate{i}"
+            while tmp_name in self.__frames__:
                 i += 1
+                tmp_name = f"{short_name}__duplicate{i}"
 
             short_name = tmp_name
 
@@ -520,7 +521,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         sid = f"{serviceid:04x}-{majorver:02x}-{minorver:08x}"
         if sid in self.__services_long__:
             print(
-                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, " + f"Minor-Ver: {minorver:d}) already exists! Not overriding it!"
+                f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver:d}, "
+                + f"Minor-Ver: {minorver:d}) already exists! Not overriding it!"
             )
             return False
 
@@ -540,16 +542,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     def get_service(self, serviceid: int, majorver: int, minorver: int | None = None) -> SOMEIPService | None:
         if minorver is None:
             sid = f"{serviceid:04x}-{majorver:02x}"
-            if sid in self.__services__:
-                return self.__services__[sid]
-            else:
-                return None
+            return self.__services__.get(sid)
         else:
             sid = f"{serviceid:04x}-{majorver:02x}-{minorver:08x}"
-            if sid in self.__services_long__:
-                return self.__services_long__[sid]
-            else:
-                return None
+            return self.__services_long__.get(sid)
 
     def add_ipv4_address_config(self, ip: str, netmask: str) -> None:
         self.__ipv4_netmasks__[ip] = netmask
@@ -625,6 +621,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
 
 class Switch(BaseSwitch):
+    """Switch representation with text formatting."""
+
     def str(self, indent: int, factory: SimpleConfigurationFactory, print_ecu_name: bool = False) -> str:
         ret = indent * " "
         tmp = f" of ECU {self.__ecu__.name()}" if self.__ecu__ is not None and print_ecu_name else ""
@@ -635,6 +633,8 @@ class Switch(BaseSwitch):
 
 
 class SwitchPort(BaseSwitchPort):
+    """Switch port representation with text formatting."""
+
     def str_vlans(self, indent: int) -> str:
         ret = ""
 
@@ -665,6 +665,8 @@ class SwitchPort(BaseSwitchPort):
 
 
 class ECU(BaseECU):
+    """ECU representation with text formatting."""
+
     def str(self, indent: int, factory: SimpleConfigurationFactory) -> str:
         ret = indent * " "
         ret += f"ECU {self.__name__}\n"
@@ -679,6 +681,8 @@ class ECU(BaseECU):
 
 
 class Controller(BaseController):
+    """Controller representation with text formatting."""
+
     def str(self, indent: int, factory: SimpleConfigurationFactory) -> str:
         ret = indent * " "
         ret += f"CTRL {self.__name__}\n"
@@ -689,6 +693,8 @@ class Controller(BaseController):
 
 
 class Interface(BaseInterface):
+    """Interface representation with text formatting."""
+
     def str(self, indent: int, factory: SimpleConfigurationFactory) -> str:
         ret = indent * " "
 
@@ -708,13 +714,13 @@ class Interface(BaseInterface):
         for s in sorted(cast(list[Socket], self.__sockets__), key=lambda x: (ip_to_key(x.ip()), x.portnumber())):
             ret += s.str(indent + 2)
 
-        if self.__frame_triggerings_in__ is not None and len(self.__frame_triggerings_in__.keys()) > 0:
+        if self.__frame_triggerings_in__ is not None and len(self.__frame_triggerings_in__) > 0:
             ret += (indent + 2) * " "
             ret += "Input Frames:\n"
             for key in sorted(self.__frame_triggerings_in__.keys()):
                 ret += cast(FrameTriggeringCAN | FrameTriggeringFlexRay, self.__frame_triggerings_in__[key]).str(indent + 4)
 
-        if self.__frame_triggerings_out__ is not None and len(self.__frame_triggerings_out__.keys()) > 0:
+        if self.__frame_triggerings_out__ is not None and len(self.__frame_triggerings_out__) > 0:
             ret += (indent + 2) * " "
             ret += "Output Frames:\n"
             for key in sorted(self.__frame_triggerings_out__.keys()):
@@ -724,6 +730,8 @@ class Interface(BaseInterface):
 
 
 class Socket(BaseSocket):
+    """Socket representation with text formatting."""
+
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += f"Socket {self.__name__} {self.__ip__}:{self.__portnumber__}/{self.__proto__}\n"
@@ -797,6 +805,8 @@ class SOMEIPServiceEventgroupReceiver(SOMEIPBaseServiceEventgroupReceiver):
 
 
 class SOMEIPService(SOMEIPBaseService):
+    """SOME/IP service representation with text formatting."""
+
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += f"Service {self.__name__} (id: 0x{self.__serviceid__:04x} ver: {self.__major__:d}.{self.__minor__:d})\n"
@@ -917,6 +927,8 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
 
 
 class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
+    """SOME/IP service eventgroup representation with text formatting."""
+
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += f"Eventgroup {self.__name__} (id: 0x{self.__id__:04x})\n"
@@ -944,7 +956,7 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
                 else:
                     first = False
                 if fid is None:
-                    print(f"ERROR: Field is referenced to Eventgroup {self.__name__} but does not have a Notifier!")
+                    logger.error("Field is referenced to Eventgroup %s but does not have a Notifier!", self.__name__)
                     ret += "None"
                 else:
                     ret += f"0x{fid:04x}"
@@ -1031,7 +1043,7 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
                 if member is not None:
                     ret += cast(SOMEIPParameterStructMember, member).str(indent + 2)
                 else:
-                    print("ERROR: struct member == None!")
+                    logger.error("Struct member is None at position %s", m)
 
         return ret
 
@@ -1088,7 +1100,7 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
                 if member is not None:
                     ret += cast(SOMEIPParameterUnionMember, member).str(indent + 2)
                 else:
-                    print("ERROR: union member == None!")
+                    logger.error("Union member is None at index %s", m)
 
         return ret
 
@@ -1123,6 +1135,8 @@ class SOMEIPParameterBitfieldItem(SOMEIPBaseParameterBitfieldItem):
 
 
 class Signal(BaseSignal):
+    """Signal representation with text formatting."""
+
     def str(self, indent: int, indent_first_line: bool = True) -> str:
         if indent_first_line:
             ret = indent * " "
@@ -1151,6 +1165,8 @@ class Signal(BaseSignal):
 
 
 class Frame(BaseFrame):
+    """Frame representation with text formatting."""
+
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += f"Frame {self.__short_name__}\n"
@@ -1162,6 +1178,8 @@ class Frame(BaseFrame):
 
 
 class PDU(BasePDU):
+    """PDU representation with text formatting."""
+
     def str(self, indent: int, indent_first_line: bool = True, start_offset: int = 0, show_signals: bool = True) -> str:
         if indent_first_line:
             ret = indent * " "
@@ -1342,8 +1360,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--show-original-datatype", action="store_true")
     parser.add_argument("--skip-signal-based-communication", action="store_true")
 
-    args = parser.parse_args()
-    return args
+    return parser.parse_args()
 
 
 def main() -> None:
@@ -1372,11 +1389,11 @@ def main() -> None:
     )
     assert output_dir is not None
 
-    print("Generating output directories:")
+    print("Generating output directories")
 
     if os.path.isdir(args.filename):
         target_dir = os.path.join(output_dir, "text")
-        textfile = os.path.join(target_dir, "all_files" + ".txt")
+        textfile = os.path.join(target_dir, "all_files.txt")
     elif os.path.isfile(args.filename):
         path, f = os.path.split(args.filename)
         filenoext = ".".join(f.split(".")[:-1])
@@ -1385,10 +1402,10 @@ def main() -> None:
 
     if not os.path.exists(target_dir):
         os.makedirs(target_dir)
-        time.sleep(0.5)
 
+    # with open(textfile, "w", encoding="utf-8") as f:
     with open(textfile, "w") as f:
-        f.write("%s" % conf_factory)
+        f.write(str(conf_factory))
 
     print("Done.")
 
