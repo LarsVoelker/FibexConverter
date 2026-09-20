@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import ipaddress
+import logging
 import os.path
 import sys
 import time
@@ -74,6 +75,8 @@ from configuration_base_classes import (
     read_csv_to_dict,
 )
 from parser_dispatcher import is_file_or_dir_valid, is_file_valid, parse_input_files, parser_formats
+
+logger = logging.getLogger(__name__)
 
 DEBUG_LEGACY_STRIPPING = False
 
@@ -262,7 +265,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
 
     def create_ecu(self, name: str, controllers: list[BaseController]) -> BaseECU:
         tmp = BaseECU(name, controllers)
-        print(f"Adding ECU {name}")
+        logger.debug("Adding ECU %s", name)
         if cast(str, tmp) in self.__ecus__:
             print(f"Detected duplicate ECU {name}")
         self.__ecus__[name] = tmp
@@ -349,7 +352,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         eventgroups: dict[int, SOMEIPBaseServiceEventgroup],
     ) -> SOMEIPService:
         ret = SOMEIPService(name, serviceid, majorver, minorver, methods, events, fields, eventgroups)
-        print(f"Adding Service(ID: 0x{serviceid:04x} Ver: {majorver:d}.{minorver:d})")
+        logger.debug("Adding Service(Name: %s ID: 0x%04x Ver: %d.%d)", name, serviceid, majorver, minorver)
         self.add_service(serviceid, majorver, minorver, ret)
         return ret
 
@@ -2100,11 +2103,7 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
             return self
         else:
             ret = factory.create_someip_parameter_union(
-                self.__name__,
-                self.__lengthOfLength__,
-                self.__lengthOfType__,
-                self.__padTo__,
-                self.__members__,
+                self.__name__, self.__lengthOfLength__, self.__lengthOfType__, self.__padTo__, self.__members__
             )
 
             return cast(_WSBacklinkDatatype, ret).create_backlinks(factory, service, method)

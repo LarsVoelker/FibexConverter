@@ -21,6 +21,7 @@
 
 import argparse
 import glob
+import logging
 import os.path
 import sys
 
@@ -28,10 +29,25 @@ from configuration_base_classes import BaseConfigurationFactory
 from fibex_parser import FibexParser
 from flync_parser import FlyncParser
 
+logger = logging.getLogger(__name__)
+
 parser_formats: list[str] = ["FIBEX", "FLYNC"]
 
 
 def is_file_or_dir_valid(parser: argparse.ArgumentParser, arg: str) -> str:
+    """
+    Validate that a file or directory path exists.
+
+    Args:
+        parser: ArgumentParser instance for error reporting
+        arg: Path to validate
+
+    Returns:
+        The validated path
+
+    Raises:
+        argparse.ArgumentError: If the path does not exist
+    """
     if not os.path.exists(arg):
         parser.error(f"File or directory does not exist: {arg}")
 
@@ -39,6 +55,19 @@ def is_file_or_dir_valid(parser: argparse.ArgumentParser, arg: str) -> str:
 
 
 def is_file_valid(parser: argparse.ArgumentParser, arg: str) -> str:
+    """
+    Validate that a file path exists and is a file.
+
+    Args:
+        parser: ArgumentParser instance for error reporting
+        arg: File path to validate
+
+    Returns:
+        The validated file path
+
+    Raises:
+        argparse.ArgumentError: If the path does not exist or is not a file
+    """
     if not os.path.isfile(arg):
         parser.error(f"File does not exist: {arg}")
 
@@ -55,6 +84,22 @@ def parse_input_files(
     file_filter: str = "",
     verbose: bool = False,
 ) -> str | None:
+    """
+    Parse input files based on the specified format type.
+
+    Args:
+        filename: Path to a file or directory to parse
+        t: Format type (e.g., "FIBEX" or "FLYNC")
+        conf_factory: Configuration factory instance
+        plugin_file: Optional path to a parser plugin file
+        ecu_name_replacement: Optional dictionary for ECU name replacements
+        print_filename: Whether to print filenames during parsing
+        file_filter: Optional glob pattern for filtering files
+        verbose: Enable verbose output
+
+    Returns:
+        Output directory path
+    """
     if t.upper() == "FLYNC":
         if not os.path.isdir(filename):
             print(f"FLYNC type requires a workspace directory, not a file: {filename}")
