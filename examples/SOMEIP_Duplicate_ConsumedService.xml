@@ -1,0 +1,261 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Duplicate consumed SOME/IP service test fixture.
+
+    Same topology as SOMEIP_simple_service.xml (provider + consumer of SVC_ECHO),
+    but the consumer declares the SAME provided service instance TWICE
+    (CSI_ECHO and CSI_ECHO_DUP both reference PSI_ECHO) and the SAME event
+    group twice (CEG_EG1 and CEG_EG1_DUP both reference EG1 on the same AEP).
+
+    This exercises the parse-time deduplication in fibex_parser.py:
+      - duplicate ServiceInstanceClient key (serviceid, majorversion, instanceid)
+      - duplicate EventgroupReceiver key (serviceid, instanceid, eventgroupid)
+
+    With keep_duplicates=False (default) the parser keeps one of each and
+    prints a WARNING. With keep_duplicates=True both are retained.
+
+    NOTE: The provider (AEP_PROVIDER) declares the service instance exactly ONCE.
+    Providing the same service instance twice on a single AEP/socket is treated
+    as invalid and is intentionally NOT represented here; see
+    SOMEIP_Duplicate_Provider_TwoECUs.xml for the supported cross-ECU case.
+-->
+<fx:FIBEX xmlns:fx="http://www.asam.net/xml/fbx"
+          xmlns:ho="http://www.asam.net/xml"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xmlns:ethernet="http://www.asam.net/xml/fbx/ethernet"
+          xmlns:service="http://www.asam.net/xml/fbx/services"
+          xmlns:it="http://www.asam.net/xml/fbx/it"
+          VERSION="4.1.2">
+
+    <fx:PROJECT ID="PROJ_DUP">
+        <ho:SHORT-NAME>SomeIPDuplicateConsumedServiceTest</ho:SHORT-NAME>
+    </fx:PROJECT>
+
+    <fx:ELEMENTS>
+
+        <fx:CHANNELS>
+            <fx:CHANNEL ID="CHAN_VLAN100" xsi:type="ethernet:CHANNEL-TYPE">
+                <ho:SHORT-NAME>VLAN100</ho:SHORT-NAME>
+                <ethernet:VIRTUAL-LAN ID="VLAN100">
+                    <ho:SHORT-NAME>VLAN100</ho:SHORT-NAME>
+                    <ethernet:VLAN-IDENTIFIER>100</ethernet:VLAN-IDENTIFIER>
+                </ethernet:VIRTUAL-LAN>
+            </fx:CHANNEL>
+        </fx:CHANNELS>
+
+        <fx:ECUS>
+
+            <fx:ECU ID="ECU_PROVIDER">
+                <ho:SHORT-NAME>ECU_PROVIDER</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_PROVIDER">
+                        <ho:SHORT-NAME>Provider_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_PROVIDER" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN100"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_PROVIDER"/>
+
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_PROVIDER">
+                                <ho:SHORT-NAME>Provider_NEP</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.1.1</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+
+                        <it:APPLICATION-ENDPOINTS>
+                            <it:APPLICATION-ENDPOINT ID="AEP_PROVIDER">
+                                <ho:SHORT-NAME>Provider_AEP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30000</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_PROVIDER"/>
+                                <it:PROVIDED-SERVICE-INSTANCES>
+                                    <it:PROVIDED-SERVICE-INSTANCE ID="PSI_ECHO">
+                                        <it:INSTANCE-IDENTIFIER>1</it:INSTANCE-IDENTIFIER>
+                                        <service:SERVICE-INTERFACE-REF ID-REF="SVC_ECHO"/>
+                                        <it:EVENT-HANDLERS>
+                                            <it:EVENT-HANDLER>
+                                                <it:CONSUMED-EVENT-GROUP-REFS>
+                                                    <it:CONSUMED-EVENT-GROUP-REF ID-REF="CEG_EG1"/>
+                                                </it:CONSUMED-EVENT-GROUP-REFS>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_PROVIDER"/>
+                                            </it:EVENT-HANDLER>
+                                        </it:EVENT-HANDLERS>
+                                    </it:PROVIDED-SERVICE-INSTANCE>
+                                </it:PROVIDED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                        </it:APPLICATION-ENDPOINTS>
+
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+            <fx:ECU ID="ECU_CONSUMER">
+                <ho:SHORT-NAME>ECU_CONSUMER</ho:SHORT-NAME>
+                <fx:CONTROLLERS>
+                    <fx:CONTROLLER ID="CTRL_CONSUMER">
+                        <ho:SHORT-NAME>Consumer_Ctrl</ho:SHORT-NAME>
+                    </fx:CONTROLLER>
+                </fx:CONTROLLERS>
+                <fx:CONNECTORS>
+                    <fx:CONNECTOR ID="CONN_CONSUMER" xsi:type="it:CONNECTOR-TYPE">
+                        <fx:CHANNEL-REF ID-REF="CHAN_VLAN100"/>
+                        <fx:CONTROLLER-REF ID-REF="CTRL_CONSUMER"/>
+
+                        <it:NETWORK-ENDPOINTS>
+                            <it:NETWORK-ENDPOINT ID="NEP_CONSUMER">
+                                <ho:SHORT-NAME>Consumer_NEP</ho:SHORT-NAME>
+                                <it:NETWORK-ENDPOINT-ADDRESSES>
+                                    <it:NETWORK-ENDPOINT-ADDRESS>
+                                        <it:IPV4>
+                                            <it:IP-ADDRESS>192.168.1.2</it:IP-ADDRESS>
+                                            <it:IPV4-ADDRESS-SOURCE>FIXED</it:IPV4-ADDRESS-SOURCE>
+                                            <it:NETWORKMASK>255.255.255.0</it:NETWORKMASK>
+                                        </it:IPV4>
+                                    </it:NETWORK-ENDPOINT-ADDRESS>
+                                </it:NETWORK-ENDPOINT-ADDRESSES>
+                            </it:NETWORK-ENDPOINT>
+                        </it:NETWORK-ENDPOINTS>
+
+                        <it:APPLICATION-ENDPOINTS>
+                            <it:APPLICATION-ENDPOINT ID="AEP_CONSUMER">
+                                <ho:SHORT-NAME>Consumer_AEP</ho:SHORT-NAME>
+                                <it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                    <it:UDP-TP>
+                                        <it:UDP-PORT>
+                                            <it:PORT-NUMBER>30001</it:PORT-NUMBER>
+                                        </it:UDP-PORT>
+                                    </it:UDP-TP>
+                                </it:IT-TRANSPORT-PROTOCOL-CONFIGURATION>
+                                <it:NETWORK-ENDPOINT-REF ID-REF="NEP_CONSUMER"/>
+                                <it:CONSUMED-SERVICE-INSTANCES>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_ECHO">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_ECHO"/>
+                                        <it:CONSUMED-EVENT-GROUPS>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_EG1">
+                                                <service:EVENT-GROUP-REF ID-REF="EG1"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_CONSUMER"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_EG1_DUP">
+                                                <service:EVENT-GROUP-REF ID-REF="EG1"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_CONSUMER"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                        </it:CONSUMED-EVENT-GROUPS>
+                                    </it:CONSUMED-SERVICE-INSTANCE>
+                                    <it:CONSUMED-SERVICE-INSTANCE ID="CSI_ECHO_DUP">
+                                        <it:PROVIDED-SERVICE-INSTANCE-REF ID-REF="PSI_ECHO"/>
+                                        <it:CONSUMED-EVENT-GROUPS>
+                                            <it:CONSUMED-EVENT-GROUP ID="CEG_EG1_B">
+                                                <service:EVENT-GROUP-REF ID-REF="EG1"/>
+                                                <it:APPLICATION-ENDPOINT-REF ID-REF="AEP_CONSUMER"/>
+                                            </it:CONSUMED-EVENT-GROUP>
+                                        </it:CONSUMED-EVENT-GROUPS>
+                                    </it:CONSUMED-SERVICE-INSTANCE>
+                                </it:CONSUMED-SERVICE-INSTANCES>
+                            </it:APPLICATION-ENDPOINT>
+                        </it:APPLICATION-ENDPOINTS>
+
+                    </fx:CONNECTOR>
+                </fx:CONNECTORS>
+            </fx:ECU>
+
+        </fx:ECUS>
+
+        <fx:SERVICE-INTERFACES>
+            <fx:SERVICE-INTERFACE ID="SVC_ECHO" xsi:type="service:SERVICE-INTERFACE-TYPE">
+                <ho:SHORT-NAME>SVC_ECHO</ho:SHORT-NAME>
+                <fx:SERVICE-IDENTIFIER>4660</fx:SERVICE-IDENTIFIER>
+                <service:API-VERSION>
+                    <service:MAJOR>1</service:MAJOR>
+                    <service:MINOR>0</service:MINOR>
+                </service:API-VERSION>
+
+                <service:METHODS>
+                    <service:METHOD ID="METHOD_GETVALUE">
+                        <ho:SHORT-NAME>GetValue</ho:SHORT-NAME>
+                        <service:METHOD-IDENTIFIER>1</service:METHOD-IDENTIFIER>
+                        <service:CALL-SEMANTIC>REQUEST_RESPONSE</service:CALL-SEMANTIC>
+                        <service:INPUT-PARAMETERS>
+                            <service:INPUT-PARAMETER ID="PARAM_IN1">
+                                <ho:SHORT-NAME>requestValue</ho:SHORT-NAME>
+                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <service:POSITION>0</service:POSITION>
+                                <service:MANDATORY>true</service:MANDATORY>
+                            </service:INPUT-PARAMETER>
+                        </service:INPUT-PARAMETERS>
+                        <service:RETURN-PARAMETERS>
+                            <service:RETURN-PARAMETER ID="PARAM_OUT1">
+                                <ho:SHORT-NAME>responseValue</ho:SHORT-NAME>
+                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <service:POSITION>0</service:POSITION>
+                                <service:MANDATORY>true</service:MANDATORY>
+                            </service:RETURN-PARAMETER>
+                        </service:RETURN-PARAMETERS>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:METHOD>
+                </service:METHODS>
+
+                <service:EVENTS>
+                    <service:EVENT ID="EVENT_STATUS">
+                        <ho:SHORT-NAME>StatusEvent</ho:SHORT-NAME>
+                        <service:METHOD-IDENTIFIER>32769</service:METHOD-IDENTIFIER>
+                        <service:INPUT-PARAMETERS>
+                            <service:INPUT-PARAMETER ID="PARAM_EVT1">
+                                <ho:SHORT-NAME>statusValue</ho:SHORT-NAME>
+                                <fx:DATATYPE-REF ID-REF="DT_UINT8"/>
+                                <service:POSITION>0</service:POSITION>
+                                <service:MANDATORY>true</service:MANDATORY>
+                            </service:INPUT-PARAMETER>
+                        </service:INPUT-PARAMETERS>
+                        <service:RELIABLE>false</service:RELIABLE>
+                    </service:EVENT>
+                </service:EVENTS>
+
+                <service:EVENT-GROUPS>
+                    <service:EVENT-GROUP ID="EG1">
+                        <ho:SHORT-NAME>EG1</ho:SHORT-NAME>
+                        <fx:SERVICE-IDENTIFIER>1</fx:SERVICE-IDENTIFIER>
+                        <service:EVENT-REFS>
+                            <service:EVENT-REF ID-REF="EVENT_STATUS"/>
+                        </service:EVENT-REFS>
+                    </service:EVENT-GROUP>
+                </service:EVENT-GROUPS>
+
+            </fx:SERVICE-INTERFACE>
+        </fx:SERVICE-INTERFACES>
+
+        <fx:DATATYPES>
+            <fx:DATATYPE xsi:type="fx:COMMON-DATATYPE-TYPE" ID="DT_UINT8">
+                <ho:SHORT-NAME>UINT8</ho:SHORT-NAME>
+                <fx:CODING-REF ID-REF="COD_UINT8"/>
+            </fx:DATATYPE>
+        </fx:DATATYPES>
+
+    </fx:ELEMENTS>
+
+    <fx:PROCESSING-INFORMATION>
+        <fx:CODINGS>
+            <fx:CODING ID="COD_UINT8">
+                <ho:SHORT-NAME>UINT8Coding</ho:SHORT-NAME>
+                <ho:CODED-TYPE CATEGORY="STANDARD-LENGTH-TYPE" ho:BASE-DATA-TYPE="A_UINT8">
+                    <ho:BIT-LENGTH>8</ho:BIT-LENGTH>
+                </ho:CODED-TYPE>
+            </fx:CODING>
+        </fx:CODINGS>
+    </fx:PROCESSING-INFORMATION>
+
+</fx:FIBEX>

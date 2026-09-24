@@ -537,9 +537,8 @@ class BaseConfigurationFactory(object):
         pdu_type: str,
         switch: BaseMultiplexPDUSwitch | None,
         seg_pos: list[BaseMultiplexPDUSegmentPosition],
-        pdu_instances: list[BasePDUInstance] | None,
-        static_segs: list[BaseMultiplexPDUSegmentPosition],
-        static_pdu: BasePDU | None,
+        pdu_instances: dict[int, BaseAbstractPDU | None] | None,
+        static_seg_pdu_combinations: list[tuple[list[BaseMultiplexPDUSegmentPosition], BasePDU]],
     ) -> BaseMultiplexPDU:
         return BaseMultiplexPDU(
             id,
@@ -549,8 +548,7 @@ class BaseConfigurationFactory(object):
             switch,
             seg_pos,
             pdu_instances,
-            static_segs,
-            static_pdu,
+            static_seg_pdu_combinations,
         )
 
     def create_multiplex_switch(
@@ -1148,8 +1146,8 @@ class BaseSocket(BaseItem):
         self.__instanceclients__: list[SOMEIPBaseServiceInstanceClient] | None = serviceinstanceclients
         self.__ehs__: list[SOMEIPBaseServiceEventgroupSender] | None = eventhandlers
         self.__cegs__: list[SOMEIPBaseServiceEventgroupReceiver] | None = eventgroupreceivers
-        self.__pdus_in__: list[BaseAbstractPDU] = []
-        self.__pdus_out__: list[BaseAbstractPDU] = []
+        self.__pdus_in__: list[BaseEthernetPDUInstance] = []
+        self.__pdus_out__: list[BaseEthernetPDUInstance] = []
         self.__interface__: BaseInterface | None = None
 
         if serviceinstances is not None:
@@ -1230,18 +1228,18 @@ class BaseSocket(BaseItem):
     def eventgroupreceivers(self) -> list[SOMEIPBaseServiceEventgroupReceiver] | None:
         return self.__cegs__
 
-    def add_incoming_pdu(self, pdu: BaseAbstractPDU) -> None:
+    def add_incoming_pdu(self, pdu: BaseEthernetPDUInstance) -> None:
         if pdu not in self.__pdus_in__:
             self.__pdus_in__.append(pdu)
 
-    def incoming_pdus(self) -> list[BaseAbstractPDU]:
+    def incoming_pdus(self) -> list[BaseEthernetPDUInstance]:
         return self.__pdus_in__
 
-    def add_outgoing_pdu(self, pdu: BaseAbstractPDU) -> None:
+    def add_outgoing_pdu(self, pdu: BaseEthernetPDUInstance) -> None:
         if pdu not in self.__pdus_out__:
             self.__pdus_out__.append(pdu)
 
-    def outgoing_pdus(self) -> list[BaseAbstractPDU]:
+    def outgoing_pdus(self) -> list[BaseEthernetPDUInstance]:
         return self.__pdus_out__
 
     def set_interface(self, interface: BaseInterface) -> None:
@@ -2583,9 +2581,8 @@ class BaseMultiplexPDU(BaseAbstractPDU):
         pdu_type: str,
         switch: BaseMultiplexPDUSwitch | None,
         segment_positions: list[BaseMultiplexPDUSegmentPosition],
-        pdu_instances: list[BasePDUInstance] | None,
-        static_segs: list[BaseMultiplexPDUSegmentPosition],
-        static_pdu: BasePDU | None,
+        pdu_instances: dict[int, BaseAbstractPDU | None] | None,
+        static_seg_pdu_combinations: list[tuple[list[BaseMultiplexPDUSegmentPosition], BasePDU]],
     ):
         super(BaseMultiplexPDU, self).__init__(id, short_name, byte_length, pdu_type)
 
@@ -2601,23 +2598,15 @@ class BaseMultiplexPDU(BaseAbstractPDU):
             print(f"ERROR: We only support up to 1 Dynamic Segment per PDU! " f"PDU {short_name} has {len(segment_positions)}")
             raise ValueError
 
-        if static_pdu is None and len(static_segs) != 0:
-            print(f"ERROR: PDU: {short_name} has Static Segments but no Static PDU!")
-            raise ValueError
-
-        if static_pdu is not None and len(static_segs) == 0:
-            print(f"ERROR: PDU: {short_name} has a Static PDU but not Static Segments!")
-            raise ValueError
-
-        if len(static_segs) > 1:
-            print(f"ERROR: We only support up to 1 Static Segment per PDU. " f"PDU {short_name} has {len(static_segs)}")
-            raise ValueError
+        for combo_segs, combo_pdu in static_seg_pdu_combinations:
+            if (combo_segs is None or len(combo_segs) == 0) and combo_pdu is not None:
+                print(f"ERROR: PDU: {short_name} has a Static PDU but no Static Segments!")
+                raise ValueError
 
         self.__switch__: BaseMultiplexPDUSwitch | None = switch
         self.__segment_positions__: list[BaseMultiplexPDUSegmentPosition] = segment_positions
-        self.__pdu_instances__: list[BasePDUInstance] | None = pdu_instances
-        self.__static_segments__: list[BaseMultiplexPDUSegmentPosition] = static_segs
-        self.__static_pdu__: BasePDU | None = static_pdu
+        self.__pdu_instances__: dict[int, BaseAbstractPDU | None] | None = pdu_instances
+        self.__static_segment_pdu_combinations__: list[tuple[list[BaseMultiplexPDUSegmentPosition], BasePDU]] = static_seg_pdu_combinations
 
     def switch(self) -> BaseMultiplexPDUSwitch | None:
         return self.__switch__
@@ -2625,17 +2614,14 @@ class BaseMultiplexPDU(BaseAbstractPDU):
     def segment_positions(self) -> list[BaseMultiplexPDUSegmentPosition]:
         return self.__segment_positions__
 
-    def pdu_instances(self) -> list[BasePDUInstance] | None:
+    def pdu_instances(self) -> dict[int, BaseAbstractPDU | None] | None:
         return self.__pdu_instances__
-
-    def static_segments(self) -> list[BaseMultiplexPDUSegmentPosition]:
-        return self.__static_segments__
-
-    def static_pdu(self) -> BasePDU | None:
-        return self.__static_pdu__
 
     def is_multiplex_pdu(self) -> bool:
         return True
+
+    def static_seg_pdu_combinations(self) -> list[tuple[list[BaseMultiplexPDUSegmentPosition], BasePDU]]:
+        return self.__static_segment_pdu_combinations__
 
 
 class BaseMultiplexPDUSwitch(BaseItem):

@@ -45,11 +45,13 @@ from flync.model.flync_4_ecu.internal_topology import (
 from flync.model.flync_4_ecu.socket_container import SocketContainer
 from flync.model.flync_4_ecu.sockets import DeploymentUnion, IPv4AddressEndpoint, IPv6AddressEndpoint, SocketTCP, SocketUDP, TCPOption
 from flync.model.flync_4_ecu.switch import Switch as FLYNCSwitch
+from flync.model.flync_4_ecu.switch import SwitchConfig as FLYNCSwitchConfig
 from flync.model.flync_4_ecu.switch import SwitchPort as FLYNCSwitchPort
 from flync.model.flync_4_ecu.switch import VLANEntry  # type: ignore[attr-defined]
 from flync.model.flync_4_metadata import BaseVersion, ECUMetadata, EmbeddedMetadata, SOMEIPServiceMetadata, SystemMetadata
 from flync.model.flync_4_signal.frame import CANFDFrame, CANFrame
 from flync.model.flync_4_signal.pdu import ContainedPDURef, ContainerPDU, ContainerPDUHeader, MultiplexedPDU, MuxGroup, PDUInstance, StandardPDU
+from flync.model.flync_4_signal.pdu_deployment import PDUReceiver, PDUSender
 from flync.model.flync_4_signal.signal import Signal, SignalDataType, SignalInstance
 from flync.model.flync_4_signal.value_encoding import TextEntry, TextTable
 from flync.model.flync_4_someip import (
@@ -70,10 +72,10 @@ from flync.model.flync_4_someip import (
     SOMEIPServiceProvider,
     SOMEIPTimingProfile,
 )
+from flync.model.flync_4_someip.someip_complex_datatypes import AllTypes, Typedef
 
 # Import FLYNC datatypes for parameter conversion
-from flync.model.flync_4_someip.someip_datatypes import (
-    AllTypes,
+from flync.model.flync_4_someip.someip_simple_datatypes import (
     Boolean,
     DynamicLengthString,
     Enum,
@@ -87,18 +89,19 @@ from flync.model.flync_4_someip.someip_datatypes import (
     Int32,
     Int64,
     Ints,
-    Typedef,
     UInt8,
     UInt16,
     UInt32,
     UInt64,
 )
-from flync.model.flync_4_topology import FLYNCTopology, SystemTopology
-from flync.model.flync_4_topology.system_topology import ExternalConnection
+from flync.model.flync_4_topology import EthernetMultidropConnection, EthernetPointToPointConnection
+from flync.model.flync_4_topology import EthernetTopology as SystemTopology
+from flync.model.flync_4_topology import FLYNCTopology
 from flync.model.flync_model import FLYNCModel
-from flync.sdk.workspace.flync_workspace import FLYNCWorkspace, WorkspaceConfiguration  # type: ignore[attr-defined]
+from flync.sdk.workspace.flync_workspace import FLYNCWorkspace, WorkspaceConfiguration
 
 from configuration_base_classes import (
+    BaseAbstractPDU,
     BaseConfigurationFactory,
     BaseController,
     BaseECU,
@@ -141,7 +144,7 @@ from parser_dispatcher import (
     parser_formats,
 )
 
-FLYNC_VERSION = "0.11.0"
+FLYNC_VERSION = "0.14.0"
 
 FLYNCUsage = Literal[
     "application",
@@ -183,7 +186,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__flync_workspace: FLYNCWorkspace | None = None
 
         self.__flync_ecus: list[ECU] = list()
-        self.__flync_connections: list[ExternalConnection] = list()
+        self.__flync_connections: list[EthernetPointToPointConnection] = list()
 
         self.__base_ecus: dict[str, BaseECU] = {}  # ecu_name -> BaseECU
         self.__base_vlan_name_to_id: dict[str, int] = {}  # vlan_name -> int vlan_id
@@ -199,6 +202,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__mux_sub_pdu_ids: set[str] = set()  # IDs of PDUs that are sub-PDUs of a mux PDU (not written as standalone FLYNC files)
         self.__can_frames: dict[str, BaseFrame] = {}  # frame_id → BaseFrame
         self.__eth_pdu_insts: dict[int | None, BaseEthernetPDUInstance] = {}  # header_id → BaseEthernetPDUInstance
+        self.__socket_pdu_insts: list[BaseEthernetPDUInstance] = []  # EthernetPDUInstances attached to sockets (in/out)
         self.__can_fts: dict[str, BaseFrameTriggeringCAN] = {}  # ft_id → BaseFrameTriggeringCAN
         self.__ft_to_channel: dict[str, str] = {}  # ft.id() → channel_name
         self.__ecu_frame_fts: dict[str, dict[str, list[BaseFrameTriggering]]] = {}  # ecu_name → {out: [ft,...], in: [ft,...]}
@@ -285,19 +289,18 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         pdu_type: str,
         switch: BaseMultiplexPDUSwitch | None,
         seg_pos: list[BaseMultiplexPDUSegmentPosition],
-        pdu_instances: list[BasePDUInstance] | None,
-        static_segs: list[BaseMultiplexPDUSegmentPosition],
-        static_pdu: BasePDU | None,
+        pdu_instances: dict[int, BaseAbstractPDU | None] | None,
+        static_seg_pdu_combinations: list[tuple[list[BaseMultiplexPDUSegmentPosition], BasePDU]],
     ) -> BaseMultiplexPDU:
-        ret = super().create_multiplex_pdu(id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances, static_segs, static_pdu)
+        ret = super().create_multiplex_pdu(id, short_name, byte_length, pdu_type, switch, seg_pos, pdu_instances, static_seg_pdu_combinations)
         self.__can_pdus[id] = ret
         # Sub-PDUs must NOT be written as standalone FLYNC files; their signal names clash
         # with the same names embedded inside the MultiplexedPDU's mux groups, causing the
         # FLYNC workspace loader's UniqueName registry to raise assertion errors.
-        for sub_pdu in cast("dict[str, BasePDUInstance | None]", pdu_instances or {}).values():
+        for sub_pdu in (pdu_instances or {}).values():
             if sub_pdu is not None:
-                self.__mux_sub_pdu_ids.add(cast(Any, sub_pdu).id())
-        if static_pdu is not None:
+                self.__mux_sub_pdu_ids.add(sub_pdu.id())
+        for _, static_pdu in static_seg_pdu_combinations:
             self.__mux_sub_pdu_ids.add(static_pdu.id())
         return ret
 
@@ -390,6 +393,36 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         hex_str = f"{mac_int:012x}"
         return ":".join(hex_str[i : i + 2] for i in range(0, 12, 2))
 
+    def _socket_carrier_name(self, pdu_name: str, header_id: int) -> str:
+        """Unique FLYNC PDU name carrying a socket PDU's network header ID."""
+        return f"{pdu_name}__hdr{header_id:#x}"
+
+    def _socket_pdu_deployments(self, fibex_socket: BaseSocket, send: bool) -> list[DeploymentUnion]:
+        """Build FLYNC PDU Sender/Receiver deployments for a socket's attached PDUs.
+
+        Returns one PDUSender (``send=True``) / PDUReceiver (``send=False``)
+        deployment per outgoing/incoming Ethernet PDU, referencing a context
+        carrier PDU that preserves the instance's network header ID.  The
+        instances are recorded so the carrier ContainerPDUs can be generated
+        later.  A PDU attached with different header IDs is kept as separate
+        contexts, since a single header ID is not unique per PDU name.
+        """
+        deps: list[DeploymentUnion] = []
+        insts = fibex_socket.outgoing_pdus() if send else fibex_socket.incoming_pdus()
+        for inst in insts or []:
+            self.__socket_pdu_insts.append(inst)
+            pdu = inst.pdu()
+            header_id = inst.header_id()
+            if pdu is None or header_id is None:
+                continue
+            root = (
+                PDUSender(pdu_ref=self._socket_carrier_name(pdu.name(), header_id))
+                if send
+                else PDUReceiver(pdu_ref=self._socket_carrier_name(pdu.name(), header_id))
+            )
+            deps.append(DeploymentUnion(root=root))
+        return deps
+
     def _to_flync_socket(self, fibex_socket: BaseSocket) -> SocketTCP | SocketUDP | None:
         """Convert a FIBEX BaseSocket to a FLYNC SocketUDP/SocketTCP, or None if not supported."""
         if fibex_socket.is_multicast():
@@ -420,6 +453,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                     mcast_deployments.append(DeploymentUnion(root=dep_consumer))
                 except Exception as e:
                     print(f"WARNING: Could not create SOMEIPServiceConsumer for 0x{svc.serviceid():04x}: {type(e).__name__}: {e}")
+            mcast_deployments.extend(self._socket_pdu_deployments(fibex_socket, send=True))
+            mcast_deployments.extend(self._socket_pdu_deployments(fibex_socket, send=False))
             sock_name = str(fibex_socket.name()) if fibex_socket.name() is not None else "None"
             return SocketUDP(
                 name=sock_name,
@@ -490,6 +525,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 deployments.append(DeploymentUnion(root=dep_client))
             except Exception as e:
                 print(f"WARNING: Could not create SOMEIPServiceConsumer for 0x{svc.serviceid():04x}: {type(e).__name__}: {e}")
+
+        deployments.extend(self._socket_pdu_deployments(fibex_socket, send=True))
+        deployments.extend(self._socket_pdu_deployments(fibex_socket, send=False))
 
         sock_name = str(fibex_socket.name()) if fibex_socket.name() is not None else "None"
         if proto == "tcp":
@@ -684,11 +722,14 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 ]
 
                 meta = self.embedded_metadata(self._safe_name(ecu_name))
-                flync_switch = FLYNCSwitch(
-                    name=sw_name,
+                switch_config = FLYNCSwitchConfig(
                     ports=flync_sw_ports,
                     vlans=vlan_entries,
                     meta=meta,
+                )
+                flync_switch = FLYNCSwitch(
+                    name=sw_name,
+                    switch_config=switch_config,
                 )
                 flync_sw_list.append(flync_switch)
 
@@ -1017,7 +1058,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             self.__flync_ecus.append(flync_ecu)
 
         # ------------------------------------------------------------------
-        # Step 4: ExternalConnections (after all ECUPorts are in INSTANCES)
+        # Step 4: External Connections (after all ECUPorts are in INSTANCES)
         # ------------------------------------------------------------------
         for i, (ecu1_name, port1_id, ecu2_name, port2_id) in enumerate(ext_connections):
             if port1_id.startswith("_port_"):
@@ -1035,7 +1076,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             else:
                 ep2_name = flync_ecuport_name_map.get((ecu2_name, port2_id), f"{self._safe_name(ecu2_name)}_{self._safe_name(port2_id)}_ep")
 
-            conn = ExternalConnection(
+            conn = EthernetPointToPointConnection(
                 id=f"ext_conn_{i}",
                 ecu1_port=ep1_name,
                 ecu2_port=ep2_name,
@@ -1199,7 +1240,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def to_flync_bitfield(self, datatype: Any, name: str, description: str = "") -> SOMEIPParameter:
         """Convert a FIBEX bitfield to a FLYNC Bitfield."""
-        from flync.model.flync_4_someip.someip_datatypes import Bitfield, BitfieldEntry
+        from flync.model.flync_4_someip.someip_simple_datatypes import Bitfield, BitfieldEntry
 
         entries: list[BitfieldEntry] = []
         for item in datatype.items():
@@ -1225,7 +1266,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def to_flync_struct(self, datatype: Any, name: str, description: str = "") -> SOMEIPParameter:
         """Convert a FIBEX struct to a FLYNC Struct."""
-        from flync.model.flync_4_someip.someip_datatypes import Struct
+        from flync.model.flync_4_someip.someip_complex_datatypes import Struct
 
         members: list[AllTypes] = []
         for m in datatype.members().values():
@@ -1261,7 +1302,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def to_flync_union(self, datatype: Any, name: str, description: str = "") -> SOMEIPParameter:
         """Convert a FIBEX union to a FLYNC Union."""
-        from flync.model.flync_4_someip.someip_datatypes import Union, UnionMember
+        from flync.model.flync_4_someip.someip_complex_datatypes import Union, UnionMember
 
         members: list[UnionMember] = []
         for m in datatype.members().values():
@@ -1296,7 +1337,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def to_flync_array(self, datatype: Any, name: str, description: str = "") -> SOMEIPParameter | None:
         """Convert a FIBEX array to a FLYNC ArrayType."""
-        from flync.model.flync_4_someip.someip_datatypes import ArrayDimension, ArrayType
+        from flync.model.flync_4_someip.someip_complex_datatypes import ArrayDimension, ArrayType
 
         child = datatype.child()
 
@@ -1411,7 +1452,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             return "other"
         return cast(FLYNCUsage, self._FIBEX_TO_FLYNC_USAGE_MAPPING.get(frame.frame_type(), "other"))
 
-    def _build_flync_multiplexed_pdu(self, base_pdu: Any, pdu_byte_len: int, flync_sigs: dict[str, Signal]) -> MultiplexedPDU | None:
+    def _build_flync_multiplexed_pdu(
+        self, base_pdu: Any, pdu_byte_len: int, flync_sigs: dict[str, Signal]
+    ) -> tuple[MultiplexedPDU, list[StandardPDU]] | None:
         """Convert a BaseMultiplexPDU into a FLYNC MultiplexedPDU.
 
         Sub-PDU signal positions in mux groups are stored as absolute bit offsets
@@ -1455,6 +1498,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         # Build one MuxGroup per switch code; signals use absolute bit positions
         mux_groups: list[MuxGroup] = []
+        sub_pdus: list[StandardPDU] = []
         for switch_code in sorted(pdu_instances_map.keys()):
             sub_pdu = pdu_instances_map[switch_code]
             if sub_pdu is None:
@@ -1467,11 +1511,13 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 flync_sig = flync_sigs.get(sig.id())
                 if flync_sig is None:
                     continue
-                abs_bit_pos = int(si.bit_position() or 0) + seg_offset
+                # Sub-PDU signals are relative to the sub-PDU (and thus to the mux
+                # segment); the PDUInstance.bit_position below places the whole
+                # sub-PDU at the segment offset within the multiplexed PDU.
                 group_sigs.append(
                     SignalInstance(
                         signal=flync_sig,
-                        bit_position=abs_bit_pos,
+                        bit_position=int(si.bit_position() or 0),
                         endianness=_fibex_endianness_to_flync(si.is_high_low_byte_order()),
                     )
                 )
@@ -1479,11 +1525,12 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 group_pdu = StandardPDU(
                     type="standard",
                     name=sub_pdu.name(),
-                    length=pdu_byte_len,
+                    length=max(1, seg_bit_len // 8),
                     pdu_usage=self._flync_pdu_type(sub_pdu),
                     signals=group_sigs,
                 )
-                mux_groups.append(MuxGroup(selector_value=switch_code, pdu=group_pdu))
+                sub_pdus.append(group_pdu)
+                mux_groups.append(MuxGroup(selector_value=switch_code, pdu=PDUInstance(pdu_ref=group_pdu.name, bit_position=seg_offset)))
             except Exception as e:
                 print(f"WARNING: Could not create MuxGroup for {base_pdu.name()} switch_code={switch_code}: {type(e).__name__}: {e}")
 
@@ -1492,12 +1539,19 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             return None
 
         # Build static_group PDU if a static PDU exists
+        static_seg_pdu_combinations = base_pdu.static_seg_pdu_combinations()
+
+        static_base_pdu: BasePDU | None = None
+        static_segs: list[BaseMultiplexPDUSegmentPosition] | None = None
+        # TODO: support more than 1 static segment PDU
+        if len(static_seg_pdu_combinations) > 0 and len(static_seg_pdu_combinations[0]) >= 2:
+            static_segs, static_base_pdu = static_seg_pdu_combinations[0]
+
         static_flync_pdu: StandardPDU | None = None
-        static_base_pdu = base_pdu.static_pdu()
-        if static_base_pdu is not None:
-            static_segs = base_pdu.static_segments()
-            static_seg = static_segs[0] if static_segs else None
-            static_seg_offset = int(static_seg.bit_position()) if static_seg else 0
+        static_seg = static_segs[0] if static_segs else None
+        static_seg_offset = 0
+        if static_base_pdu is not None and static_seg is not None:
+            static_seg_offset = int(static_seg.bit_position())
             static_sigs: list[SignalInstance] = []
             for si in static_base_pdu.signal_instances_sorted_by_bit_position():
                 sig = si.signal()
@@ -1506,22 +1560,24 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 flync_sig = flync_sigs.get(sig.id())
                 if flync_sig is None:
                     continue
-                abs_bit_pos = int(si.bit_position() or 0) + static_seg_offset
+                rel_bit_pos = int(si.bit_position() or 0)
                 static_sigs.append(
                     SignalInstance(
                         signal=flync_sig,
-                        bit_position=abs_bit_pos,
+                        bit_position=rel_bit_pos,
                         endianness=_fibex_endianness_to_flync(si.is_high_low_byte_order()),
                     )
                 )
             try:
+                static_len = max(1, int(static_seg.bit_length()) // 8)
                 static_flync_pdu = StandardPDU(
                     type="standard",
                     name=static_base_pdu.name(),
-                    length=pdu_byte_len,
+                    length=static_len,
                     pdu_usage=self._flync_pdu_type(base_pdu),
                     signals=static_sigs,
                 )
+                sub_pdus.append(static_flync_pdu)
             except Exception as e:
                 print(f"WARNING: Could not create static group PDU for {base_pdu.name()}: {type(e).__name__}: {e}")
 
@@ -1542,22 +1598,25 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         description = json.dumps(meta)
 
         try:
-            return MultiplexedPDU(
+            flync_pdu = MultiplexedPDU(
                 type="multiplexed",
                 name=base_pdu.name(),
                 length=pdu_byte_len,
                 pdu_usage=self._flync_pdu_type(base_pdu),
                 description=description,
                 selector_signal=selector_si,
-                static_group=static_flync_pdu,
+                static_group=(
+                    [PDUInstance(pdu_ref=static_flync_pdu.name, bit_position=static_seg_offset)] if static_flync_pdu is not None else None
+                ),
                 mux_groups=mux_groups,
             )
+            return flync_pdu, sub_pdus
         except Exception as e:
             print(f"WARNING: Could not create FLYNC MultiplexedPDU for {base_pdu.name()}: {type(e).__name__}: {e}")
             return None
 
     def _create_flync_channels(self) -> FLYNCChannelConfig | None:
-        if not self.__can_frames:
+        if not self.__can_frames and not self.__socket_pdu_insts:
             return None
 
         # Map ft.id() → channel_name (already built in create_interface overrides)
@@ -1652,8 +1711,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 pdu_byte_len = int(pdu_byte_len)
             except (TypeError, ValueError):
                 pdu_byte_len = 1
+            flync_pdu: StandardPDU | MultiplexedPDU | None = None
             if base_pdu.is_multiplex_pdu():
-                flync_pdu: StandardPDU | MultiplexedPDU | None = self._build_flync_multiplexed_pdu(base_pdu, pdu_byte_len, flync_sigs)
+                result = self._build_flync_multiplexed_pdu(base_pdu, pdu_byte_len, flync_sigs)
+                if result is not None:
+                    flync_pdu, sub_pdus = result
+                    # Register mux sub-PDUs as standalone named PDUs so the FLYNC
+                    # PDUInstance references (mux_groups pdu / static_group) resolve.
+                    flync_pdus.extend(sub_pdus)
+                else:
+                    flync_pdu = None
             else:
                 sig_insts: list[SignalInstance] = []
                 for si in cast(BasePDU, base_pdu).signal_instances_sorted_by_bit_position():
@@ -1749,12 +1816,6 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 print(f"WARNING: Could not create FLYNC CANFrame for {base_frame.name()}: {type(e).__name__}: {e}")
 
         # Build FLYNC ContainerPDU objects for Ethernet frames (no CAN frame triggering).
-        # Use header_ids from __eth_pdu_insts; fall back to enumeration index if not found.
-        eth_header_by_pdu_id: dict[str, int | None] = {}
-        for h_id, inst in self.__eth_pdu_insts.items():
-            pdu_obj = inst.pdu()
-            if pdu_obj is not None:
-                eth_header_by_pdu_id[pdu_obj.id()] = h_id
         flync_eth_containers: list[ContainerPDU] = []
         for frame_id, base_frame in self.__can_frames.items():
             if frame_id in frame_ids_with_can_ft:
@@ -1767,8 +1828,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 flync_pdu = flync_pdu_by_id.get(pdu.id())
                 if flync_pdu is None:
                     continue
-                pdu_header_id = eth_header_by_pdu_id.get(pdu.id(), idx)
-                contained_pdus.append(ContainedPDURef(pdu_id=cast(int, pdu_header_id), pdu_ref=flync_pdu.name, offset=pi.bit_position()))
+                contained_pdus.append(ContainedPDURef(header_id=idx + 1, pdu_ref=flync_pdu.name, offset=pi.bit_position()))
             frame_byte_len = base_frame.byte_length()
             try:
                 frame_byte_len = int(frame_byte_len)
@@ -1777,10 +1837,12 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             # ContainerPDU requires length >= len(contained_pdus) * header_overhead (8 bytes at 32+32 bits)
             min_length = len(contained_pdus) * 8
             try:
+                # TODO: get header_id if it makes sense!
+                header_id = 0
                 flync_eth_containers.append(
                     ContainerPDU(
                         name=base_frame.name(),
-                        pdu_id=0,
+                        pdu_id=header_id,
                         length=max(frame_byte_len, min_length),
                         header=ContainerPDUHeader(id_length_bits=32, length_field_bits=32),
                         contained_pdus=contained_pdus,
@@ -1788,6 +1850,43 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                 )
             except Exception as e:
                 print(f"WARNING: Could not create FLYNC ContainerPDU for {base_frame.name()}: {type(e).__name__}: {e}")
+
+        # Build FLYNC ContainerPDU "carrier" entries for PDUs attached directly to
+        # sockets (PDUs in/out).  Each carrier is keyed by (PDU name, network
+        # header ID) so a PDU that appears on different sockets with different
+        # header IDs keeps each context's own header ID.  The original PDU name is
+        # stored in the carrier's description so the round-trip parser can restore
+        # the correct name, while pdu_id carries the header ID.
+        socket_carrier_names: set[str] = set()
+        for eth_inst in self.__socket_pdu_insts:
+            pdu = eth_inst.pdu()
+            inst_header_id = eth_inst.header_id()
+            if pdu is None or inst_header_id is None:
+                continue
+            name = pdu.name()
+            carrier_name = self._socket_carrier_name(name, inst_header_id)
+            if carrier_name in socket_carrier_names:
+                continue
+            socket_carrier_names.add(carrier_name)
+            pdu_len = pdu.byte_length()
+            try:
+                pdu_len = int(pdu_len)
+            except (TypeError, ValueError):
+                pdu_len = 1
+            try:
+                flync_eth_containers.append(
+                    ContainerPDU(
+                        name=carrier_name,
+                        pdu_id=inst_header_id,
+                        length=max(pdu_len, 8),
+                        header=ContainerPDUHeader(id_length_bits=32, length_field_bits=32),
+                        pdu_usage=self._flync_pdu_type(pdu),
+                        description=json.dumps({"pdu": name}),
+                        contained_pdus=[],
+                    )
+                )
+            except Exception as e:
+                print(f"WARNING: Could not create FLYNC PDU carrier for socket PDU {name}: {type(e).__name__}: {e}")
 
         if not flync_frames_by_channel and not flync_eth_containers:
             return None
@@ -2067,7 +2166,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         return SOMEIPConfig(sd_config=self.someipsd_config(), services=self.__flync_someip_services, someip_timings=self.__flync_someip_timings)
 
     def topology(self) -> FLYNCTopology:
-        st = SystemTopology(connections=self.__flync_connections)
+        st = SystemTopology(connections=cast(list[EthernetPointToPointConnection | EthernetMultidropConnection], self.__flync_connections))
         return FLYNCTopology(system_topology=st)
 
     def create_flync_model(self) -> None:
@@ -2079,7 +2178,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             tcp_profiles=[self.__flync_tcp_profile],
             channels=channel_config,
         )
-        self.__flync_model = FLYNCModel(ecus=self.ecus(), general=general_config, topology=self.topology(), metadata=self.system_metadata())
+        self.__flync_model = FLYNCModel(ecus=self.ecus(), communication=general_config, topology=self.topology(), metadata=self.system_metadata())
 
     def save_flync_model(self, target_dir: str) -> None:
         workspace_config = WorkspaceConfiguration(exclude_unset=False)

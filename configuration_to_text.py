@@ -448,9 +448,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         pdu_type: str,
         switch: BaseMultiplexPDUSwitch | None,
         seg_pos: list[BaseMultiplexPDUSegmentPosition],
-        pdu_instances: list[BasePDUInstance] | None,
-        static_segs: list[BaseMultiplexPDUSegmentPosition],
-        static_pdu: BasePDU | None,
+        pdu_instances: dict[int, BaseAbstractPDU | None] | None,
+        static_seg_pdu_combinations: list[tuple[list[BaseMultiplexPDUSegmentPosition], BasePDU]],
     ) -> MultiplexPDU:
         ret = MultiplexPDU(
             id,
@@ -460,8 +459,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             switch,
             seg_pos,
             pdu_instances,
-            static_segs,
-            static_pdu,
+            static_seg_pdu_combinations,
         )
 
         if id in self.__pdus__:
@@ -729,9 +727,11 @@ class Socket(BaseSocket):
         ret += f"Socket {self.__name__} {self.__ip__}:{self.__portnumber__}/{self.__proto__}\n"
         for inst in sorted(cast(list[SOMEIPServiceInstance], self.__instances__), key=lambda x: (x.service().serviceid(), x.instanceid())):
             ret += inst.str(indent + 2)
-        for client in sorted(
-            cast(list[SOMEIPServiceInstanceClient], self.__instanceclients__), key=lambda x: (x.service().serviceid(), x.instanceid())
-        ):
+        clients = sorted(
+            cast(list[SOMEIPServiceInstanceClient], self.__instanceclients__),
+            key=lambda x: (x.service().serviceid(), x.instanceid()),
+        )
+        for client in clients:
             ret += client.str(indent + 2)
         for eh in sorted(
             cast(list[SOMEIPServiceEventgroupSender], self.__ehs__),
@@ -1192,24 +1192,31 @@ class MultiplexPDU(BaseMultiplexPDU):
             ret += cast(MultiplexPDUSegmentPosition, seg).str(indent + 2, prefix="Dynamic")
             dyn_seg_start = seg.bit_position()
 
-        for switch_code in sorted(cast(list[BasePDUInstance], self.__pdu_instances__)):  # type: ignore[type-var]
-            pdu = self.__pdu_instances__[switch_code] if self.__pdu_instances__ is not None else None  # type: ignore[call-overload]
+        pdu_instances = self.__pdu_instances__ or {}
+        for switch_code in sorted(pdu_instances.keys()):
+            pdu = pdu_instances[switch_code]
             pdu_str = cast(PDU, pdu).str(indent + 4, indent_first_line=False, start_offset=dyn_seg_start) if pdu is not None else "PDU NOT FOUND!\n"
 
             ret += (indent + 4) * " "
             ret += f"[Switch Code: {switch_code}]: {pdu_str}"
 
-        static_seg_start = 0
-        if self.__static_segments__ is not None:
-            for seg in self.__static_segments__:
-                ret += cast(MultiplexPDUSegmentPosition, seg).str(indent + 2, prefix="Static")
-                static_seg_start = seg.bit_position()
+        for static_segments, static_pdu in self.__static_segment_pdu_combinations__:
+            # TODO: the static_seg_start should not be overwritten!
+            static_seg_start = 0
+            if static_segments is not None:
+                for seg in static_segments:
+                    ret += cast(MultiplexPDUSegmentPosition, seg).str(indent + 2, prefix="Static")
+                    static_seg_start = seg.bit_position()
 
-        if self.__static_pdu__ is not None:
-            pdu_str = cast(PDU, self.__static_pdu__).str(indent + 4, indent_first_line=False, start_offset=static_seg_start)
+            if static_pdu is not None:
+                pdu_str = (
+                    cast(PDU, static_pdu).str(indent + 4, indent_first_line=False, start_offset=static_seg_start)
+                    if static_pdu is not None
+                    else "PDU NOT FOUND!\n"
+                )
 
-            ret += (indent + 4) * " "
-            ret += f"[Static PDU] {pdu_str}"
+                ret += (indent + 4) * " "
+                ret += f"[Static PDU] {pdu_str}"
 
         return ret
 
@@ -1341,6 +1348,11 @@ def parse_arguments() -> argparse.Namespace:
     )
     parser.add_argument("--show-original-datatype", action="store_true")
     parser.add_argument("--skip-signal-based-communication", action="store_true")
+    parser.add_argument(
+        "--keep-duplicates",
+        action="store_true",
+        help="Do not remove duplicate SOME/IP clients/receivers on a socket. " "By default duplicates are removed.",
+    )
 
     args = parser.parse_args()
     return args
@@ -1369,6 +1381,7 @@ def main() -> None:
         conf_factory,
         plugin_file=args.plugin,
         ecu_name_replacement=ecu_name_mapping,
+        keep_duplicates=args.keep_duplicates,
     )
     assert output_dir is not None
 

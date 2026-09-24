@@ -54,6 +54,7 @@ def parse_input_files(
     print_filename: bool = True,
     file_filter: str = "",
     verbose: bool = False,
+    keep_duplicates: bool = False,
 ) -> str | None:
     if t.upper() == "FLYNC":
         if not os.path.isdir(filename):
@@ -83,7 +84,7 @@ def parse_input_files(
         return None
 
     if t.upper() == "FIBEX":
-        fb_parser: FibexParser = FibexParser(plugin_file, ecu_name_replacement)
+        fb_parser: FibexParser = FibexParser(plugin_file, ecu_name_replacement, keep_duplicates=keep_duplicates)
         for f in files:
             if print_filename:
                 print(f"\nFile: {f}")

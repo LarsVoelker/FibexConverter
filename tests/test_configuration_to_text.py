@@ -247,8 +247,8 @@ class TestSocket:
             eventhandlers=[],
             eventgroupreceivers=[],
         )
-        socket.add_incoming_pdu(eth_pdu_in)  # type: ignore
-        socket.add_outgoing_pdu(eth_pdu_out)  # type: ignore
+        socket.add_incoming_pdu(eth_pdu_in)
+        socket.add_outgoing_pdu(eth_pdu_out)
         text = socket.str(0)
         assert "PDUs in" in text
         assert "PDUs out" in text
@@ -422,9 +422,8 @@ class TestFrameAndPDU:
             pdu_type="MULTIPLEX",
             switch=mux_switch,
             seg_pos=[seg_pos],
-            pdu_instances={0: dyn_pdu0, 1: dyn_pdu1},  # type: ignore
-            static_segs=[],
-            static_pdu=None,
+            pdu_instances={0: dyn_pdu0, 1: dyn_pdu1},
+            static_seg_pdu_combinations=[],
         )
         text = mux_pdu.str(0)
         assert "TestMuxPDU" in text
@@ -446,9 +445,8 @@ class TestFrameAndPDU:
             pdu_type="MULTIPLEX",
             switch=mux_switch,
             seg_pos=[seg_pos],
-            pdu_instances={0: dyn_pdu},  # type: ignore
-            static_segs=[static_seg],
-            static_pdu=static_pdu,
+            pdu_instances={0: dyn_pdu},
+            static_seg_pdu_combinations=[([static_seg], static_pdu)],
         )
         text = mux_pdu.str(0)
         assert "StaticMuxPDU" in text
@@ -1463,3 +1461,30 @@ class TestFactoryManagement:
         assert "ECUs:" in text
         assert "SvcStr" in text
         assert "FrmStr" in text
+
+
+class TestKeepDuplicatesTextOutput:
+    """Rendering of duplicate consumed SOME/IP clients/receivers in text output."""
+
+    def _render(self, keep_duplicates: bool) -> str:
+        from pathlib import Path
+
+        from fibex_parser import FibexParser
+
+        fibex = Path(__file__).parent.parent / "examples" / "SOMEIP_Duplicate_ConsumedService.xml"
+        factory = SimpleConfigurationFactory()
+        parser = FibexParser(plugin_file=None, ecu_name_replacement=None, keep_duplicates=keep_duplicates)
+        parser.parse_file(factory, str(fibex), verbose=False)
+        return str(factory)
+
+    def test_default_deduplicates_clients(self) -> None:
+        text = self._render(keep_duplicates=False)
+        assert text.count("ServiceInstance ") == 1
+        assert text.count("ServiceInstanceClient ") == 1
+        assert text.count("EventgroupReceiver: ") == 1
+
+    def test_keep_duplicates_retains_all(self) -> None:
+        text = self._render(keep_duplicates=True)
+        assert text.count("ServiceInstance ") == 1
+        assert text.count("ServiceInstanceClient ") == 2
+        assert text.count("EventgroupReceiver: ") == 3
