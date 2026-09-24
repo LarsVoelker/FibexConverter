@@ -1,5 +1,6 @@
 #!/usr/bin/python
 
+from pathlib import Path
 from typing import Any, cast
 
 """Unit tests for FibexParser core functionality."""
@@ -10,6 +11,10 @@ from lxml.etree import _Element
 
 from configuration_base_classes import BaseConfigurationFactory
 from fibex_parser import FibexParser
+
+DUP_CSV_FIBEX = Path(__file__).parent.parent / "examples" / "SOMEIP_Duplicate_ConsumedService.xml"
+PROV_TWO_SOCK_FIBEX = Path(__file__).parent.parent / "examples" / "SOMEIP_Provider_TwoSockets.xml"
+PROV_TWO_ECU_FIBEX = Path(__file__).parent.parent / "examples" / "SOMEIP_Duplicate_Provider_TwoECUs.xml"
 
 
 def _root(xml: str) -> _Element:
@@ -626,3 +631,81 @@ class TestFibexParserIntegration:
 
         # Verify signals were parsed
         assert len(parser.__signals__) > 0
+
+
+class TestFibexParserDuplicateConsumedService:
+    """Parse-time dedup of duplicate consumed SOME/IP services/receivers."""
+
+    def _parse(self, keep_duplicates: bool) -> Any:
+        from configuration_to_text import SimpleConfigurationFactory
+
+        factory = SimpleConfigurationFactory()
+        parser = FibexParser(plugin_file=None, ecu_name_replacement=None, keep_duplicates=keep_duplicates)
+        parser.parse_file(factory, str(DUP_CSV_FIBEX), verbose=False)
+        return parser
+
+    def test_deduplicates_by_default(self, capsys: Any) -> None:
+        parser = self._parse(keep_duplicates=False)
+        psis = parser.__aeps__["AEP_PROVIDER"][0]
+        csis = parser.__aeps__["AEP_CONSUMER"][1]
+        cegs = parser.__aeps__["AEP_CONSUMER"][3]
+
+        assert len(psis) == 1
+        assert len(csis) == 1
+        assert len(cegs) == 1
+
+        out = capsys.readouterr().out
+        assert "provided more than once" not in out
+        assert out.count("Skipping duplicate SOME/IP ServiceInstanceClient for") == 1
+        assert out.count("Skipping duplicate SOME/IP EventgroupReceiver") == 2
+
+    def test_keeps_duplicates_when_requested(self, capsys: Any) -> None:
+        parser = self._parse(keep_duplicates=True)
+        psis = parser.__aeps__["AEP_PROVIDER"][0]
+        csis = parser.__aeps__["AEP_CONSUMER"][1]
+        cegs = parser.__aeps__["AEP_CONSUMER"][3]
+
+        assert len(psis) == 1
+        assert len(csis) == 2
+        assert len(cegs) == 3
+
+        out = capsys.readouterr().out
+        assert "Skipping duplicate" not in out
+        assert "provided more than once" not in out
+
+    def test_provider_on_two_sockets_of_same_ecu_not_deduped(self) -> None:
+        """An identical provider on two different AEPs (sockets) is kept on both."""
+        from configuration_to_text import SimpleConfigurationFactory
+
+        factory = SimpleConfigurationFactory()
+        parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
+        parser.parse_file(factory, str(PROV_TWO_SOCK_FIBEX), verbose=False)
+
+        psis_a = parser.__aeps__["AEP_PROVIDER_A"][0]
+        psis_b = parser.__aeps__["AEP_PROVIDER_B"][0]
+
+        assert len(psis_a) == 1
+        assert len(psis_b) == 1
+        assert psis_a[0].service().serviceid() == psis_b[0].service().serviceid()
+        assert psis_a[0].instanceid() == psis_b[0].instanceid()
+
+    def test_provider_on_two_different_ecus_not_deduped(self, capsys: Any) -> None:
+        """The same provider on two different ECUs (sockets) is kept on both and
+        is valid FIBEX, since FLYNC supports it until variant management lands."""
+        from configuration_to_text import SimpleConfigurationFactory
+
+        factory = SimpleConfigurationFactory()
+        parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
+        parser.parse_file(factory, str(PROV_TWO_ECU_FIBEX), verbose=False)
+
+        psis_a = parser.__aeps__["AEP_PROVIDER_A"][0]
+        psis_b = parser.__aeps__["AEP_PROVIDER_B"][0]
+
+        assert len(psis_a) == 1
+        assert len(psis_b) == 1
+        assert psis_a[0].service().serviceid() == psis_b[0].service().serviceid()
+        assert psis_a[0].instanceid() == psis_b[0].instanceid()
+
+        out = capsys.readouterr().out
+        assert "provided more than once" not in out
+        assert "Skipping duplicate" not in out

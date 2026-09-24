@@ -9,6 +9,10 @@ maintainers = [
     { name = "Dr. Lars Völker", email = "lars.voelker@technica-engineering.de" },
 ]
 dependencies = [
+    "black",
+    "isort",
+    "flake8",
+    "colorama",
     "graphviz>=0.21",
     "isodate>=0.7.2",
     "lxml>=6.1.1",
@@ -17,7 +21,7 @@ dependencies = [
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
     "xlsxwriter>=3.2.9",
-    "flync==0.13.0",
+    "flync==0.14.0",
 ]
 
 [tool.black]

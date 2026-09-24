@@ -80,7 +80,7 @@ class FlyncParser:
         self._base_pdu_by_name: dict[str, BaseAbstractPDU] = {}
         self._pdu_header_id_by_name: dict[str, int] = {}
         self._eth_pdu_header_id_counter: int = 0
-        self._container_pdu_meta: dict[str, tuple[int, dict[str, BaseSignalInstance]]] = {}
+        self._container_pdu_meta: dict[str, tuple[int, dict[str, BaseSignalInstance], str, str]] = {}
 
     def parse_dir(self, conf_factory: BaseConfigurationFactory, directory: str, verbose: bool = False) -> None:
         """Parse a FLYNC workspace directory and populate conf_factory."""
@@ -99,7 +99,7 @@ class FlyncParser:
         self._base_pdu_by_name = {}  # pdu_name -> BasePDU (for socket PDU deployments)
         self._pdu_header_id_by_name = {}  # pdu_name -> header_id (for EthernetPDUInstance)
         self._eth_pdu_header_id_counter = 0
-        self._container_pdu_meta = {}  # name -> (length, sig_insts) for deferred create_pdu
+        self._container_pdu_meta = {}  # name -> (length, sig_insts, pdu_type, original_name) for deferred create_pdu
         # In FLYNC 0.13 cross-model references are resolved during workspace load
         # (via pydantic model validators / parent pointers), so model methods such
         # as EthernetInterface.get_controller() work without an active registry.
@@ -147,7 +147,7 @@ class FlyncParser:
         "other": "OTHER",
         "service": "SERVICE",
         "tpl": "TPL",
-        "xcp_pro_configured": "XCP_PRE_CONFIGURED",
+        "xcp_pre_configured": "XCP_PRE_CONFIGURED",
         "xcp_runtime_configured": "XCP_RUNTIME_CONFIGURED",
     }
 
@@ -211,7 +211,7 @@ class FlyncParser:
                 )
                 si_obj.add_signal(base_sig)
                 sig_insts[si_id] = si_obj
-            base_pdu = conf_factory.create_pdu(
+            base_pdu: BasePDU | BaseMultiplexPDU = conf_factory.create_pdu(
                 flync_pdu.name,
                 flync_pdu.name,
                 flync_pdu.length,
@@ -220,12 +220,16 @@ class FlyncParser:
             )
             base_pdu_by_name[flync_pdu.name] = base_pdu
 
+        # Map of FLYNC StandardPDU objects by name (multiplex sub-PDUs are referenced
+        # from base_pdu_by_name via pdu_ref at parse time).
+        std_flync_by_name = {p.name: p for p in channels.pdus or [] if not isinstance(p, MultiplexedPDU)}
+
         # Pass 2: parse multiplex PDUs (sub-PDUs are already in base_pdu_by_name)
         for flync_pdu in channels.pdus or []:
             if not isinstance(flync_pdu, MultiplexedPDU):
                 continue
-            mux_pdu = self._parse_multiplex_pdu(flync_pdu, conf_factory, base_pdu_by_name)
-            base_pdu_by_name[flync_pdu.name] = mux_pdu
+            base_pdu = self._parse_multiplex_pdu(flync_pdu, conf_factory, base_pdu_by_name, std_flync_by_name)
+            base_pdu_by_name[flync_pdu.name] = base_pdu
 
         # Build frames and frame triggerings; populate per-ECU maps.
         # The FLYNC model may carry the same logical frame more than once (one
@@ -275,6 +279,19 @@ class FlyncParser:
 
         # Parse Ethernet container PDUs (no frame triggerings — frames/PDUs are registered directly).
         for container_pdu in channels.ethernet_pdu_containers or []:
+            # Socket PDU carriers are marked with a JSON description
+            # {"pdu": "<original-pdu-name>"}.  They carry a socket PDU context
+            # (original PDU + network header ID) and must NOT be emitted as
+            # frames; the original name is used to resolve the socket PDU.
+            carrier_original: str | None = None
+            if container_pdu.description:
+                try:
+                    _desc = json.loads(container_pdu.description)
+                    if isinstance(_desc, dict) and "pdu" in _desc:
+                        carrier_original = str(_desc["pdu"])
+                except (TypeError, ValueError):
+                    carrier_original = None
+
             pdu_insts = {}
             sig_insts_for_container: dict[str, BaseSignalInstance] = {}
             for cpdu_ref in container_pdu.contained_pdus:
@@ -296,21 +313,27 @@ class FlyncParser:
                 if hasattr(cont_base_pdu, "signal_instances") and callable(cont_base_pdu.signal_instances):
                     for si_key, si_obj in (cont_base_pdu.signal_instances() or {}).items():
                         sig_insts_for_container[f"{cpdu_ref.pdu_ref}_{si_key}"] = si_obj
-            conf_factory.create_frame(
-                container_pdu.name,
-                container_pdu.name,
-                container_pdu.length,
-                "APPLICATION",
-                pdu_insts,
-            )
+            if carrier_original is None:
+                conf_factory.create_frame(
+                    container_pdu.name,
+                    container_pdu.name,
+                    container_pdu.length,
+                    "APPLICATION",
+                    pdu_insts,
+                )
             # Store container metadata for deferred PDU creation.  The actual
             # BasePDU is only created (via create_pdu) when a PDUSender or
             # PDUReceiver deployment references this container, so workspaces
             # that have no such deployments stay identical to the FIBEX output.
+            # For socket PDU carriers the original PDU name is kept in the
+            # description so the socket PDUs round-trip with the correct name.
             if container_pdu.name not in base_pdu_by_name:
+                original_name = carrier_original or container_pdu.name
                 self._container_pdu_meta[container_pdu.name] = (
                     container_pdu.length,
                     sig_insts_for_container,
+                    self._map_pdu_usage(container_pdu),
+                    original_name,
                 )
 
         # Expose PDU lookup for socket deployment parsing (_parse_sockets_for_vlan).
@@ -330,6 +353,7 @@ class FlyncParser:
         flync_pdu: Any,
         conf_factory: BaseConfigurationFactory,
         base_pdu_by_name: dict[str, BaseAbstractPDU],
+        std_flync_by_name: dict[str, Any] | None = None,
     ) -> BaseMultiplexPDU:
         """Reconstruct a BaseMultiplexPDU from a FLYNC MultiplexedPDU.
 
@@ -380,23 +404,25 @@ class FlyncParser:
         seg_pos = conf_factory.create_multiplex_segment_position(seg_bit_pos, seg_is_high_low, seg_bit_len)
 
         # Build sub-PDUs from mux group signals (absolute → sub-PDU-relative positions).
-        # The sub-PDU name is taken from group.pdu.name (set during FIBEX→FLYNC conversion).
-        pdu_instances: dict[str, BasePDU] = {}
+        # Sub-PDUs are now standalone StandardPDUs in the channel, referenced by name
+        # (PDUInstance.pdu_ref) instead of being inlined in the mux group.
+        pdu_instances: dict[int, BasePDU] = {}
         if seg_bit_len <= 0:
             raise ValueError(f"Invalid multiplex segment bit length {seg_bit_len} in PDU {flync_pdu.name!r}")
         for group in flync_pdu.mux_groups:
             switch_code = group.selector_value
-            sub_pdu_name = group.pdu.name or mux_pdu_refs.get(switch_code) or f"{flync_pdu.name}_mux{switch_code}"
+            sub_std = (std_flync_by_name or {}).get(group.pdu.pdu_ref)
+            sub_pdu_name = (sub_std.name if sub_std is not None else None) or mux_pdu_refs.get(switch_code) or f"{flync_pdu.name}_mux{switch_code}"
             sub_byte_len = max(1, seg_bit_len // 8)
             sig_insts: dict[str, BaseSignalInstance] = {}
-            for si in getattr(group.pdu, "signals", []):
+            for si in (sub_std.signals if sub_std is not None else []):
                 sig = si.signal
                 basetype = self._SIGNAL_DATA_TYPE_TO_FIBEX.get(sig.data_type, "A_UINT8")
                 compu_scale = self._compu_scale_for(sig)
                 compu_consts = self._compu_consts_for(sig)
                 base_sig = conf_factory.create_signal(sig.name, sig.name, compu_scale, compu_consts, sig.bit_length, 0, 0, basetype, sig.bit_length)
                 si_id = sig.name + "_si"
-                sub_bit_pos = (si.bit_position or 0) - seg_bit_pos
+                sub_bit_pos = si.bit_position or 0
                 if sub_bit_pos < 0:
                     print(
                         f"WARNING: Signal {sig.name!r} in multiplex PDU {flync_pdu.name!r} "
@@ -409,27 +435,33 @@ class FlyncParser:
                 si_obj.add_signal(base_sig)
                 sig_insts[si_id] = si_obj
             pdu_instances[switch_code] = conf_factory.create_pdu(
-                sub_pdu_name, sub_pdu_name, sub_byte_len, self._map_pdu_usage(group.pdu), cast(dict[int, BaseSignalInstance], sig_insts)
+                sub_pdu_name,
+                sub_pdu_name,
+                sub_byte_len,
+                self._map_pdu_usage(sub_std if sub_std is not None else flync_pdu),
+                cast(dict[int, BaseSignalInstance], sig_insts),
             )
 
         # Reconstruct static PDU and segment from static_group if present
         static_base_pdu: BasePDU | None = None
         static_segs: list[BaseMultiplexPDUSegmentPosition] = []
         if flync_pdu.static_group is not None:
+            static_group_refs = [g.pdu_ref for g in flync_pdu.static_group if g.pdu_ref]
+            static_std = (std_flync_by_name or {}).get(static_group_refs[0]) if static_group_refs else None
             static_sig_insts: dict[str, BaseSignalInstance] = {}
-            static_pdu_name = flync_pdu.static_group.name
-            static_byte_len = max(1, meta.get("static_seg_bit_len", flync_pdu.static_group.length * 8) // 8)
+            static_pdu_name = (static_std.name if static_std is not None else None) or f"{flync_pdu.name}_static"
+            static_byte_len = max(1, meta.get("static_seg_bit_len", (static_std.length if static_std is not None else flync_pdu.length) * 8) // 8)
             static_seg_bit_pos = meta.get("static_seg_bit_pos", 0)
-            static_seg_bit_len = meta.get("static_seg_bit_len", flync_pdu.static_group.length * 8)
+            static_seg_bit_len = meta.get("static_seg_bit_len", (static_std.length if static_std is not None else flync_pdu.length) * 8)
             static_seg_is_high_low = meta.get("static_seg_is_high_low", "false")
-            for si in getattr(flync_pdu.static_group, "signals", []):
+            for si in (static_std.signals if static_std is not None else []):
                 sig = si.signal
                 basetype = self._SIGNAL_DATA_TYPE_TO_FIBEX.get(sig.data_type, "A_UINT8")
                 compu_scale = self._compu_scale_for(sig)
                 compu_consts = self._compu_consts_for(sig)
                 base_sig = conf_factory.create_signal(sig.name, sig.name, compu_scale, compu_consts, sig.bit_length, 0, 0, basetype, sig.bit_length)
                 si_id = sig.name + "_si"
-                sub_bit_pos = (si.bit_position or 0) - static_seg_bit_pos
+                sub_bit_pos = si.bit_position or 0
                 si_obj = conf_factory.create_signal_instance(si_id, si_id, sub_bit_pos, si.endianness == "BE")
                 si_obj.add_signal(base_sig)
                 static_sig_insts[si_id] = si_obj
@@ -437,12 +469,13 @@ class FlyncParser:
                 static_pdu_name,
                 static_pdu_name,
                 static_byte_len,
-                self._map_pdu_usage(flync_pdu.static_group),
+                self._map_pdu_usage(static_std if static_std is not None else flync_pdu),
                 cast(dict[int, BaseSignalInstance], static_sig_insts),
             )
             static_seg = conf_factory.create_multiplex_segment_position(static_seg_bit_pos, static_seg_is_high_low, static_seg_bit_len)
             static_segs = [static_seg]
 
+        static_seg_pdu_combinations = [(static_segs, static_base_pdu)] if static_base_pdu is not None else []
         return conf_factory.create_multiplex_pdu(
             flync_pdu.name,
             flync_pdu.name,
@@ -450,9 +483,8 @@ class FlyncParser:
             self._map_pdu_usage(flync_pdu),
             switch,
             [seg_pos],
-            cast(list[BasePDUInstance] | None, pdu_instances),
-            static_segs,
-            static_base_pdu,
+            cast(dict[int, BaseAbstractPDU | None], pdu_instances),
+            static_seg_pdu_combinations,
         )
 
     def _parse_services(self, conf_factory: BaseConfigurationFactory, flync_model: Any, verbose: bool = False) -> None:
@@ -809,8 +841,20 @@ class FlyncParser:
         meta = self._container_pdu_meta.get(pdu_ref)
         if meta is None:
             return None
-        length, sig_insts = meta
-        base_pdu = conf_factory.create_pdu(pdu_ref, pdu_ref, length, "APPLICATION", cast(dict[int, BaseSignalInstance], sig_insts))
+        length, sig_insts, pdu_type, original_name = meta
+        # Reuse a channel PDU with the same original name (socket PDUs may also
+        # be regular channel PDUs) so content and signals stay identical.
+        existing = self._base_pdu_by_name.get(original_name)
+        if existing is not None:
+            self._base_pdu_by_name[pdu_ref] = existing
+            return existing
+        base_pdu = conf_factory.create_pdu(
+            original_name,
+            original_name,
+            length,
+            pdu_type,
+            cast(dict[int, BaseSignalInstance], sig_insts),
+        )
         self._base_pdu_by_name[pdu_ref] = base_pdu
         return base_pdu
 
@@ -905,9 +949,9 @@ class FlyncParser:
                 )
 
                 for pdu_inst in incoming_pdus:
-                    s.add_incoming_pdu(cast(BaseAbstractPDU, pdu_inst))
+                    s.add_incoming_pdu(pdu_inst)
                 for pdu_inst in outgoing_pdus:
-                    s.add_outgoing_pdu(cast(BaseAbstractPDU, pdu_inst))
+                    s.add_outgoing_pdu(pdu_inst)
 
                 sockets.append(s)
         return sockets

@@ -69,9 +69,15 @@ from configuration_base_classes import (
 
 
 class FibexParser(AbstractParser):
-    def __init__(self, plugin_file: str | None, ecu_name_replacement: dict[str, str] | None) -> None:
+    def __init__(
+        self,
+        plugin_file: str | None,
+        ecu_name_replacement: dict[str, str] | None,
+        keep_duplicates: bool = False,
+    ) -> None:
         super().__init__()
         self.__conf_factory__ = None
+        self.__keep_duplicates__: bool = keep_duplicates
 
         self.__ns__ = {
             "fx": "http://www.asam.net/xml/fbx",
@@ -453,8 +459,7 @@ class FibexParser(AbstractParser):
         BaseMultiplexPDUSwitch,
         list[BaseMultiplexPDUSegmentPosition],
         dict[int, BaseAbstractPDU | None],
-        list[BaseMultiplexPDUSegmentPosition],
-        str | None,
+        list[tuple[list[BaseMultiplexPDUSegmentPosition], BasePDU]],
     ]:
         # Switch
         id = self.get_child_attribute(element, "./fx:SWITCH", "ID")
@@ -493,9 +498,22 @@ class FibexParser(AbstractParser):
             static_segs.append(conf_factory.create_multiplex_segment_position(bit_pos, cast(bool, high_low), bit_len))
 
         # static pdu instances
-        static_pdu = self.get_child_attribute(element, "./fx:STATIC-PART/fx:STATIC-PDU-INSTANCE/fx:PDU-REF", "ID-REF")
+        static_pdu_id = self.get_child_attribute(element, "./fx:STATIC-PART/fx:STATIC-PDU-INSTANCE/fx:PDU-REF", "ID-REF")
 
-        return switch, segs, pdus, static_segs, static_pdu
+        static_seg_pdu_combinations = []
+
+        if len(static_segs) > 0 and static_pdu_id is not None:
+            static_pdu = self.get_pdu(static_pdu_id)
+
+            if static_pdu is None:
+                print(f"ERROR: PDU Multiplexer {id=} {name=}: {static_pdu_id=} does not reference PDU!")
+            else:
+                # we only can have up to one combination anyhow (limitation of FIBEX)
+                static_seg_pdu_combinations.append((static_segs, cast(BasePDU, static_pdu)))
+        elif len(static_segs) > 0 or static_pdu_id is not None:
+            print(f"ERROR: PDU Multiplexer {id=} {name=}: combination of {static_pdu_id=} and {len(static_segs)=} makes no sense!")
+
+        return switch, segs, pdus, static_seg_pdu_combinations
 
     def parse_signal_pdu(self, element: _Element, verbose: bool) -> BasePDU:
         id = self.get_id(element)
@@ -536,9 +554,8 @@ class FibexParser(AbstractParser):
 
         multiplexer = element.find("./fx:MULTIPLEXER", self.__ns__)
 
-        switch, seg_pos, pdu_instances, static_segs, static_pdu_id = self.parse_multiplexer(cast(_Element, multiplexer))
+        switch, seg_pos, pdu_instances, static_seg_pdu_combinations = self.parse_multiplexer(cast(_Element, multiplexer))
 
-        static_pdu = self.get_pdu(cast(str, static_pdu_id))
         conf_factory = self.__conf_factory__
         assert conf_factory is not None
         ret = conf_factory.create_multiplex_pdu(
@@ -548,9 +565,8 @@ class FibexParser(AbstractParser):
             cast(str, pdu_type),
             switch,
             seg_pos,
-            cast(list[BasePDUInstance] | None, pdu_instances),
-            static_segs,
-            cast(BasePDU | None, static_pdu),
+            pdu_instances,
+            static_seg_pdu_combinations,
         )
 
         self.add_pdu(ret)
@@ -1499,6 +1515,7 @@ class FibexParser(AbstractParser):
         return neps
 
     def parse_psis(self, root: _Element) -> None:
+        seen_providers: dict[str, set[tuple[int, int, int]]] = {}
         for aep in root.findall(".//it:APPLICATION-ENDPOINT", self.__ns__):
             protover_txt = self.get_child_text(aep, "it:SERIALIZATION-TECHNOLOGY/it:VERSION")
             protover = 1 if protover_txt is None else protover_txt
@@ -1523,6 +1540,16 @@ class FibexParser(AbstractParser):
 
                     if aepid not in self.__aeps__:
                         self.__aeps__[cast(str, aepid)] = ([], [], [], [])
+
+                    pkey = (service.serviceid(), service.majorversion(), si.instanceid())
+                    if pkey in seen_providers.setdefault(cast(str, aepid), set()):
+                        print(
+                            f"WARNING: SOME/IP ServiceInstance (service=0x{service.serviceid():04x}, "
+                            f"major_version={service.majorversion()}, instance_id={si.instanceid()}) "
+                            f"is provided more than once in application endpoint {cast(str, aepid)!r}."
+                        )
+                    else:
+                        seen_providers[cast(str, aepid)].add(pkey)
 
                     psis, csis, ehs, cegs = self.__aeps__[cast(str, aepid)]
                     self.__aeps__[cast(str, aepid)] = (psis + [si], csis, ehs, cegs)
@@ -1561,7 +1588,18 @@ class FibexParser(AbstractParser):
                     psis, csis, ehs, cegs = self.__aeps__[cast(str, aepid)]
                     self.__aeps__[cast(str, aepid)] = (psis, csis, ehs + [eh], cegs)
 
+    @staticmethod
+    def _client_key(client: SOMEIPBaseServiceInstanceClient) -> tuple[int, int, int]:
+        return (client.service().serviceid(), client.service().majorversion(), client.instanceid())
+
+    @staticmethod
+    def _receiver_key(receiver: SOMEIPBaseServiceEventgroupReceiver) -> tuple[int, int, int]:
+        si = receiver.serviceinstance()
+        return (si.service().serviceid(), si.instanceid(), receiver.eventgroupid())
+
     def parse_csis_and_cegs(self, root: _Element) -> None:
+        seen_clients: dict[str, set[tuple[int, int, int]]] = {}
+        seen_receivers: dict[str, set[tuple[int, int, int]]] = {}
         for aep in root.findall(".//it:APPLICATION-ENDPOINT", self.__ns__):
 
             aepid = self.get_id(aep)
@@ -1582,7 +1620,19 @@ class FibexParser(AbstractParser):
                         self.__aeps__[cast(str, aepid)] = ([], [], [], [])
 
                     psis, csis, ehs, cegs = self.__aeps__[cast(str, aepid)]
-                    self.__aeps__[cast(str, aepid)] = (psis, csis + [tmp], ehs, cegs)
+                    if self.__keep_duplicates__:
+                        self.__aeps__[cast(str, aepid)] = (psis, csis + [tmp], ehs, cegs)
+                    else:
+                        ckey = self._client_key(tmp)
+                        if ckey in seen_clients.setdefault(cast(str, aepid), set()):
+                            print(
+                                f"WARNING: Skipping duplicate SOME/IP ServiceInstanceClient for "
+                                f"(service=0x{tmp.service().serviceid():04x}, major_version={tmp.service().majorversion()}, "
+                                f"instance_id={tmp.instanceid()}) in application endpoint {cast(str, aepid)!r}."
+                            )
+                        else:
+                            seen_clients[cast(str, aepid)].add(ckey)
+                            self.__aeps__[cast(str, aepid)] = (psis, csis + [tmp], ehs, cegs)
 
                     for ceg in csi.findall("it:CONSUMED-EVENT-GROUPS/it:CONSUMED-EVENT-GROUP", self.__ns__):
                         cegid = self.get_id(ceg)
@@ -1607,7 +1657,20 @@ class FibexParser(AbstractParser):
                                 self.__aeps__[cast(str, aepref)] = ([], [], [], [])
 
                             psis, csis, ehs, cegs = self.__aeps__[cast(str, aepref)]
-                            self.__aeps__[cast(str, aepref)] = (psis, csis, ehs, cegs + [tmp2])
+                            if self.__keep_duplicates__:
+                                self.__aeps__[cast(str, aepref)] = (psis, csis, ehs, cegs + [tmp2])
+                            else:
+                                rkey = self._receiver_key(tmp2)
+                                if rkey in seen_receivers.setdefault(cast(str, aepref), set()):
+                                    print(
+                                        f"WARNING: Skipping duplicate SOME/IP EventgroupReceiver for "
+                                        f"(service=0x{tmp2.serviceinstance().service().serviceid():04x}, "
+                                        f"instance_id={tmp2.serviceinstance().instanceid()}, "
+                                        f"eventgroup_id={tmp2.eventgroupid()}) in application endpoint {cast(str, aepref)!r}."
+                                    )
+                                else:
+                                    seen_receivers[cast(str, aepref)].add(rkey)
+                                    self.__aeps__[cast(str, aepref)] = (psis, csis, ehs, cegs + [tmp2])
 
                 else:
                     print(f"ERROR in FIBEX: Cannot find PSI {psiid}")

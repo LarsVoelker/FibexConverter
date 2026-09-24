@@ -1439,18 +1439,16 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         # We assume that Ethernet PDUs have globally unique IDs...
         for socket in self.__sockets__:
             for p in socket.incoming_pdus():
-                peth = cast(BaseEthernetPDUInstance, p)
-                if peth.pdu() is not None:
-                    header_id = peth.header_id()
+                if p.pdu() is not None:
+                    header_id = p.header_id()
                     assert header_id is not None
-                    eth_pdus[header_id] = peth
+                    eth_pdus[header_id] = p
 
             for p in socket.outgoing_pdus():
-                peth = cast(BaseEthernetPDUInstance, p)
-                if peth.pdu() is not None:
-                    header_id = peth.header_id()
+                if p.pdu() is not None:
+                    header_id = p.header_id()
                     assert header_id is not None
-                    eth_pdus[header_id] = peth
+                    eth_pdus[header_id] = p
 
         return eth_pdus
 

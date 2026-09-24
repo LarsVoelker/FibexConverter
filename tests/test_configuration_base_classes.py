@@ -1575,8 +1575,7 @@ class TestBaseMultiplexPDU:
             switch=switch,
             seg_pos=[segment_position],
             pdu_instances=[signal_instance],  # type: ignore
-            static_segs=[],
-            static_pdu=None,
+            static_seg_pdu_combinations=[],
         )
         assert pdu.name() == "TestMultiplexPDU"
         assert pdu.switch() == switch

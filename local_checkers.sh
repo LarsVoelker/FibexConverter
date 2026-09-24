@@ -10,9 +10,9 @@ fi
 
 for i in ${params} ; do
 	echo "--> $i"
-	isort --check --diff --color $i
+	isort --color $i
 	flake8 $i
-	black --check --diff --color $i
+	black --color $i
 	echo ""
 done
 
