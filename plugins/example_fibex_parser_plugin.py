@@ -2,7 +2,7 @@
 
 # Automotive configuration file scripts
 # Copyright (C) 2015-2026  Dr. Lars Voelker
-# Copyright (C) 2020-2023  Dr. Lars Voelker, Technica Engineering GmbH
+# Copyright (C) 2020-2026  Dr. Lars Voelker, Technica Engineering GmbH
 
 # This program is free software; you can redistribute it and/or
 # modify it under the terms of the GNU General Public License
