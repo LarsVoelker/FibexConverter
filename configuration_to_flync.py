@@ -30,7 +30,7 @@ import time
 from typing import Any, Literal, cast
 
 from flync.core.datatypes.macaddress import FLYNCMacAddress
-from flync.model.flync_4_bus.can_bus import CANBus
+from flync.model.flync_4_bus.can_bus import CANBaudRate, CANBus
 from flync.model.flync_4_communication import FLYNCChannelConfig, FLYNCCommunicationConfig
 from flync.model.flync_4_ecu import BASET1, ECU, RGMII, Controller, ECUPort, EthernetInterface, InternalTopology
 from flync.model.flync_4_ecu.can_interface import CANFrameRef, CANInterface
@@ -49,7 +49,7 @@ from flync.model.flync_4_ecu.switch import SwitchConfig as FLYNCSwitchConfig
 from flync.model.flync_4_ecu.switch import SwitchPort as FLYNCSwitchPort
 from flync.model.flync_4_ecu.switch import VLANEntry  # type: ignore[attr-defined]
 from flync.model.flync_4_metadata import BaseVersion, ECUMetadata, EmbeddedMetadata, SOMEIPServiceMetadata, SystemMetadata
-from flync.model.flync_4_signal.frame import CANFDFrame, CANFrame
+from flync.model.flync_4_signal.frame import CANFDFrame, CANFrame, J1939Frame
 from flync.model.flync_4_signal.pdu import ContainedPDURef, ContainerPDU, ContainerPDUHeader, MultiplexedPDU, MuxGroup, PDUInstance, StandardPDU
 from flync.model.flync_4_signal.pdu_deployment import PDUReceiver, PDUSender
 from flync.model.flync_4_signal.signal import Signal, SignalDataType, SignalInstance
@@ -1399,7 +1399,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     }
     _SIGNAL_DATA_TYPE_TO_FIBEX = {v: k for k, v in _FIBEX_TO_SIGNAL_DATA_TYPE.items()}
 
-    _ALLOWED_CAN_BAUD_RATES = (10_000, 20_000, 50_000, 100_000, 125_000, 250_000, 500_000, 1_000_000)
+    _ALLOWED_CAN_BAUD_RATES: tuple[CANBaudRate, ...] = (
+        10_000,
+        20_000,
+        50_000,
+        100_000,
+        125_000,
+        250_000,
+        500_000,
+        1_000_000,
+    )
 
     @classmethod
     def _basetype_to_signal_data_type(cls, basetype: str) -> SignalDataType:
@@ -1412,7 +1421,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         return cls._FIBEX_TO_SIGNAL_DATA_TYPE.get(basetype, SignalDataType.BYTEARRAY)
 
     @classmethod
-    def _nearest_can_baud_rate(cls, speed: int | None) -> int:
+    def _nearest_can_baud_rate(cls, speed: int | None) -> CANBaudRate:
         if speed is None:
             return 500_000
         if speed in cls._ALLOWED_CAN_BAUD_RATES:
@@ -1421,7 +1430,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         print(f"WARNING: CAN speed {speed} not in allowed FLYNC baud rates; using {nearest}")
         return nearest
 
-    def _cluster_speed_for_channel(self, channel_name: str) -> int:
+    def _cluster_speed_for_channel(self, channel_name: str) -> CANBaudRate:
         cluster_id = self.__channel_to_cluster.get(channel_name)
         if cluster_id is None:
             return 500_000
@@ -1761,7 +1770,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         # longer require globally unique names (Frame is no longer a UniqueName)
         # and CANFrameRef references frames by (bus, CAN ID), so we keep the
         # original FIBEX frame name to preserve a clean round-trip.
-        flync_frames_by_channel: dict[str, list[CANFrame | CANFDFrame]] = {}
+        flync_frames_by_channel: dict[str, list[CANFrame | CANFDFrame | J1939Frame]] = {}
         for ft in self.__can_fts.values():
             base_frame = ft.frame()
             if base_frame is None:
