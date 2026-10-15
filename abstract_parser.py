@@ -19,6 +19,7 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 
+import logging
 from typing import Any, cast
 
 import isodate  # type: ignore[import-untyped]
@@ -26,13 +27,18 @@ from lxml.etree import _Element
 
 from configuration_base_classes import BaseConfigurationFactory
 
+logger = logging.getLogger(__name__)
+
 
 class AbstractParser(object):
+    """Common helper functions for XML-based configuration parsers."""
+
     def __init__(self) -> None:
         self.__conf_factory__: BaseConfigurationFactory | None = None
         self.__ns__: dict[str, str] = {}
 
     def get_child_text(self, element: _Element | None, childtag: str) -> str | None:
+        """Return the text of the first matching child or ``None`` if not found."""
         if element is None:
             return None
 
@@ -43,18 +49,21 @@ class AbstractParser(object):
         return c.text
 
     def get_attribute(self, element: _Element, attribkey: str) -> str | None:
-        if self.__ns__ is not None and len(attribkey.split(":")) > 1:
-            prefix, elem = attribkey.split(":")
+        """Return the attribute value from *element* or ``None``.
+
+        Namespaced attributes can be requested with the ``prefix:name`` notation.
+        """
+        if self.__ns__ is not None and ":" in attribkey:
+            prefix, elem = attribkey.split(":", 1)
             if prefix in self.__ns__:
                 attribkey = "{" + self.__ns__[prefix] + "}" + elem
             else:
-                print(f"Cannot lookup namespace: {attribkey}")
+                logger.warning("Cannot lookup namespace for attribute %s", attribkey)
 
-        if attribkey in element.attrib:
-            return cast(str, element.attrib[attribkey])
-        return None
+        return element.attrib.get(attribkey)
 
     def get_child_attribute(self, element: _Element, childtag: str | None, attribkey: str | None) -> str | None:
+        """Return an attribute of a child element or ``None`` if child/attribute is missing."""
         if childtag is None or attribkey is None:
             return None
 
@@ -62,9 +71,7 @@ class AbstractParser(object):
         if c is None:
             # xml.etree.ElementTree.dump(element)
             return None
-        if attribkey in c.attrib:
-            return cast(str, c.attrib[attribkey])
-        return None
+        return c.attrib.get(attribkey)
 
     @staticmethod
     def element_text_to_int(element: _Element | None, default: int) -> int:
@@ -74,23 +81,27 @@ class AbstractParser(object):
 
     @staticmethod
     def element_text(element: _Element | None) -> str | None:
+        """Return ``element.text`` or ``None`` when *element* is ``None``."""
         if element is None:
             return None
         return element.text
 
     @staticmethod
     def get_from_dict(d: dict[str, Any] | None, key: str | None, default: Any) -> Any:
+        """Safe dictionary lookup that tolerates ``None`` for *d* or *key*."""
         if d is None or key is None or key not in d:
             return default
         return d[key]
 
     def get_from_dict_or_none(self, d: dict[str, Any] | None, key: str) -> Any | None:
+        """Convenience wrapper to get a value from a dict or ``None``."""
         if d is None:
             return None
         return self.get_from_dict(d, key, None)
 
     @staticmethod
     def dict_to_sorted_set(d: dict[Any, Any]) -> tuple[Any, ...]:
+        """Return tuple of dictionary values ordered by sorted keys."""
         ret: tuple[Any, ...] = ()
 
         for k in sorted(d.keys()):
@@ -106,7 +117,8 @@ class AbstractParser(object):
 
     @staticmethod
     def value_to_bit(i: int) -> int | None:
-        if i.bit_count() != 1:
+        """Return the bit index of a power-of-two integer or ``None`` otherwise."""
+        if i <= 0 or i.bit_count() != 1:
             return None
 
         bitnumber = 0

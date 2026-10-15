@@ -23,10 +23,13 @@ from __future__ import annotations
 
 import csv
 import ipaddress
+import logging
 from collections.abc import Iterable
 from typing import Literal, Protocol
 
 import macaddress  # type: ignore[import-untyped]
+
+logger = logging.getLogger(__name__)
 
 CallSemantic = Literal["REQUEST_RESPONSE", "FIRE_AND_FORGET"]
 
