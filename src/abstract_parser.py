@@ -29,24 +29,33 @@ from configuration_base_classes import BaseConfigurationFactory
 
 class AbstractParser(object):
     def __init__(self) -> None:
-        self.__conf_factory__: BaseConfigurationFactory | None = None
-        self.__ns__: dict[str, str] = {}
+        self._conf_factory: BaseConfigurationFactory | None = None
+        self._ns: dict[str, str] = {}
 
     def get_child_text(self, element: _Element | None, childtag: str) -> str | None:
         if element is None:
             return None
 
-        c = element.find(childtag, self.__ns__)
+        c = element.find(childtag, self._ns)
         if c is None:
             return None
 
         return c.text
 
+    def get_child_text_required(self, element: _Element, childtag: str) -> str:
+        text = self.get_child_text(element, childtag)
+        if text is None:
+            raise ValueError(f"Required element {childtag} missing in {element.tag} (ID: {element.get('ID')})")
+        return text
+
+    def get_child_int(self, element: _Element, childtag: str) -> int:
+        return int(self.get_child_text_required(element, childtag))
+
     def get_attribute(self, element: _Element, attribkey: str) -> str | None:
-        if self.__ns__ is not None and len(attribkey.split(":")) > 1:
+        if self._ns is not None and len(attribkey.split(":")) > 1:
             prefix, elem = attribkey.split(":")
-            if prefix in self.__ns__:
-                attribkey = "{" + self.__ns__[prefix] + "}" + elem
+            if prefix in self._ns:
+                attribkey = "{" + self._ns[prefix] + "}" + elem
             else:
                 print(f"Cannot lookup namespace: {attribkey}")
 
@@ -58,7 +67,7 @@ class AbstractParser(object):
         if childtag is None or attribkey is None:
             return None
 
-        c = element.find(childtag, self.__ns__)
+        c = element.find(childtag, self._ns)
         if c is None:
             # xml.etree.ElementTree.dump(element)
             return None
@@ -71,6 +80,12 @@ class AbstractParser(object):
         if element is None:
             return default
         return int(element.text or "")
+
+    @staticmethod
+    def parse_bool(text: str | None, default: bool = False) -> bool:
+        if text is None:
+            return default
+        return text.strip().lower() == "true"
 
     @staticmethod
     def element_text(element: _Element | None) -> str | None:

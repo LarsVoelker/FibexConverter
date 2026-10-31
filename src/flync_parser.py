@@ -54,6 +54,7 @@ from configuration_base_classes import (
     BaseSwitchPort,
     BaseVLAN,
     CallSemantic,
+    CompuConst,
     SOMEIPBaseDatatype,
     SOMEIPBaseParameter,
     SOMEIPBaseParameterUnionMember,
@@ -128,7 +129,7 @@ class FlyncParser:
         return (offset, factor, 1.0)
 
     @staticmethod
-    def _compu_consts_for(sig: Any) -> list[object]:
+    def _compu_consts_for(sig: Any) -> list[CompuConst]:
         enc = getattr(sig, "value_encoding", None)
         if enc is None:
             return []
@@ -279,8 +280,8 @@ class FlyncParser:
 
         # Parse Ethernet container PDUs (no frame triggerings — frames/PDUs are registered directly).
         for container_pdu in channels.ethernet_pdu_containers or []:
-            # Socket PDU carriers are marked with a JSON description
-            # {"pdu": "<original-pdu-name>"}.  They carry a socket PDU context
+            # Socket PDU carriers are marked by a JSON string in their description field
+            # (inside the FLYNC YAML): {"pdu": "<original-pdu-name>"}.  They carry a socket PDU context
             # (original PDU + network header ID) and must NOT be emitted as
             # frames; the original name is used to resolve the socket PDU.
             carrier_original: str | None = None
@@ -357,10 +358,10 @@ class FlyncParser:
     ) -> BaseMultiplexPDU:
         """Reconstruct a BaseMultiplexPDU from a FLYNC MultiplexedPDU.
 
-        Segment layout and sub-PDU name mapping are read from the JSON-encoded description.
+        Segment layout and sub-PDU name mapping are read from the PDU's description field,
+        which holds a JSON string inside the FLYNC YAML (written by configuration_to_flync.py).
         Sub-PDU objects are built from the mux group signals (absolute → relative positions).
-        is_high_low_byte_order is stored as a non-empty string ("true"/"false") to preserve
-        the FIBEX parser's truthy-string convention used by the text factory's str() methods.
+        Segment endianness is encoded there as "true"/"false" strings.
         """
         meta = {}
         if flync_pdu.description:
@@ -380,19 +381,16 @@ class FlyncParser:
                 print(f"WARNING: Skipping non-numeric mux_pdu_refs key {k!r} in multiplex PDU {flync_pdu.name!r}")
         seg_bit_pos = meta.get("seg_bit_pos")
         seg_bit_len = meta.get("seg_bit_len")
-        # Stored as string "true"/"false" so it's a truthy non-empty string, matching the FIBEX
-        # parser convention where IS-HIGH-LOW-BYTE-ORDER XML text is stored verbatim.
-        seg_is_high_low = meta.get("seg_is_high_low", "false")
+        seg_is_high_low = str(meta.get("seg_is_high_low", "false")).lower() == "true"
 
         # Reconstruct the switch from the selector signal
         sel = flync_pdu.selector_signal
-        # Pass "true"/"false" strings to match FIBEX parser's truthy-string convention
-        sel_is_high_low = "true" if sel.endianness == "BE" else "false"
+        sel_is_high_low = sel.endianness == "BE"
         switch = conf_factory.create_multiplex_switch(
             sel.signal.name + "_switch",
             sel.signal.name,
             sel.bit_position or 0,
-            cast(bool, sel_is_high_low),
+            sel_is_high_low,
             sel.signal.bit_length,
         )
 
@@ -453,7 +451,7 @@ class FlyncParser:
             static_byte_len = max(1, meta.get("static_seg_bit_len", (static_std.length if static_std is not None else flync_pdu.length) * 8) // 8)
             static_seg_bit_pos = meta.get("static_seg_bit_pos", 0)
             static_seg_bit_len = meta.get("static_seg_bit_len", (static_std.length if static_std is not None else flync_pdu.length) * 8)
-            static_seg_is_high_low = meta.get("static_seg_is_high_low", "false")
+            static_seg_is_high_low = str(meta.get("static_seg_is_high_low", "false")).lower() == "true"
             for si in (static_std.signals if static_std is not None else []):
                 sig = si.signal
                 basetype = self._SIGNAL_DATA_TYPE_TO_FIBEX.get(sig.data_type, "A_UINT8")

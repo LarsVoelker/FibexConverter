@@ -185,11 +185,11 @@ class TestFibexParserBasic:
 
     def test_initialization(self) -> None:
         """Test parser initialization."""
-        assert self.parser.__ns__ is not None
-        assert self.parser.__services__ == {}
-        assert self.parser.__codings__ == {}
-        assert self.parser.__signals__ == {}
-        assert self.parser.__frames__ == {}
+        assert self.parser._ns is not None
+        assert self.parser._services == {}
+        assert self.parser._codings == {}
+        assert self.parser._signals == {}
+        assert self.parser._frames == {}
 
     def test_get_attribute_with_namespace(self) -> None:
         """Test get_attribute with namespace prefix."""
@@ -228,8 +228,8 @@ class TestFibexParserCodings:
         root = _root(xml)
         self.parser.parse_codings(root)
 
-        assert "COD1" in self.parser.__codings__
-        coding = self.parser.__codings__["COD1"]
+        assert "COD1" in self.parser._codings
+        coding = self.parser._codings["COD1"]
         assert coding["Name"] == "Coding1"
         assert coding["Basetype"] == "A_UINT8"
         assert coding["BitLength"] == 8
@@ -257,8 +257,8 @@ class TestFibexParserCodings:
         root = _root(xml)
         self.parser.parse_codings(root)
 
-        assert "COD1" in self.parser.__codings__
-        assert "COD2" in self.parser.__codings__
+        assert "COD1" in self.parser._codings
+        assert "COD2" in self.parser._codings
 
 
 class TestFibexParserSignals:
@@ -307,8 +307,8 @@ class TestFibexParserSignals:
             ) -> Any:
                 return type("MockSignal", (), {"id": lambda self: id, "name": lambda self: name})()
 
-        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
-        result: Any = self.parser.parse_signal(cast(_Element, root.find(".//fx:SIGNALS/fx:SIGNAL", self.parser.__ns__)))
+        self.parser._conf_factory = cast(BaseConfigurationFactory, MockFactory())
+        result: Any = self.parser.parse_signal(cast(_Element, root.find(".//fx:SIGNALS/fx:SIGNAL", self.parser._ns)))
 
         assert result is not None
         assert result.id() == "SIG1"
@@ -336,14 +336,14 @@ class TestFibexParserPDUs:
 </fx:FIBEX>"""
 
         root = _root(xml)
-        pdu_element = cast(_Element, root.find(".//fx:PDUS/fx:PDU", self.parser.__ns__))
+        pdu_element = cast(_Element, root.find(".//fx:PDUS/fx:PDU", self.parser._ns))
 
         # Mock factory
         class MockFactory:
             def create_pdu(self, id: Any, short_name: Any, byte_length: Any, pdu_type: Any, signal_instances: Any) -> Any:
                 return type("MockPDU", (), {"id": lambda self: id, "short_name": lambda self: short_name, "byte_length": lambda self: byte_length})()
 
-        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
+        self.parser._conf_factory = cast(BaseConfigurationFactory, MockFactory())
         result: Any = self.parser.parse_signal_pdu(pdu_element, verbose=False)
 
         assert result is not None
@@ -373,7 +373,7 @@ class TestFibexParserFrames:
 </fx:FIBEX>"""
 
         root = _root(xml)
-        frame_element = cast(_Element, root.find(".//fx:FRAMES/fx:FRAME", self.parser.__ns__))
+        frame_element = cast(_Element, root.find(".//fx:FRAMES/fx:FRAME", self.parser._ns))
 
         # Mock factory
         class MockFactory:
@@ -389,7 +389,7 @@ class TestFibexParserFrames:
                     },
                 )()
 
-        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
+        self.parser._conf_factory = cast(BaseConfigurationFactory, MockFactory())
         result: Any = self.parser.parse_frame(frame_element, verbose=False)
 
         assert result is not None
@@ -419,7 +419,7 @@ class TestFibexParserFrameTriggering:
 </fx:FIBEX>"""
 
         root = _root(xml)
-        ft_element = cast(_Element, root.find(".//fx:FRAME-TRIGGERING", self.parser.__ns__))
+        ft_element = cast(_Element, root.find(".//fx:FRAME-TRIGGERING", self.parser._ns))
 
         # Mock factory
         class MockFactory:
@@ -431,7 +431,7 @@ class TestFibexParserFrameTriggering:
             ) -> Any:
                 return None  # Not flexray
 
-        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
+        self.parser._conf_factory = cast(BaseConfigurationFactory, MockFactory())
         result: Any = self.parser.parse_frame_triggering(ft_element)
 
         assert result is not None
@@ -456,7 +456,7 @@ class TestFibexParserFrameTriggering:
 </fx:FIBEX>"""
 
         root = _root(xml)
-        ft_element = cast(_Element, root.find(".//fx:FRAME-TRIGGERING", self.parser.__ns__))
+        ft_element = cast(_Element, root.find(".//fx:FRAME-TRIGGERING", self.parser._ns))
 
         # Mock factory
         class MockFactory:
@@ -472,7 +472,7 @@ class TestFibexParserFrameTriggering:
                     {"id": lambda self: id, "slot_id": lambda self: slot_id, "cycle_counter": lambda self: cycle_counter},
                 )()
 
-        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
+        self.parser._conf_factory = cast(BaseConfigurationFactory, MockFactory())
         result: Any = self.parser.parse_frame_triggering(ft_element)
 
         assert result is not None
@@ -506,8 +506,8 @@ class TestFibexParserECUs:
         root = _root(xml)
         self.parser.parse_channels(root)
 
-        assert "CHAN1" in self.parser.__channels__
-        channel = self.parser.__channels__["CHAN1"]
+        assert "CHAN1" in self.parser._channels
+        channel = self.parser._channels["CHAN1"]
         assert channel["name"] == "Ethernet1"
         assert channel["vlanid"] == "100"
 
@@ -552,11 +552,11 @@ class TestFibexParserECUs:
             def create_socket(self, name: Any, ip: Any, proto: Any, portnumber: Any, psis: Any, csis: Any, ehs: Any, cegs: Any) -> Any:
                 return type("MockSocket", (), {"name": lambda self: name, "ip": lambda self: ip})()
 
-        self.parser.__conf_factory__ = cast(BaseConfigurationFactory, MockFactory())
+        self.parser._conf_factory = cast(BaseConfigurationFactory, MockFactory())
         self.parser.parse_ecus(root)
 
-        assert len(self.parser.__ecus__) > 0
-        assert "ECU1" in self.parser.__ecus__
+        assert len(self.parser._ecus) > 0
+        assert "ECU1" in self.parser._ecus
 
 
 class TestBasetypeUtils:
@@ -615,7 +615,7 @@ class TestFibexParserIntegration:
         parser.parse_file(factory, str(fibex_file), verbose=False)
 
         # Verify ECUs were parsed
-        assert len(factory.__ecus__) > 0
+        assert len(factory._ecus) > 0
 
     def test_parse_fibex_with_signals(self, tmpdir: Any) -> None:
         """Test parsing a FIBEX file with signals."""
@@ -630,7 +630,7 @@ class TestFibexParserIntegration:
         parser.parse_file(factory, str(fibex_file), verbose=False)
 
         # Verify signals were parsed
-        assert len(parser.__signals__) > 0
+        assert len(parser._signals) > 0
 
 
 class TestFibexParserDuplicateConsumedService:
@@ -646,9 +646,9 @@ class TestFibexParserDuplicateConsumedService:
 
     def test_deduplicates_by_default(self, capsys: Any) -> None:
         parser = self._parse(keep_duplicates=False)
-        psis = parser.__aeps__["AEP_PROVIDER"][0]
-        csis = parser.__aeps__["AEP_CONSUMER"][1]
-        cegs = parser.__aeps__["AEP_CONSUMER"][3]
+        psis = parser._aeps["AEP_PROVIDER"][0]
+        csis = parser._aeps["AEP_CONSUMER"][1]
+        cegs = parser._aeps["AEP_CONSUMER"][3]
 
         assert len(psis) == 1
         assert len(csis) == 1
@@ -661,9 +661,9 @@ class TestFibexParserDuplicateConsumedService:
 
     def test_keeps_duplicates_when_requested(self, capsys: Any) -> None:
         parser = self._parse(keep_duplicates=True)
-        psis = parser.__aeps__["AEP_PROVIDER"][0]
-        csis = parser.__aeps__["AEP_CONSUMER"][1]
-        cegs = parser.__aeps__["AEP_CONSUMER"][3]
+        psis = parser._aeps["AEP_PROVIDER"][0]
+        csis = parser._aeps["AEP_CONSUMER"][1]
+        cegs = parser._aeps["AEP_CONSUMER"][3]
 
         assert len(psis) == 1
         assert len(csis) == 2
@@ -681,8 +681,8 @@ class TestFibexParserDuplicateConsumedService:
         parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
         parser.parse_file(factory, str(PROV_TWO_SOCK_FIBEX), verbose=False)
 
-        psis_a = parser.__aeps__["AEP_PROVIDER_A"][0]
-        psis_b = parser.__aeps__["AEP_PROVIDER_B"][0]
+        psis_a = parser._aeps["AEP_PROVIDER_A"][0]
+        psis_b = parser._aeps["AEP_PROVIDER_B"][0]
 
         assert len(psis_a) == 1
         assert len(psis_b) == 1
@@ -698,8 +698,8 @@ class TestFibexParserDuplicateConsumedService:
         parser = FibexParser(plugin_file=None, ecu_name_replacement=None)
         parser.parse_file(factory, str(PROV_TWO_ECU_FIBEX), verbose=False)
 
-        psis_a = parser.__aeps__["AEP_PROVIDER_A"][0]
-        psis_b = parser.__aeps__["AEP_PROVIDER_B"][0]
+        psis_a = parser._aeps["AEP_PROVIDER_A"][0]
+        psis_b = parser._aeps["AEP_PROVIDER_B"][0]
 
         assert len(psis_a) == 1
         assert len(psis_b) == 1

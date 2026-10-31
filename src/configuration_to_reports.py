@@ -76,14 +76,14 @@ class _HasStr(Protocol):
 class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def __init__(self) -> None:
-        self.__services__: dict[str, SOMEIPService] = dict()
-        self.__services_long__: dict[str, SOMEIPService] = dict()
-        self.__ecus__: dict[str, ECU] = dict()
+        self._services: dict[str, SOMEIPService] = dict()
+        self._services_long: dict[str, SOMEIPService] = dict()
+        self._ecus: dict[str, ECU] = dict()
 
     def create_ecu(self, name: str, controllers: list[BaseController]) -> ECU:
         ret = ECU(name, controllers)
-        assert name not in self.__ecus__
-        self.__ecus__[name] = ret
+        assert name not in self._ecus
+        self._ecus[name] = ret
         return ret
 
     def create_controller(self, name: str, interfaces: list[BaseInterface]) -> Controller:
@@ -373,57 +373,57 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
     def add_service(self, serviceid: int, majorver: int, minorver: int, service: SOMEIPService) -> bool:
         sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
-        if sid in self.__services_long__:
+        if sid in self._services_long:
             print("ERROR: Service (SID: 0x%04x, Major-Ver: %d, Minor-Ver: %d) already exists! Not overriding it!" % (serviceid, majorver, minorver))
             return False
-        self.__services_long__[sid] = service
+        self._services_long[sid] = service
 
         sid = "%04x-%02x" % (serviceid, majorver)
-        if sid in self.__services__:
+        if sid in self._services:
             print(
                 f"ERROR: Service (SID: 0x{serviceid:04x}, Major-Ver: {majorver}) "
                 + "already exists with a different Minor Version (not {minorver})! Not overriding it!"
             )
             return False
-        self.__services__[sid] = service
+        self._services[sid] = service
         return True
 
     def get_service(self, serviceid: int, majorver: int, minorver: int | None = None) -> SOMEIPService | None:
         if minorver is None:
             sid = "%04x-%02x" % (serviceid, majorver)
-            if sid in self.__services__:
-                return self.__services__[sid]
+            if sid in self._services:
+                return self._services[sid]
             else:
                 return None
         else:
             sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
-            if sid in self.__services_long__:
-                return self.__services_long__[sid]
+            if sid in self._services_long:
+                return self._services_long[sid]
             else:
                 return None
 
     def get_services(self) -> dict[str, SOMEIPService]:
-        return self.__services__
+        return self._services
 
     def __str__(self) -> str:
         ret = "Services: \n"
-        for serviceid in sorted(self.__services__):
-            ret += self.__services__[serviceid].str(2)
+        for serviceid in sorted(self._services):
+            ret += self._services[serviceid].str(2)
 
         ret += "\nECUs: \n"
-        for name in sorted(self.__ecus__):
-            ret += self.__ecus__[name].str(2)
+        for name in sorted(self._ecus):
+            ret += self._ecus[name].str(2)
 
         return ret
 
     def get_ecu_names(self) -> Iterable[str]:
-        return self.__ecus__.keys()
+        return self._ecus.keys()
 
     def get_service_instance_client_relations(self) -> dict[str, dict[str, list[str]]]:
         print("Looking at Service Instances...")
         ret: dict[str, dict[str, list[str]]] = dict()
 
-        for e in self.__ecus__.items():
+        for e in self._ecus.items():
             ecu = e[1]
             ecu_key = ecu.name()
             print(f"Looking at ECU: {ecu_key}")
@@ -457,8 +457,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self,
     ) -> list[tuple[SOMEIPService, SOMEIPBaseServiceMethod | SOMEIPBaseServiceEvent | SOMEIPBaseServiceField, str]]:
         ret: list[tuple[SOMEIPService, SOMEIPBaseServiceMethod | SOMEIPBaseServiceEvent | SOMEIPBaseServiceField, str]] = []
-        for i in sorted(self.__services__.keys()):
-            service = self.__services__[i]
+        for i in sorted(self._services.keys()):
+            service = self._services[i]
             for m in service.methods():
                 ret.append((service, service.methods()[m], "Method"))
             for m in service.events():
@@ -471,9 +471,9 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 class ECU(BaseECU):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"ECU {self.__name__}\n"
+        ret += f"ECU {self._name}\n"
 
-        for c in cast(list[_HasStr], self.__controllers__):
+        for c in cast(list[_HasStr], self._controllers):
             ret += c.str(indent + 2)
 
         return ret
@@ -482,8 +482,8 @@ class ECU(BaseECU):
 class Controller(BaseController):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"CTRL {self.__name__}\n"
-        for i in cast(list[_HasStr], self.__interfaces__):
+        ret += f"CTRL {self._name}\n"
+        for i in cast(list[_HasStr], self._interfaces):
             ret += i.str(indent + 2)
 
         return ret
@@ -492,8 +492,8 @@ class Controller(BaseController):
 class Interface(BaseInterface):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += "Interface %s (VLAN-ID: 0x%x)\n" % (self.__vlanname__, self.__vlanid__)
-        for s in cast(list[_HasStr], self.__sockets__):
+        ret += "Interface %s (VLAN-ID: 0x%x)\n" % (self._vlanname, self._vlanid)
+        for s in cast(list[_HasStr], self._sockets):
             ret += s.str(indent + 2)
         return ret
 
@@ -502,18 +502,18 @@ class Socket(BaseSocket):
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += "Socket %s %s:%s/%s\n" % (
-            self.__name__,
-            self.__ip__,
-            self.__portnumber__,
-            self.__proto__,
+            self._name,
+            self._ip,
+            self._portnumber,
+            self._proto,
         )
-        for i in cast(list[_HasStr], self.__instances__):
+        for i in cast(list[_HasStr], self._instances):
             ret += i.str(indent + 2)
-        for i in cast(list[_HasStr], self.__instanceclients__):
+        for i in cast(list[_HasStr], self._instanceclients):
             ret += i.str(indent + 2)
-        for c in cast(list[_HasStr], self.__ehs__):
+        for c in cast(list[_HasStr], self._ehs):
             ret += c.str(indent + 2)
-        for c in cast(list[_HasStr], self.__cegs__):
+        for c in cast(list[_HasStr], self._cegs):
             ret += c.str(indent + 2)
         return ret
 
@@ -521,46 +521,46 @@ class Socket(BaseSocket):
 class SOMEIPServiceInstance(SOMEIPBaseServiceInstance):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"ServiceInstance Service-ID: 0x{self.__service__.serviceid():04x} "
-        ret += f"Version: {self.__service__.versionstring()} "
-        ret += f"Instance-ID: 0x{self.__instanceid__:04x} "
-        ret += f"Protover: {self.__protover__}\n"
+        ret += f"ServiceInstance Service-ID: 0x{self._service.serviceid():04x} "
+        ret += f"Version: {self._service.versionstring()} "
+        ret += f"Instance-ID: 0x{self._instanceid:04x} "
+        ret += f"Protover: {self._protover}\n"
         return ret
 
     def key(self) -> builtin_str:
         return "0x%04x-0x%02x-0x%04x-%s" % (
-            self.__service__.serviceid(),
-            self.__service__.majorversion(),
-            self.__instanceid__,
-            self.__service__.name(),
+            self._service.serviceid(),
+            self._service.majorversion(),
+            self._instanceid,
+            self._service.name(),
         )
 
 
 class SOMEIPServiceInstanceClient(SOMEIPBaseServiceInstanceClient):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"ServiceInstanceClient Service-ID: 0x{self.__service__.serviceid():04x} "
-        ret += f"Version: {self.__service__.versionstring()} "
-        ret += f"Instance-ID: 0x{self.__instanceid__:04x} "
-        ret += f"Protover: {self.__protover__}\n"
+        ret += f"ServiceInstanceClient Service-ID: 0x{self._service.serviceid():04x} "
+        ret += f"Version: {self._service.versionstring()} "
+        ret += f"Instance-ID: 0x{self._instanceid:04x} "
+        ret += f"Protover: {self._protover}\n"
         return ret
 
 
 class SOMEIPServiceEventgroupSender(SOMEIPBaseServiceEventgroupSender):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"EventgroupSender: Service-ID: 0x{self.__si__.service().serviceid():04x} "
-        ret += f"Instance-ID: 0x{self.__si__.instanceid():04x} "
-        ret += f"Eventgroup-ID: 0x{self.__eventgroupid__:04x}\n"
+        ret += f"EventgroupSender: Service-ID: 0x{self._si.service().serviceid():04x} "
+        ret += f"Instance-ID: 0x{self._si.instanceid():04x} "
+        ret += f"Eventgroup-ID: 0x{self._eventgroupid:04x}\n"
         return ret
 
 
 class SOMEIPServiceEventgroupReceiver(SOMEIPBaseServiceEventgroupReceiver):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"EventgroupReceiver: Service-ID: 0x{self.__si__.service().serviceid():04x} "
-        ret += f"Instance-ID: 0x{self.__si__.instanceid():04x} "
-        ret += f"Eventgroup-ID: 0x{self.__eventgroupid__:04x}\n"
+        ret += f"EventgroupReceiver: Service-ID: 0x{self._si.service().serviceid():04x} "
+        ret += f"Instance-ID: 0x{self._si.instanceid():04x} "
+        ret += f"Eventgroup-ID: 0x{self._eventgroupid:04x}\n"
         return ret
 
 
@@ -568,23 +568,23 @@ class SOMEIPService(SOMEIPBaseService):
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += "%s (id: 0x%04x  ver: %d.%d)\n" % (
-            self.__name__,
-            self.__serviceid__,
-            self.__major__,
-            self.__minor__,
+            self._name,
+            self._serviceid,
+            self._major,
+            self._minor,
         )
 
-        for methodid in self.__methods__:
-            ret += cast(_HasStr, self.__methods__[methodid]).str(indent + 2)
+        for methodid in self._methods:
+            ret += cast(_HasStr, self._methods[methodid]).str(indent + 2)
 
-        for eventsid in self.__events__:
-            ret += cast(_HasStr, self.__events__[eventsid]).str(indent + 2)
+        for eventsid in self._events:
+            ret += cast(_HasStr, self._events[eventsid]).str(indent + 2)
 
-        for fieldid in self.__fields__:
-            ret += cast(_HasStr, self.__fields__[fieldid]).str(indent + 2)
+        for fieldid in self._fields:
+            ret += cast(_HasStr, self._fields[fieldid]).str(indent + 2)
 
-        for egid in self.__eventgroups__:
-            ret += cast(_HasStr, self.__eventgroups__[egid]).str(indent + 2)
+        for egid in self._eventgroups:
+            ret += cast(_HasStr, self._eventgroups[egid]).str(indent + 2)
 
         return ret
 
@@ -593,20 +593,20 @@ class SOMEIPServiceMethod(SOMEIPBaseServiceMethod):
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += "Method %s (id: 0x%04x  type: %s  reli: %s)\n" % (
-            self.__name__,
-            self.__methodid__,
-            self.__calltype__,
-            self.__reliable__,
+            self._name,
+            self._methodid,
+            self._calltype,
+            self._reliable,
         )
 
         ret += (indent + 2) * " "
         ret += "In Parameters: \n"
-        for param in cast(list[_HasStr], self.__inparams__):
+        for param in cast(list[_HasStr], self._inparams):
             ret += param.str(indent + 4)
 
         ret += (indent + 2) * " "
         ret += "Out Parameters: \n"
-        for param in cast(list[_HasStr], self.__outparams__):
+        for param in cast(list[_HasStr], self._outparams):
             ret += param.str(indent + 4)
 
         return ret
@@ -616,12 +616,12 @@ class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += "Event %s (id: 0x%04x  reli: %s)\n" % (
-            self.__name__,
-            self.__methodid__,
-            self.__reliable__,
+            self._name,
+            self._methodid,
+            self._reliable,
         )
 
-        for param in cast(list[_HasStr], self.__params__):
+        for param in cast(list[_HasStr], self._params):
             ret += param.str(indent + 2)
 
         return ret
@@ -630,34 +630,34 @@ class SOMEIPServiceEvent(SOMEIPBaseServiceEvent):
 class SOMEIPServiceField(SOMEIPBaseServiceField):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"Field {self.__name__}\n"
+        ret += f"Field {self._name}\n"
 
         indent += 2
-        if self.__getter__ is not None:
+        if self._getter is not None:
             ret += indent * " "
             ret += "Getter(id: 0x%04x  reli: %s)\n" % (
-                self.__getter__.methodid(),
-                self.__getter__.reliable(),
+                self._getter.methodid(),
+                self._getter.reliable(),
             )
 
-        if self.__setter__ is not None:
+        if self._setter is not None:
             ret += indent * " "
             ret += "Setter(id: 0x%04x  reli: %s)\n" % (
-                self.__setter__.methodid(),
-                self.__setter__.reliable(),
+                self._setter.methodid(),
+                self._setter.reliable(),
             )
 
-        if self.__notifier__ is not None:
+        if self._notifier is not None:
             ret += indent * " "
             ret += "Notifier(id: 0x%04x  reli: %s)\n" % (
-                self.__notifier__.methodid(),
-                self.__notifier__.reliable(),
+                self._notifier.methodid(),
+                self._notifier.reliable(),
             )
 
         ret += indent * " "
         ret += "Parameters:\n"
-        if self.__params__ is not None:
-            for param in cast(list[_HasStr], self.__params__):
+        if self._params is not None:
+            for param in cast(list[_HasStr], self._params):
                 ret += param.str(indent + 2)
 
         return ret
@@ -666,13 +666,13 @@ class SOMEIPServiceField(SOMEIPBaseServiceField):
 class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"Eventgroup {self.__name__} (id: 0x{self.__id__:04x})\n"
+        ret += f"Eventgroup {self._name} (id: 0x{self._id:04x})\n"
 
-        if len(self.__eventids__) > 0:
+        if len(self._eventids) > 0:
             ret += (2 + indent) * " "
             ret += "Events: "
             first = True
-            for eid in self.__eventids__:
+            for eid in self._eventids:
                 if not first:
                     ret += ", "
                 else:
@@ -680,11 +680,11 @@ class SOMEIPServiceEventgroup(SOMEIPBaseServiceEventgroup):
                 ret += f"0x{eid:04x}"
             ret += "\n"
 
-        if len(self.__fieldids__) > 0:
+        if len(self._fieldids) > 0:
             ret += (2 + indent) * " "
             ret += "Notifiers: "
             first = True
-            for fid in self.__fieldids__:
+            for fid in self._fieldids:
                 if not first:
                     ret += ", "
                 else:
@@ -699,14 +699,14 @@ class SOMEIPParameter(SOMEIPBaseParameter):
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += "Parameter %d %s (mandatory: %s)\n" % (
-            self.__position__,
-            self.__name__,
-            self.__mandatory__,
+            self._position,
+            self._name,
+            self._mandatory,
         )
-        if self.__datatype__ is None:
+        if self._datatype is None:
             ret += "%sNone\n" % ((indent + 2) * " ")
         else:
-            ret += cast(_HasStr, self.__datatype__).str(indent + 2)
+            ret += cast(_HasStr, self._datatype).str(indent + 2)
 
         return ret
 
@@ -717,16 +717,16 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
 
     def str(self, indent: int) -> str:
         endian = "BE"
-        if not self.__bigendian__:
+        if not self._bigendian:
             endian = "LE"
 
         ret = indent * " "
         ret += "%s %s %s (%d;%d)\n" % (
-            self.__name__,
-            self.__datatype__,
+            self._name,
+            self._datatype,
             endian,
-            self.__bitlength_basetype__,
-            self.__bitlength_encoded_type__,
+            self._bitlength_basetype,
+            self._bitlength_encoded_type,
         )
         return ret
 
@@ -734,19 +734,19 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
 class SOMEIPParameterString(SOMEIPBaseParameterString):
     def str(self, indent: int) -> str:
         endian = "BE"
-        if not self.__bigendian__:
+        if not self._bigendian:
             endian = "LE"
 
         ret = indent * " "
         ret += "String %s %s %s (%d;%d) term: %s len: %d pad: %d\n" % (
-            self.__name__,
-            self.__chartype__,
+            self._name,
+            self._chartype,
             endian,
-            self.__lowerlimit__,
-            self.__upperlimit__,
-            self.__termination__,
-            self.__lengthOfLength__,
-            self.__padTo__,
+            self._lowerlimit,
+            self._upperlimit,
+            self._termination,
+            self._lengthOfLength,
+            self._padTo,
         )
         return ret
 
@@ -754,13 +754,13 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
 class SOMEIPParameterArray(SOMEIPBaseParameterArray):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += "Array {self.__name__}:\n"
-        for dim in self.__dims__:
-            ret += cast(_HasStr, self.__dims__[dim]).str(indent + 2)
-        if self.__child__ is None:
+        ret += "Array {self._name}:\n"
+        for dim in self._dims:
+            ret += cast(_HasStr, self._dims[dim]).str(indent + 2)
+        if self._child is None:
             ret += "%sNone\n" % ((indent + 2) * " ")
         else:
-            ret += cast(_HasStr, self.__child__).str(indent + 2)
+            ret += cast(_HasStr, self._child).str(indent + 2)
 
         return ret
 
@@ -769,11 +769,11 @@ class SOMEIPParameterArrayDim(SOMEIPBaseParameterArrayDim):
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += "Dimension %d [%d-%d] lengthOfLength: %d padding: %d\n" % (
-            self.__dim__,
-            self.__lowerlimit__,
-            self.__upperlimit__,
-            self.__lengthOfLength__,
-            self.__padTo__,
+            self._dim,
+            self._lowerlimit,
+            self._upperlimit,
+            self._lengthOfLength,
+            self._padTo,
         )
         return ret
 
@@ -781,10 +781,10 @@ class SOMEIPParameterArrayDim(SOMEIPBaseParameterArrayDim):
 class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"Struct {self.__name__}:\n"
-        if self.__members__ is not None:
-            for m in sorted(self.__members__.keys()):
-                member = self.__members__[m]
+        ret += f"Struct {self._name}:\n"
+        if self._members is not None:
+            for m in sorted(self._members.keys()):
+                member = self._members[m]
                 if member is not None:
                     ret += cast(_HasStr, member).str(indent + 2)
                 else:
@@ -797,13 +797,13 @@ class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
     def str(self, indent: int) -> str:
         ret = indent * " "
         ret += "%d %s (mandatory: %s)\n" % (
-            self.__position__,
-            self.__name__,
-            self.__mandatory__,
+            self._position,
+            self._name,
+            self._mandatory,
         )
 
-        if self.__child__ is not None:
-            ret += cast(_HasStr, self.__child__).str(indent + 2)
+        if self._child is not None:
+            ret += cast(_HasStr, self._child).str(indent + 2)
 
         return ret
 
@@ -811,18 +811,18 @@ class SOMEIPParameterStructMember(SOMEIPBaseParameterStructMember):
 class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += "Typedef: %s %s\n" % (self.__name__, self.__name2__)
-        if self.__child__ is not None:
-            ret += cast(_HasStr, self.__child__).str(indent + 2)
+        ret += "Typedef: %s %s\n" % (self._name, self._name2)
+        if self._child is not None:
+            ret += cast(_HasStr, self._child).str(indent + 2)
         return ret
 
 
 class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"Enumeration {self.__name__}\n"
-        ret += cast(_HasStr, self.__child__).str(indent + 2)
-        for i in cast(list[_HasStr], self.__items__):
+        ret += f"Enumeration {self._name}\n"
+        ret += cast(_HasStr, self._child).str(indent + 2)
+        for i in cast(list[_HasStr], self._items):
             i.str(indent + 2)
         return ret
 
@@ -830,17 +830,17 @@ class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
 class SOMEIPParameterEnumerationItem(SOMEIPBaseParameterEnumerationItem):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"{self.__value__}: {self.__name__}"
+        ret += f"{self._value}: {self._name}"
         return ret
 
 
 class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += "Union {self.__name__}:\n"
-        if self.__members__ is not None:
-            for m in sorted(self.__members__.keys()):
-                member = self.__members__[m]
+        ret += "Union {self._name}:\n"
+        if self._members is not None:
+            for m in sorted(self._members.keys()):
+                member = self._members[m]
                 if member is not None:
                     ret += cast(_HasStr, member).str(indent + 2)
                 else:
@@ -854,13 +854,13 @@ class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
         ret = indent * " "
 
         ret += "%d %s (mandatory: %s)\n" % (
-            self.__index__,
-            self.__name__,
-            self.__mandatory__,
+            self._index,
+            self._name,
+            self._mandatory,
         )
 
-        if self.__child__ is not None:
-            ret += cast(_HasStr, self.__child__).str(indent + 2)
+        if self._child is not None:
+            ret += cast(_HasStr, self._child).str(indent + 2)
 
         return ret
 
@@ -868,9 +868,9 @@ class SOMEIPParameterUnionMember(SOMEIPBaseParameterUnionMember):
 class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"Bitfield {self.__name__}\n"
-        ret += cast(_HasStr, self.__child__).str(indent + 2)
-        for i in cast(list[_HasStr], self.__items__):
+        ret += f"Bitfield {self._name}\n"
+        ret += cast(_HasStr, self._child).str(indent + 2)
+        for i in cast(list[_HasStr], self._items):
             ret += i.str(indent + 2)
         return ret
 
@@ -878,7 +878,7 @@ class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
 class SOMEIPParameterBitfieldItem(SOMEIPBaseParameterBitfieldItem):
     def str(self, indent: int) -> str:
         ret = indent * " "
-        ret += f"Bit {self.__bit_number__}: {self.__name__}\n"
+        ret += f"Bit {self._bit_number}: {self._name}\n"
         return ret
 
 

@@ -754,7 +754,7 @@ class TestBaseConfigurationFactory:
         controller = factory.create_controller("Controller1", [])
         port = factory.create_switch_port("PORT1", controller, None, None, [])
         repr_str = repr(port)
-        # Note: __repr__ returns <unknown>.PORT1 because __switch__ is never set
+        # Note: __repr__ returns <unknown>.PORT1 because _switch is never set
         assert "PORT1" in repr_str
 
     def test_create_pdu_route_unicast(self) -> None:

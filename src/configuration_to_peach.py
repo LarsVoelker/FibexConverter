@@ -66,14 +66,14 @@ class _PeachDatatype(Protocol):
 
 class PeachConfigurationFactory(BaseConfigurationFactory):
     def __init__(self) -> None:
-        self.__services__: dict[str, SOMEIPBaseService] = dict()
-        self.__services_long__: dict[str, SOMEIPBaseService] = dict()
-        self.__ecus__: dict[str, BaseECU] = dict()
+        self._services: dict[str, SOMEIPBaseService] = dict()
+        self._services_long: dict[str, SOMEIPBaseService] = dict()
+        self._ecus: dict[str, BaseECU] = dict()
 
     def create_ecu(self, name: str, controllers: list[BaseController]) -> BaseECU:
         ret = BaseECU(name, controllers)
-        assert name not in self.__ecus__
-        self.__ecus__[name] = ret
+        assert name not in self._ecus
+        self._ecus[name] = ret
         return ret
 
     def create_someip_service(
@@ -200,38 +200,38 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
         service: SOMEIPBaseService,
     ) -> bool:
         sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
-        if sid in self.__services_long__:
+        if sid in self._services_long:
             print("ERROR: Service (SID: 0x%04x, Major-Ver: %d, Minor-Ver: %d) already exists! Not overriding it!" % (serviceid, majorver, minorver))
             return False
-        self.__services_long__[sid] = service
+        self._services_long[sid] = service
 
         sid = "%04x-%02x" % (serviceid, majorver)
-        if sid in self.__services__:
+        if sid in self._services:
             print(
                 "ERROR: Service (SID: 0x%04x, Major-Ver: %d) already exists with a different Minor Version (not %d)!"
                 " Not overriding it!" % (serviceid, majorver, minorver)
             )
             return False
-        self.__services__[sid] = service
+        self._services[sid] = service
         return True
 
     def get_service(self, serviceid: int, majorver: int, minorver: int | None = None) -> SOMEIPBaseService | None:
         if minorver is None:
             sid = "%04x-%02x" % (serviceid, majorver)
-            if sid in self.__services__:
-                return self.__services__[sid]
+            if sid in self._services:
+                return self._services[sid]
             else:
                 return None
         else:
             sid = "%04x-%02x-%08x" % (serviceid, majorver, minorver)
-            if sid in self.__services_long__:
-                return self.__services_long__[sid]
+            if sid in self._services_long:
+                return self._services_long[sid]
             else:
                 return None
 
     def generate_configs(self, target_dir: str) -> None:
-        for ecukey in sorted(self.__ecus__.keys()):
-            ecu = self.__ecus__[ecukey]
+        for ecukey in sorted(self._ecus.keys()):
+            ecu = self._ecus[ecukey]
             # ecu_name = ecu.name()
 
             for ctrl in ecu.controllers():
@@ -566,8 +566,8 @@ class PeachConfigurationFactory(BaseConfigurationFactory):
 
 class SOMEIPParameter(SOMEIPBaseParameter):
     def peachout(self, f: TextIO) -> None:
-        if self.__datatype__ is not None:
-            cast(_PeachDatatype, self.__datatype__).peachout(f, 4, self.name(), 1, 1)
+        if self._datatype is not None:
+            cast(_PeachDatatype, self._datatype).peachout(f, 4, self.name(), 1, 1)
 
 
 class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
@@ -581,7 +581,7 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
             % (
                 indent * " ",
                 paramname,
-                self.__bitlength_encoded_type__,
+                self._bitlength_encoded_type,
                 endian,
                 minnum,
                 maxnum,
@@ -592,7 +592,7 @@ class SOMEIPParameterBasetype(SOMEIPBaseParameterBasetype):
 class SOMEIPParameterString(SOMEIPBaseParameterString):
     def peachout_bom(self, f: TextIO, indent: int, blockid: str) -> int:
         identtabs = indent * "	"
-        t = self.__chartype__
+        t = self._chartype
 
         if t.upper() == "UTF-8":
             f.write('%s<Number name="%s_BOM1" size="8" value="0xEF" minOccurs="1" maxOccurs="1" />\n' % (identtabs, blockid))
@@ -600,7 +600,7 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
             f.write('%s<Number name="%s_BOM3" size="8" value="0xBF" minOccurs="1" maxOccurs="1" />\n' % (identtabs, blockid))
             return 3
         elif t.upper() == "UTF-16":
-            endian = "big" if self.__bigendian__ else "little"
+            endian = "big" if self._bigendian else "little"
             f.write(
                 '%s<Number name="%s_BOM" size="16" value="0xFEFF" endian="%s" minOccurs="1" ' 'maxOccurs="1" />\n' % (identtabs, blockid, endian)
             )
@@ -613,10 +613,10 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
         identtabs = indent * "	"
 
         endian = "BE"
-        if not self.__bigendian__:
+        if not self._bigendian:
             endian = "LE"
 
-        t = self.__chartype__
+        t = self._chartype
         if t.upper() == "UTF-8":
             t = "utf8"
         elif t.upper() == "UTF-16":
@@ -630,45 +630,45 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
             # its probably wrong. but we leave it
             pass
 
-        if self.__termination__ == "ZERO":
+        if self._termination == "ZERO":
             term = 'nullTerminated="true"'
         else:
-            print("WARNING: unknown termination for string: %s" % self.__termination__)
+            print("WARNING: unknown termination for string: %s" % self._termination)
             term = ""
 
         blockid = "String_%s_%x" % (paramname, id(self))
 
-        if self.__lengthOfLength__ != 0:
-            f.write('%s<Number name="%s_Len" size="%d" endian="big" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid, self.__lengthOfLength__))
+        if self._lengthOfLength != 0:
+            f.write('%s<Number name="%s_Len" size="%d" endian="big" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid, self._lengthOfLength))
             f.write('%s	<Relation type="size" of="%s" />\n' % (identtabs, blockid))
             f.write("%s</Number>\n" % identtabs)
 
         f.write('%s<Block name="%s" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid))
 
-        if self.__lengthOfLength__ != 0:
+        if self._lengthOfLength != 0:
             f.write(
                 "%s	<!-- String %s %s %s (%d..%d) len:%d pad:%d %s -->\n"
                 % (
                     identtabs,
-                    self.__name__,
-                    self.__chartype__,
+                    self._name,
+                    self._chartype,
                     endian,
-                    self.__lowerlimit__,
-                    self.__upperlimit__,
-                    self.__lengthOfLength__,
-                    self.__padTo__,
+                    self._lowerlimit,
+                    self._upperlimit,
+                    self._lengthOfLength,
+                    self._padTo,
                     term,
                 )
             )
 
-            if self.__padTo__ != 0:
-                print("ERROR: String %s has padto set to %d but we do not support!!" % (self.name(), self.__padTo__))
-                f.write("%s<!-- Padto Parameter set to %d! -->" % (identtabs, self.__padTo__))
+            if self._padTo != 0:
+                print("ERROR: String %s has padto set to %d but we do not support!!" % (self.name(), self._padTo))
+                f.write("%s<!-- Padto Parameter set to %d! -->" % (identtabs, self._padTo))
 
             bomlen = self.peachout_bom(f, indent + 1, blockid)
 
-            lower = self.__lowerlimit__ - bomlen
-            upper = self.__upperlimit__ - bomlen
+            lower = self._lowerlimit - bomlen
+            upper = self._upperlimit - bomlen
 
             if lower < 0:
                 lower = 0
@@ -681,10 +681,10 @@ class SOMEIPParameterString(SOMEIPBaseParameterString):
 
         else:
             # fixed length string
-            assert self.__lowerlimit__ == self.__upperlimit__
+            assert self._lowerlimit == self._upperlimit
             bomlen = self.peachout_bom(f, indent + 1, blockid)
 
-            lower = self.__lowerlimit__ - bomlen
+            lower = self._lowerlimit - bomlen
 
             if lower < 1:
                 print("ERROR: String %s does not have valid length." % (self.name()))
@@ -698,15 +698,15 @@ class SOMEIPParameterArray(SOMEIPBaseParameterArray):
         counter = 0
         identtabs = indent * "	"
 
-        if len(self.__dims__) != 1:
+        if len(self._dims) != 1:
             f.write("%s<!--TODO: Multi-Dim Arrays-->\n" % identtabs)
         else:
             blockid = "Array%s%x%x" % (self.name(), id(self), counter)
             counter += 1
 
             # there is only one dim and this should have the key 1
-            for i in self.__dims__.keys():
-                dim = self.__dims__[i]
+            for i in self._dims.keys():
+                dim = self._dims[i]
             min2 = dim.lowerlimit()
             max2 = dim.upperlimit()
             lengthOfLength = dim.length_of_length()
@@ -731,36 +731,36 @@ class SOMEIPParameterStruct(SOMEIPBaseParameterStruct):
         identtabs = indent * "	"
         blockid = "Struct%s%x" % (self.name(), id(self))
 
-        if self.__lengthOfLength__ != 0:
+        if self._lengthOfLength != 0:
             f.write(
                 '%s<Number name="StructLen%x" size="%d" mutable="false" endian="big" minOccurs="1" '
-                'maxOccurs="1" >\n' % (identtabs, id(self), self.__lengthOfLength__)
+                'maxOccurs="1" >\n' % (identtabs, id(self), self._lengthOfLength)
             )
             f.write('%s	<Relation type="size" of="%s" />\n' % (identtabs, blockid))
             f.write("%s</Number>\n" % identtabs)
 
         f.write('%s<Block name="%s" minOccurs="%d" maxOccurs="%d">\n' % (identtabs, blockid, minnum, maxnum))
-        # f.write("%s<!-- Struct %s start -->\n" % (identtabs, self.__name__))
-        for m in sorted(self.__members__.keys()):
-            member = self.__members__[m]
+        # f.write("%s<!-- Struct %s start -->\n" % (identtabs, self._name))
+        for m in sorted(self._members.keys()):
+            member = self._members[m]
             # print "struct-member: ", member
             child = member.child()
             # print "struct-member-child: ", child
             cast(_PeachDatatype, child).peachout(f, indent + 1, member.name(), 1, 1)
         f.write("%s</Block>\n" % identtabs)
-        # f.write("%s<!-- Struct %s end -->\n" % (identtabs, self.__name__))
+        # f.write("%s<!-- Struct %s end -->\n" % (identtabs, self._name))
 
 
 class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
     def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
-        if self.__child__ is not None:
-            cast(_PeachDatatype, self.__child__).peachout(f, indent, paramname, minnum, maxnum)
+        if self._child is not None:
+            cast(_PeachDatatype, self._child).peachout(f, indent, paramname, minnum, maxnum)
 
 
 class SOMEIPParameterEnumeration(SOMEIPBaseParameterEnumeration):
     def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
-        if self.__child__ is not None:
-            cast(_PeachDatatype, self.__child__).peachout(f, indent, paramname, minnum, maxnum)
+        if self._child is not None:
+            cast(_PeachDatatype, self._child).peachout(f, indent, paramname, minnum, maxnum)
 
 
 class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
@@ -771,24 +771,24 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
 
         f.write('%s<Choice name="%s" minOccurs="%d" maxOccurs="%d">\n' % (identtabs, blockidchoice, minnum, maxnum))
 
-        for m in self.__members__:
-            member = self.__members__[m]
+        for m in self._members:
+            member = self._members[m]
             blockid = "Union%s0x%xType0x%04x" % (self.name(), id(self), member.index())
 
             f.write('%s	<Block name="%sWrapper" minOccurs="1" maxOccurs="1" >\n' % (identtabs, blockid))
 
-            if self.__lengthOfLength__ != 0:
+            if self._lengthOfLength != 0:
                 f.write(
                     '%s		<Number name="UnionLen%s" size="%d" endian="big" minOccurs="1" '
-                    'maxOccurs="1" >\n' % (identtabs, blockid, self.__lengthOfLength__)
+                    'maxOccurs="1" >\n' % (identtabs, blockid, self._lengthOfLength)
                 )
                 f.write('%s			<Relation type="size" of="%s" />\n' % (identtabs, blockid))
                 f.write("%s		</Number>\n" % identtabs)
 
-            if self.__lengthOfType__ != 0:
+            if self._lengthOfType != 0:
                 f.write(
                     '%s		<Number name="UnionType%s" size="%d" value="0x%04x" endian="big" '
-                    'minOccurs="1" maxOccurs="1" />\n' % (identtabs, blockid, self.__lengthOfType__, member.index())
+                    'minOccurs="1" maxOccurs="1" />\n' % (identtabs, blockid, self._lengthOfType, member.index())
                 )
             else:
                 print("ERROR: Union %s thinks that typefield can be 0 bytes long!!!!" % (self.name()))
@@ -806,8 +806,8 @@ class SOMEIPParameterUnion(SOMEIPBaseParameterUnion):
 
 class SOMEIPParameterBitfield(SOMEIPBaseParameterBitfield):
     def peachout(self, f: TextIO, indent: int, paramname: str, minnum: int, maxnum: int) -> None:
-        if self.__child__ is not None:
-            cast(_PeachDatatype, self.__child__).peachout(f, indent, paramname, minnum, maxnum)
+        if self._child is not None:
+            cast(_PeachDatatype, self._child).peachout(f, indent, paramname, minnum, maxnum)
 
 
 def parse_arguments() -> argparse.Namespace:
