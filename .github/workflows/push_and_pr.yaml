@@ -3,10 +3,10 @@ name: Workflows for push and pull requests
 on:
   push:
     branches:
-    - master
+    - main
   pull_request:
     branches:
-    - master
+    - main
 
 jobs:
   format-check:
