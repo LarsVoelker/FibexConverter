@@ -30,10 +30,10 @@ import time
 from typing import Any, Literal, cast
 
 from flync.core.datatypes.macaddress import FLYNCMacAddress
-from flync.model.flync_4_bus.can_bus import CANBus
+from flync.model.flync_4_bus.can_bus import CANBaudRate, CANBus
 from flync.model.flync_4_communication import FLYNCChannelConfig, FLYNCCommunicationConfig
 from flync.model.flync_4_ecu import BASET1, ECU, RGMII, Controller, ECUPort, EthernetInterface, InternalTopology
-from flync.model.flync_4_ecu.can_interface import CANFrameRef, CANInterface
+from flync.model.flync_4_ecu.can_interface import CANInterface
 from flync.model.flync_4_ecu.controller import EthernetInterfaceConfig, VirtualControllerInterface
 from flync.model.flync_4_ecu.internal_topology import (
     ECUPortToControllerInterface,
@@ -47,9 +47,10 @@ from flync.model.flync_4_ecu.sockets import DeploymentUnion, IPv4AddressEndpoint
 from flync.model.flync_4_ecu.switch import Switch as FLYNCSwitch
 from flync.model.flync_4_ecu.switch import SwitchConfig as FLYNCSwitchConfig
 from flync.model.flync_4_ecu.switch import SwitchPort as FLYNCSwitchPort
-from flync.model.flync_4_ecu.switch import VLANEntry  # type: ignore[attr-defined]
+from flync.model.flync_4_ecu.switch import VLANEntry
 from flync.model.flync_4_metadata import BaseVersion, ECUMetadata, EmbeddedMetadata, SOMEIPServiceMetadata, SystemMetadata
-from flync.model.flync_4_signal.frame import CANFDFrame, CANFrame
+from flync.model.flync_4_signal.can_frame_ref import CANFrameRef
+from flync.model.flync_4_signal.frame import CANFDFrame, CANFrame, J1939Frame
 from flync.model.flync_4_signal.pdu import ContainedPDURef, ContainerPDU, ContainerPDUHeader, MultiplexedPDU, MuxGroup, PDUInstance, StandardPDU
 from flync.model.flync_4_signal.pdu_deployment import PDUReceiver, PDUSender
 from flync.model.flync_4_signal.signal import Signal, SignalDataType, SignalInstance
@@ -99,6 +100,7 @@ from flync.model.flync_4_topology import EthernetTopology as SystemTopology
 from flync.model.flync_4_topology import FLYNCTopology
 from flync.model.flync_model import FLYNCModel
 from flync.sdk.workspace.flync_workspace import FLYNCWorkspace, WorkspaceConfiguration
+from ruamel.yaml import YAML
 
 from configuration_base_classes import (
     BaseAbstractPDU,
@@ -166,6 +168,69 @@ g_gen_portid = False
 def _fibex_endianness_to_flync(value: object) -> Literal["BE", "LE"]:
     """Map a FIBEX is-high-low-byte-order value (bool or truthy string) to FLYNC 'BE'/'LE'."""
     return "BE" if str(value).lower() == "true" else "LE"
+
+
+def _use_eventgroup_name_references(target_dir: str) -> None:
+    """Rewrite generated SOME/IP service files to reference eventgroup members by name.
+
+    FLYNC writes every eventgroup entry as a full copy of the referenced event or
+    field.  Its YAML dumper folds long strings at column 80, and a fold that hits a
+    run of spaces drops one of them.  The eventgroup copy is nested deeper than the
+    service-level copy, so both copies can end up with slightly different
+    descriptions.  FLYNC then compares the eventgroup entry with the service's
+    events/fields by value and rejects the file ("Eventgroup references ... which is
+    not in events/fields of Service ...").
+
+    ``eventgroups[].events`` also accepts plain names, which FLYNC resolves after
+    loading.  Using names keeps a single serialized copy of each event/field and
+    therefore avoids the divergence.  Entries whose name is not unique within the
+    service are left inline.
+    """
+    services_dir = os.path.join(target_dir, "communication", "someip", "services")
+    if not os.path.isdir(services_dir):
+        return
+
+    yaml = YAML(typ="rt")
+    yaml.default_flow_style = False
+    yaml.allow_unicode = True
+    # Never fold long strings: folding may drop meaningful spaces (which is the
+    # bug this rewrite works around in the first place).
+    yaml.width = 10_000_000
+
+    for filename in sorted(os.listdir(services_dir)):
+        if not filename.endswith(".flync.yaml"):
+            continue
+        path = os.path.join(services_dir, filename)
+        with open(path, "r", encoding="utf-8") as f:
+            data = yaml.load(f)
+        if not isinstance(data, dict) or not data.get("eventgroups"):
+            continue
+
+        name_counts: dict[str, int] = {}
+        for key in ("events", "fields"):
+            for entry in data.get(key) or []:
+                if isinstance(entry, dict) and isinstance(entry.get("name"), str):
+                    name_counts[entry["name"]] = name_counts.get(entry["name"], 0) + 1
+
+        changed = False
+        for eventgroup in data.get("eventgroups") or []:
+            if not isinstance(eventgroup, dict) or not isinstance(eventgroup.get("events"), list):
+                continue
+            entries: list[Any] = []
+            for entry in eventgroup["events"]:
+                name = entry.get("name") if isinstance(entry, dict) else None
+                if isinstance(name, str) and name_counts.get(name) == 1:
+                    entries.append(name)
+                    changed = True
+                else:
+                    entries.append(entry)
+                    if isinstance(name, str):
+                        print(f"WARNING: Keeping inline eventgroup member {name!r} in {filename}: its name is not unique in the service")
+            eventgroup["events"] = entries
+
+        if changed:
+            with open(path, "w", encoding="utf-8") as f:
+                yaml.dump(data, f)
 
 
 class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
@@ -870,27 +935,39 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         )
 
                 # Sort ethernet interfaces by interface name for deterministic output
-                eth_interfaces.sort(key=lambda ei: ei.interface_config.name)
+                eth_interfaces.sort(key=lambda ei: ei.interface_config.name or "")
 
                 # Build CAN interfaces for this controller from its FIBEX frame triggerings
-                can_iface_frames: dict[str, dict[str, set[int]]] = {}  # bus_ref → {"sender": set, "receiver": set}
+                can_iface_frames: dict[str, dict[str, set[tuple[int, bool]]]] = (
+                    {}
+                )  # bus_ref → {"sender": set, "receiver": set} of (can_id, is_extended)
                 for fibex_iface in fibex_ctrl.interfaces():
                     for ft in fibex_iface.frame_triggerings_out().values():
                         if isinstance(ft, BaseFrameTriggeringCAN) and ft.is_can() and ft.frame() is not None:
                             ch = self.__ft_to_channel.get(ft.id())
                             if ch:
-                                can_iface_frames.setdefault(ch, {"sender": set(), "receiver": set()})["sender"].add(ft.can_id())
+                                can_iface_frames.setdefault(ch, {"sender": set(), "receiver": set()})["sender"].add(
+                                    (ft.can_id(), ft.is_extended_id())
+                                )
                     for ft in fibex_iface.frame_triggerings_in().values():
                         if isinstance(ft, BaseFrameTriggeringCAN) and ft.is_can() and ft.frame() is not None:
                             ch = self.__ft_to_channel.get(ft.id())
                             if ch:
-                                can_iface_frames.setdefault(ch, {"sender": set(), "receiver": set()})["receiver"].add(ft.can_id())
+                                can_iface_frames.setdefault(ch, {"sender": set(), "receiver": set()})["receiver"].add(
+                                    (ft.can_id(), ft.is_extended_id())
+                                )
                 can_interfaces = [
                     CANInterface(
                         name=fibex_ctrl.name(),
                         bus_ref=bus_ref,
-                        sender_frames=[CANFrameRef(bus_ref=bus_ref, frame_ref=cid) for cid in sorted(fdata["sender"])],
-                        receiver_frames=[CANFrameRef(bus_ref=bus_ref, frame_ref=cid) for cid in sorted(fdata["receiver"])],
+                        sender_frames=[
+                            CANFrameRef(frame_ref=cid, id_format="extended_29bit" if ext else "standard_11bit")
+                            for cid, ext in sorted(fdata["sender"])
+                        ],
+                        receiver_frames=[
+                            CANFrameRef(frame_ref=cid, id_format="extended_29bit" if ext else "standard_11bit")
+                            for cid, ext in sorted(fdata["receiver"])
+                        ],
                     )
                     for bus_ref, fdata in sorted(can_iface_frames.items())
                 ]
@@ -1399,7 +1476,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     }
     _SIGNAL_DATA_TYPE_TO_FIBEX = {v: k for k, v in _FIBEX_TO_SIGNAL_DATA_TYPE.items()}
 
-    _ALLOWED_CAN_BAUD_RATES = (10_000, 20_000, 50_000, 100_000, 125_000, 250_000, 500_000, 1_000_000)
+    _ALLOWED_CAN_BAUD_RATES: tuple[CANBaudRate, ...] = (
+        10_000,
+        20_000,
+        50_000,
+        100_000,
+        125_000,
+        250_000,
+        500_000,
+        1_000_000,
+    )
 
     @classmethod
     def _basetype_to_signal_data_type(cls, basetype: str) -> SignalDataType:
@@ -1412,7 +1498,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         return cls._FIBEX_TO_SIGNAL_DATA_TYPE.get(basetype, SignalDataType.BYTEARRAY)
 
     @classmethod
-    def _nearest_can_baud_rate(cls, speed: int | None) -> int:
+    def _nearest_can_baud_rate(cls, speed: int | None) -> CANBaudRate:
         if speed is None:
             return 500_000
         if speed in cls._ALLOWED_CAN_BAUD_RATES:
@@ -1421,7 +1507,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         print(f"WARNING: CAN speed {speed} not in allowed FLYNC baud rates; using {nearest}")
         return nearest
 
-    def _cluster_speed_for_channel(self, channel_name: str) -> int:
+    def _cluster_speed_for_channel(self, channel_name: str) -> CANBaudRate:
         cluster_id = self.__channel_to_cluster.get(channel_name)
         if cluster_id is None:
             return 500_000
@@ -1761,7 +1847,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         # longer require globally unique names (Frame is no longer a UniqueName)
         # and CANFrameRef references frames by (bus, CAN ID), so we keep the
         # original FIBEX frame name to preserve a clean round-trip.
-        flync_frames_by_channel: dict[str, list[CANFrame | CANFDFrame]] = {}
+        flync_frames_by_channel: dict[str, list[CANFrame | CANFDFrame | J1939Frame]] = {}
         for ft in self.__can_fts.values():
             base_frame = ft.frame()
             if base_frame is None:
@@ -1980,7 +2066,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         reliable=m.reliable(),
                         input_parameters=input_params,
                         output_parameters=output_params,
-                    )  # type: ignore[no-untyped-call]
+                    )
                 )
             else:
                 flync_methods.append(
@@ -1989,7 +2075,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
                         id=m.methodid(),
                         reliable=m.reliable(),
                         input_parameters=input_params,
-                    )  # type: ignore[no-untyped-call]
+                    )
                 )
             # print(f"INFO: Created FLYNC method '{m.name()}' (id: 0x{m.methodid():04x}, type: {method_type})")
 
@@ -2185,6 +2271,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         self.__flync_workspace = FLYNCWorkspace("FLYNC_WORKSPACE", workspace_path=target_dir, configuration=workspace_config)
         assert self.__flync_model is not None
         self.__flync_workspace.load_model(flync_model=self.__flync_model, file_path=target_dir)
+        _use_eventgroup_name_references(target_dir)
 
 
 def parse_arguments() -> argparse.Namespace:
