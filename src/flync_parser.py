@@ -358,30 +358,16 @@ class FlyncParser:
     ) -> BaseMultiplexPDU:
         """Reconstruct a BaseMultiplexPDU from a FLYNC MultiplexedPDU.
 
-        Segment layout and sub-PDU name mapping are read from the PDU's description field,
-        which holds a JSON string inside the FLYNC YAML (written by configuration_to_flync.py).
-        Sub-PDU objects are built from the mux group signals (absolute → relative positions).
-        Segment endianness is encoded there as "true"/"false" strings.
+        Segment positions are taken from the PDU instances of the mux groups and the static
+        group, segment lengths from the referenced PDUs. FLYNC has no segment byte order,
+        so segments default to low-high byte order.
         """
-        meta = {}
-        if flync_pdu.description:
-            try:
-                meta = json.loads(flync_pdu.description)
-            except (json.JSONDecodeError, ValueError) as e:
-                print(
-                    f"WARNING: Could not parse description JSON for multiplex PDU "
-                    f"{flync_pdu.name!r}: {e}; segment geometry will be inferred from defaults"
-                )
+        std_by_name = std_flync_by_name or {}
 
-        mux_pdu_refs: dict[int, str] = {}
-        for k, v in meta.get("mux_pdu_refs", {}).items():
-            try:
-                mux_pdu_refs[int(k)] = v
-            except (TypeError, ValueError):
-                print(f"WARNING: Skipping non-numeric mux_pdu_refs key {k!r} in multiplex PDU {flync_pdu.name!r}")
-        seg_bit_pos = meta.get("seg_bit_pos")
-        seg_bit_len = meta.get("seg_bit_len")
-        seg_is_high_low = str(meta.get("seg_is_high_low", "false")).lower() == "true"
+        first_group = flync_pdu.mux_groups[0] if flync_pdu.mux_groups else None
+        first_sub_std = std_by_name.get(first_group.pdu.pdu_ref) if first_group is not None else None
+        seg_bit_pos = first_group.pdu.bit_position if first_group is not None else None
+        seg_bit_len = first_sub_std.length * 8 if first_sub_std is not None else None
 
         # Reconstruct the switch from the selector signal
         sel = flync_pdu.selector_signal
@@ -394,23 +380,22 @@ class FlyncParser:
             sel.signal.bit_length,
         )
 
-        # Infer segment position from metadata or fall back to selector end
+        # Without any position information, the segment follows the selector
         if seg_bit_pos is None:
             seg_bit_pos = (sel.bit_position or 0) + sel.signal.bit_length
         if seg_bit_len is None:
             seg_bit_len = flync_pdu.length * 8 - seg_bit_pos
-        seg_pos = conf_factory.create_multiplex_segment_position(seg_bit_pos, seg_is_high_low, seg_bit_len)
+        seg_pos = conf_factory.create_multiplex_segment_position(seg_bit_pos, False, seg_bit_len)
 
-        # Build sub-PDUs from mux group signals (absolute → sub-PDU-relative positions).
-        # Sub-PDUs are now standalone StandardPDUs in the channel, referenced by name
-        # (PDUInstance.pdu_ref) instead of being inlined in the mux group.
+        # Build sub-PDUs from the standalone StandardPDUs referenced by the mux groups
+        # (PDUInstance.pdu_ref); signal positions are relative to the sub-PDU.
         pdu_instances: dict[int, BasePDU] = {}
         if seg_bit_len <= 0:
             raise ValueError(f"Invalid multiplex segment bit length {seg_bit_len} in PDU {flync_pdu.name!r}")
         for group in flync_pdu.mux_groups:
             switch_code = group.selector_value
-            sub_std = (std_flync_by_name or {}).get(group.pdu.pdu_ref)
-            sub_pdu_name = (sub_std.name if sub_std is not None else None) or mux_pdu_refs.get(switch_code) or f"{flync_pdu.name}_mux{switch_code}"
+            sub_std = std_by_name.get(group.pdu.pdu_ref)
+            sub_pdu_name = (sub_std.name if sub_std is not None else None) or f"{flync_pdu.name}_mux{switch_code}"
             sub_byte_len = max(1, seg_bit_len // 8)
             sig_insts: dict[str, BaseSignalInstance] = {}
             for si in (sub_std.signals if sub_std is not None else []):
@@ -444,14 +429,13 @@ class FlyncParser:
         static_base_pdu: BasePDU | None = None
         static_segs: list[BaseMultiplexPDUSegmentPosition] = []
         if flync_pdu.static_group is not None:
-            static_group_refs = [g.pdu_ref for g in flync_pdu.static_group if g.pdu_ref]
-            static_std = (std_flync_by_name or {}).get(static_group_refs[0]) if static_group_refs else None
+            static_group = [g for g in flync_pdu.static_group if g.pdu_ref]
+            static_std = std_by_name.get(static_group[0].pdu_ref) if static_group else None
             static_sig_insts: dict[str, BaseSignalInstance] = {}
             static_pdu_name = (static_std.name if static_std is not None else None) or f"{flync_pdu.name}_static"
-            static_byte_len = max(1, meta.get("static_seg_bit_len", (static_std.length if static_std is not None else flync_pdu.length) * 8) // 8)
-            static_seg_bit_pos = meta.get("static_seg_bit_pos", 0)
-            static_seg_bit_len = meta.get("static_seg_bit_len", (static_std.length if static_std is not None else flync_pdu.length) * 8)
-            static_seg_is_high_low = str(meta.get("static_seg_is_high_low", "false")).lower() == "true"
+            static_seg_bit_pos = (static_group[0].bit_position if static_group else None) or 0
+            static_seg_bit_len = (static_std.length if static_std is not None else flync_pdu.length) * 8
+            static_byte_len = max(1, static_seg_bit_len // 8)
             for si in (static_std.signals if static_std is not None else []):
                 sig = si.signal
                 basetype = self._SIGNAL_DATA_TYPE_TO_FIBEX.get(sig.data_type, "A_UINT8")
@@ -470,7 +454,7 @@ class FlyncParser:
                 self._map_pdu_usage(static_std if static_std is not None else flync_pdu),
                 cast(dict[int, BaseSignalInstance], static_sig_insts),
             )
-            static_seg = conf_factory.create_multiplex_segment_position(static_seg_bit_pos, static_seg_is_high_low, static_seg_bit_len)
+            static_seg = conf_factory.create_multiplex_segment_position(static_seg_bit_pos, False, static_seg_bit_len)
             static_segs = [static_seg]
 
         static_seg_pdu_combinations = [(static_segs, static_base_pdu)] if static_base_pdu is not None else []
