@@ -35,7 +35,7 @@ jobs:
       - name: Run isort
         run: |
           mkdir format-reports
-          isort --check --diff --color --profile black --line-length 149 *.py > format-reports/isort-report.diff
+          isort --check --diff --color --profile black --line-length 149 src/ > format-reports/isort-report.diff
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v7
@@ -56,8 +56,8 @@ jobs:
 
       - name: Run flake8
         run: |
-          flake8 *.py
-          flake8 *.py --format html --htmldir flake8-report
+          flake8 src/
+          flake8 src/ --format html --htmldir flake8-report
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v7
@@ -80,7 +80,7 @@ jobs:
 
       - name: Run pytest
         run: |
-          uv run pytest -n auto tests/ --cov=. --cov-report=html
+          uv run pytest -n auto tests/ --cov=src --cov-report=html
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v7

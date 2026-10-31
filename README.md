@@ -19,7 +19,7 @@ Dependencies: `isodate`, `graphviz`, `macaddress`, `xlsxwriter`
 
 All tools share the same basic invocation pattern:
 
-    python3 <script>.py FIBEX <file-or-directory> [options]
+    python3 src/<script>.py FIBEX <file-or-directory> [options]
 
 You can pass either a single XML file or a directory containing multiple FIBEX files.
 
@@ -35,7 +35,7 @@ You can pass either a single XML file or a directory containing multiple FIBEX f
 
 ### Convert to text
 
-    python3 configuration_to_text.py FIBEX example-file.xml
+    python3 src/configuration_to_text.py FIBEX example-file.xml
 
 Output:
 
@@ -45,7 +45,7 @@ Output:
 
 ### Convert to Wireshark configs
 
-    python3 configuration_to_wireshark_config.py FIBEX example-file.xml
+    python3 src/configuration_to_wireshark_config.py FIBEX example-file.xml
 
 Output (three version-specific directories):
 
@@ -65,7 +65,7 @@ Each directory contains hosts, VLAN IDs, and SOME/IP service/method/event/eventg
 
 ### Convert to CSV reports
 
-    python3 configuration_to_reports.py FIBEX example-file.xml
+    python3 src/configuration_to_reports.py FIBEX example-file.xml
 
 Output:
 
@@ -85,7 +85,7 @@ Generates service instance matrices, statistics, and size reports.
 
 ### Convert to topology
 
-    python3 configuration_to_topology.py FIBEX example-file.xml
+    python3 src/configuration_to_topology.py FIBEX example-file.xml
 
 Output:
 
@@ -106,7 +106,7 @@ Generates topology tables (CSV and XLSX), endpoint lists, forwarding tables for 
 
 ### Convert to Peach fuzzing definitions
 
-    python3 configuration_to_peach.py FIBEX example-file.xml
+    python3 src/configuration_to_peach.py FIBEX example-file.xml
 
 Output:
 
@@ -118,7 +118,7 @@ Generates Peach framework XML files for SOME/IP fuzzing.
 
 ### Convert to FLYNC model
 
-    python3 configuration_to_flync.py FIBEX example-file.xml
+    python3 src/configuration_to_flync.py FIBEX example-file.xml
 
 Output:
 
@@ -154,17 +154,19 @@ Pre-generated outputs for `Ethernet_Topology_with_Switches.xml` are included in 
 
 | File | Description |
 |------|-------------|
-| `configuration_to_text.py` | Convert to human-readable text |
-| `configuration_to_wireshark_config.py` | Generate Wireshark dissector configs |
-| `configuration_to_reports.py` | Generate CSV/XLSX statistical reports |
-| `configuration_to_topology.py` | Generate network topology visualizations |
-| `configuration_to_peach.py` | Generate Peach fuzzing XML definitions |
-| `configuration_to_flync.py` | Convert to FLYNC model |
-| `fibex_parser.py` | FIBEX 4 XML parser |
-| `flync_parser.py` | FLYNC model parser |
-| `configuration_base_classes.py` | Shared data model and base classes |
-| `parser_dispatcher.py` | Routes input files to the appropriate parser |
-| `abstract_parser.py` | Abstract base class for XML parsing |
+| `src/configuration_to_text.py` | Convert to human-readable text |
+| `src/configuration_to_wireshark_config.py` | Generate Wireshark dissector configs |
+| `src/configuration_to_reports.py` | Generate CSV/XLSX statistical reports |
+| `src/configuration_to_topology.py` | Generate network topology visualizations |
+| `src/configuration_to_peach.py` | Generate Peach fuzzing XML definitions |
+| `src/configuration_to_flync.py` | Convert to FLYNC model |
+| `src/fibex_parser.py` | FIBEX 4 XML parser |
+| `src/flync_parser.py` | FLYNC model parser |
+| `src/configuration_base_classes.py` | Shared data model and base classes |
+| `src/parser_dispatcher.py` | Routes input files to the appropriate parser |
+| `src/abstract_parser.py` | Abstract base class for XML parsing |
+| `plugins/` | Example FIBEX parser plugin |
+| `tools/` | Helper scripts (FIBEX schema validation, dependency update) |
 | `examples/` | Example FIBEX files with pre-generated outputs |
 | `tests/` | pytest test suite |
 

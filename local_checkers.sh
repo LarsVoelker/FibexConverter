@@ -2,7 +2,7 @@
 
 LINE_LENGTH=149
 
-params="*.py plugins/ tests/"
+params="src/ plugins/ tests/"
 
 if [ "$1" != "" ] ; then
 	params="$1"

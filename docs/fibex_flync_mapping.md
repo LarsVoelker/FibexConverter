@@ -3,8 +3,8 @@
 This document describes how automotive network configuration concepts map between FIBEX 4 (XML) and the FLYNC model. The FibexConverter project uses **configuration base classes** as an intermediate representation, so every mapping passes through them.
 
 ```
-FIBEX XML  ──(fibex_parser.py)──►  Base Classes  ──(configuration_to_flync.py)──►  FLYNC files
-FLYNC files  ──(flync_parser.py)──►  Base Classes  ──(configuration_to_*.py)──►  outputs
+FIBEX XML  ──(src/fibex_parser.py)──►  Base Classes  ──(src/configuration_to_flync.py)──►  FLYNC files
+FLYNC files  ──(src/flync_parser.py)──►  Base Classes  ──(src/configuration_to_*.py)──►  outputs
 ```
 
 ---
@@ -29,9 +29,9 @@ FLYNC files  ──(flync_parser.py)──►  Base Classes  ──(configuratio
 
 | Layer | FIBEX | Base Class | FLYNC |
 |---|---|---|---|
-| Parser | `fibex_parser.py` | — | `flync_parser.py` |
-| Writer | — | — | `configuration_to_flync.py` |
-| Model | XML elements (`fx:*`, `service:*`, `ethernet:*`) | `configuration_base_classes.py` | `external/FLYNC/src/flync/model/` |
+| Parser | `src/fibex_parser.py` | — | `src/flync_parser.py` |
+| Writer | — | — | `src/configuration_to_flync.py` |
+| Model | XML elements (`fx:*`, `service:*`, `ethernet:*`) | `src/configuration_base_classes.py` | `external/FLYNC/src/flync/model/` |
 | Workspace | Single `.xml` file or directory of `.xml` files | — | Directory of `.flync.yaml` files |
 
 ---

@@ -33,6 +33,7 @@ profile = "black"
 line_length = 149
 
 [tool.mypy]
+mypy_path = "src"
 python_version = "3.13"
 strict = true
 warn_unused_ignores = true
@@ -45,7 +46,8 @@ disallow_any_generics = true
 exclude = "(^|/)(\\.venv|venv_brew|venv_brew\\.disables)/"
 
 [tool.pytest]
-addopts = ["-n", "auto", "--cov=.", "--cov-report=html"]
+pythonpath = ["src"]
+addopts = ["-n", "auto", "--cov=src", "--cov-report=html"]
 testpaths = ["tests"]
 
 [dependency-groups]

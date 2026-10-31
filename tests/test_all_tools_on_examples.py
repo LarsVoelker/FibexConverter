@@ -48,7 +48,7 @@ def test_tool_exits_cleanly(tool: Any, example_file: Any) -> None:
         shutil.copy(example_file, tmp_file)
 
         result = subprocess.run(
-            [sys.executable, str(REPO_ROOT / tool), "FIBEX", str(tmp_file)],
+            [sys.executable, str(REPO_ROOT / "src" / tool), "FIBEX", str(tmp_file)],
             capture_output=True,
             text=True,
             cwd=str(REPO_ROOT),
