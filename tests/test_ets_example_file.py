@@ -91,10 +91,10 @@ class TestETSWiresharkService:
 
     def setup_method(self) -> None:
         self.factory, self.parser = _parse_wireshark()
-        self.service = self.factory.__services__["0101-01"]
+        self.service = self.factory._services["0101-01"]
 
     def test_service_registered(self) -> None:
-        assert "0101-01" in self.factory.__services__
+        assert "0101-01" in self.factory._services
 
     def test_service_id(self) -> None:
         assert self.service.serviceid() == 0x0101
@@ -173,7 +173,7 @@ class TestETSWiresharkService:
         assert self.service.eventgroups()[6].name() == "eg6_events_multicast"
 
     def test_provider_ecu_in_factory(self) -> None:
-        assert "ECU_ETS_PROVIDER" in self.factory.__ecus__
+        assert "ECU_ETS_PROVIDER" in self.factory._ecus
 
 
 # ---------------------------------------------------------------------------

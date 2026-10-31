@@ -80,7 +80,7 @@ def test_socket_pdu_roundtrip(tmp_path: Path) -> None:
     text_factory.parsing_done()
 
     socket_texts = []
-    for ecu in text_factory.__ecus__.values():
+    for ecu in text_factory._ecus.values():
         socket_texts.append(ecu.str(1, text_factory))
     combined = "\n".join(socket_texts)
 

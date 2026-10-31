@@ -9,17 +9,11 @@ maintainers = [
     { name = "Dr. Lars Völker", email = "lars.voelker@technica-engineering.de" },
 ]
 dependencies = [
-    "black>=26.10.1",
-    "isort",
-    "flake8",
     "colorama",
     "graphviz>=0.21",
     "isodate>=0.7.2",
     "lxml>=6.1.1",
     "macaddress>=2.0.2",
-    "pytest>=9.0.3",
-    "pytest-cov>=7.1.0",
-    "pytest-xdist>=3.8.0",
     "xlsxwriter>=3.2.9",
     "flync==0.15.1",
     "ruamel.yaml>=0.19.1",
@@ -52,6 +46,12 @@ testpaths = ["tests"]
 
 [dependency-groups]
 dev = [
+    "black>=26.10.1",
+    "flake8",
+    "isort",
     "lxml-stubs>=0.5.1",
     "mypy>=2.3.1",
+    "pytest>=9.0.3",
+    "pytest-cov>=7.1.0",
+    "pytest-xdist>=3.8.0",
 ]

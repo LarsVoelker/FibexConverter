@@ -23,6 +23,13 @@ source .venv/bin/activate
 pytest -v tests/test_fibex_schema_validation.py
 ```
 
+## Type Checking
+mypy runs in strict mode (configured in `pyproject.toml`, also run in CI):
+```bash
+source .venv/bin/activate
+mypy src tests plugins tools
+```
+
 ## Notes
 - Run the tools from the repo root, e.g. `python3 src/configuration_to_text.py FIBEX <file>`
 - The project uses Python 3.13 (venv_brew)
