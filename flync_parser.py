@@ -73,7 +73,7 @@ class FlyncParser:
     def __init__(self) -> None:
         # Populated by _parse_channels; declared here so _parse_ecus can rely on it
         # without a hasattr/getattr dance.
-        self._ft_by_can_id: dict[tuple[str, int], BaseFrameTriggering] = {}
+        self._ft_by_can_id: dict[tuple[str, int, str], BaseFrameTriggering] = {}
         self._can_frame_triggerings_by_ecu: dict[str, list[BaseFrameTriggering]] = {}
         self._services_by_id: dict[tuple[int, int], SOMEIPBaseService] = {}
         self._ecu_by_name: dict[str, BaseECU] = {}
@@ -94,7 +94,7 @@ class FlyncParser:
         # Reset per-parse state so the same parser instance can be reused.
         self._services_by_id = {}  # (service_id, major_version) -> SOMEIPBaseService
         self._ecu_by_name = {}  # ecu_name -> base_ecu
-        self._ft_by_can_id = {}  # (bus_name, can_id) → ft object (for CAN interface lookup)
+        self._ft_by_can_id = {}  # (bus_name, can_id, id_format) → ft object (for CAN interface lookup)
         self._can_frame_triggerings_by_ecu = {}
         self._base_pdu_by_name = {}  # pdu_name -> BasePDU (for socket PDU deployments)
         self._pdu_header_id_by_name = {}  # pdu_name -> header_id (for EthernetPDUInstance)
@@ -271,9 +271,9 @@ class FlyncParser:
                     is_extended_id=flync_frame.id_format == "extended_29bit",
                     is_can_fd=flync_frame.type == "can_fd",
                 )
-                # Index by (bus, CAN ID) so _parse_ecus can look up FTs from
-                # can_interfaces (CANFrameRef references frames by CAN ID).
-                self._ft_by_can_id[(bus.name, flync_frame.can_id)] = ft
+                # Index by (bus, CAN ID, id format) so _parse_ecus can look up FTs from
+                # can_interfaces (CANFrameRef references frames by CAN ID and id format).
+                self._ft_by_can_id[(bus.name, flync_frame.can_id, flync_frame.id_format)] = ft
             # The channel entry in TextFactory is populated via create_interface calls
             # in _parse_ecus — no separate create_channel call needed.
 
@@ -789,16 +789,16 @@ class FlyncParser:
                         )
                         interfaces.append(iface)
                 # Reconstruct CAN frame triggerings from can_interfaces.
-                # CANFrameRef references frames by (bus_ref, CAN ID).
+                # CANFrameRef references frames by (CAN ID, id format) on the interface's bus_ref.
                 for can_iface in controller.can_interfaces or []:
                     out_fts: dict[str, BaseFrameTriggering] = {}
                     in_fts: dict[str, BaseFrameTriggering] = {}
                     for fr in can_iface.sender_frames or []:
-                        ft = self._ft_by_can_id.get((fr.bus_ref, fr.frame_ref))
+                        ft = self._ft_by_can_id.get((can_iface.bus_ref, fr.frame_ref, fr.id_format))
                         if ft:
                             out_fts[ft.calc_key()] = ft
                     for fr in can_iface.receiver_frames or []:
-                        ft = self._ft_by_can_id.get((fr.bus_ref, fr.frame_ref))
+                        ft = self._ft_by_can_id.get((can_iface.bus_ref, fr.frame_ref, fr.id_format))
                         if ft:
                             in_fts[ft.calc_key()] = ft
                     iface = conf_factory.create_interface(

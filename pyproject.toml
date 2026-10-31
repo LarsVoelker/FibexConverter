@@ -21,7 +21,8 @@ dependencies = [
     "pytest-cov>=7.1.0",
     "pytest-xdist>=3.8.0",
     "xlsxwriter>=3.2.9",
-    "flync==0.14.0",
+    "flync==0.15.1",
+    "ruamel.yaml>=0.19.1",
 ]
 
 [tool.black]
