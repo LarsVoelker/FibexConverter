@@ -1544,10 +1544,10 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
     ) -> tuple[MultiplexedPDU, list[StandardPDU]] | None:
         """Convert a BaseMultiplexPDU into a FLYNC MultiplexedPDU.
 
-        Sub-PDU signal positions in mux groups are stored as absolute bit offsets
-        within the overall PDU.  Metadata needed for round-trip (segment layout and
-        sub-PDU names per switch code) is stored as a JSON string in the PDU's description
-        field, since the FLYNC YAML model has no dedicated fields for it.
+        Each mux group and the static group reference a standalone StandardPDU, placed at the
+        segment offset via PDUInstance.bit_position; signal positions are relative to that PDU.
+        The segment length is given by the referenced PDU's length. FLYNC has no segment byte
+        order, so it is not exported.
         """
         switch = base_pdu.switch()
         seg_positions = base_pdu.segment_positions()
@@ -1560,7 +1560,6 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         seg = seg_positions[0]
         seg_offset = int(seg.bit_position())
         seg_bit_len = int(seg.bit_length())
-        seg_is_high_low = seg.is_high_low_byte_order()
 
         # Selector signal (synthetic — not a regular FIBEX signal)
         _sel_dt = {8: SignalDataType.UINT8, 16: SignalDataType.UINT16, 32: SignalDataType.UINT32}
@@ -1669,28 +1668,12 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             except Exception as e:
                 print(f"WARNING: Could not create static group PDU for {base_pdu.name()}: {type(e).__name__}: {e}")
 
-        # Encode round-trip metadata as a JSON string in the PDU's description field (FLYNC has
-        # no native field for it): segment layout and static segment info when present.
-        # Endianness is stored as "true"/"false" strings (as in FIBEX XML).
-        meta = {
-            "seg_bit_pos": seg_offset,
-            "seg_bit_len": seg_bit_len,
-            "seg_is_high_low": "true" if seg_is_high_low else "false",
-        }
-        if static_base_pdu is not None and static_seg is not None:
-            static_seg_is_high_low = static_seg.is_high_low_byte_order()
-            meta["static_seg_bit_pos"] = static_seg_offset
-            meta["static_seg_bit_len"] = int(static_seg.bit_length())
-            meta["static_seg_is_high_low"] = "true" if static_seg_is_high_low else "false"
-        description = json.dumps(meta)
-
         try:
             flync_pdu = MultiplexedPDU(
                 type="multiplexed",
                 name=base_pdu.name(),
                 length=pdu_byte_len,
                 pdu_usage=self._flync_pdu_type(base_pdu),
-                description=description,
                 selector_signal=selector_si,
                 static_group=(
                     [PDUInstance(pdu_ref=static_flync_pdu.name, bit_position=static_seg_offset)] if static_flync_pdu is not None else None
