@@ -122,6 +122,7 @@ from configuration_base_classes import (
     BaseSocket,
     BaseSwitchPort,
     BaseVLAN,
+    CompuConst,
     SOMEIPBaseDatatype,
     SOMEIPBaseParameter,
     SOMEIPBaseParameterArray,
@@ -165,9 +166,9 @@ FLYNCUsage = Literal[
 g_gen_portid = False
 
 
-def _fibex_endianness_to_flync(value: object) -> Literal["BE", "LE"]:
-    """Map a FIBEX is-high-low-byte-order value (bool or truthy string) to FLYNC 'BE'/'LE'."""
-    return "BE" if str(value).lower() == "true" else "LE"
+def _fibex_endianness_to_flync(is_high_low_byte_order: bool) -> Literal["BE", "LE"]:
+    """Map a FIBEX is-high-low-byte-order flag to FLYNC 'BE'/'LE'."""
+    return "BE" if is_high_low_byte_order else "LE"
 
 
 def _use_eventgroup_name_references(target_dir: str) -> None:
@@ -236,10 +237,10 @@ def _use_eventgroup_name_references(target_dir: str) -> None:
 class SOMEIPParameterTypedef(SOMEIPBaseParameterTypedef):
     def __init__(self, globalid: int | str, name: str, name2: str, child: SOMEIPBaseDatatype) -> None:
         super(SOMEIPParameterTypedef, self).__init__(name, name2, child)
-        self.__globalid__ = int(globalid)
+        self._globalid = int(globalid)
 
     def globalid(self) -> int:
-        return self.__globalid__
+        return self._globalid
 
 
 class SimpleConfigurationFactory(BaseConfigurationFactory):
@@ -330,7 +331,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         id: str,
         name: str,
         compu_scale: tuple[float, float, float] | None,
-        compu_consts: list[object] | None,
+        compu_consts: list[CompuConst] | None,
         bit_len: int,
         min_len: int,
         max_len: int,
@@ -1545,7 +1546,8 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
 
         Sub-PDU signal positions in mux groups are stored as absolute bit offsets
         within the overall PDU.  Metadata needed for round-trip (segment layout and
-        sub-PDU names per switch code) is JSON-encoded in the description field.
+        sub-PDU names per switch code) is stored as a JSON string in the PDU's description
+        field, since the FLYNC YAML model has no dedicated fields for it.
         """
         switch = base_pdu.switch()
         seg_positions = base_pdu.segment_positions()
@@ -1558,7 +1560,7 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
         seg = seg_positions[0]
         seg_offset = int(seg.bit_position())
         seg_bit_len = int(seg.bit_length())
-        seg_is_high_low = seg.is_high_low_byte_order() in (True, "true", "TRUE")
+        seg_is_high_low = seg.is_high_low_byte_order()
 
         # Selector signal (synthetic — not a regular FIBEX signal)
         _sel_dt = {8: SignalDataType.UINT8, 16: SignalDataType.UINT16, 32: SignalDataType.UINT32}
@@ -1667,17 +1669,16 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             except Exception as e:
                 print(f"WARNING: Could not create static group PDU for {base_pdu.name()}: {type(e).__name__}: {e}")
 
-        # Encode round-trip metadata: segment layout and static segment info when present.
-        # Endianness is stored as "true"/"false" strings so that the read-back value is a
-        # non-empty string (truthy), matching the FIBEX parser's convention of storing the
-        # raw XML text "false"/"true" in is_high_low_byte_order fields.
+        # Encode round-trip metadata as a JSON string in the PDU's description field (FLYNC has
+        # no native field for it): segment layout and static segment info when present.
+        # Endianness is stored as "true"/"false" strings (as in FIBEX XML).
         meta = {
             "seg_bit_pos": seg_offset,
             "seg_bit_len": seg_bit_len,
             "seg_is_high_low": "true" if seg_is_high_low else "false",
         }
         if static_base_pdu is not None and static_seg is not None:
-            static_seg_is_high_low = static_seg.is_high_low_byte_order() in (True, "true", "TRUE")
+            static_seg_is_high_low = static_seg.is_high_low_byte_order()
             meta["static_seg_bit_pos"] = static_seg_offset
             meta["static_seg_bit_len"] = int(static_seg.bit_length())
             meta["static_seg_is_high_low"] = "true" if static_seg_is_high_low else "false"
@@ -1732,10 +1733,13 @@ class SimpleConfigurationFactory(BaseConfigurationFactory):
             try:
                 single_entries: dict[int, str] = {}
                 range_entries: list[tuple[int, int, str]] = []
-                for name, start, end in cast(list[tuple[str, Any, Any]], base_sig.compu_consts() or []):
+                for text, start, end in base_sig.compu_consts() or []:
+                    name = text or ""
                     try:
+                        if start is None or end is None:
+                            raise ValueError("missing limit")
                         lo, hi = int(start), int(end)
-                    except (TypeError, ValueError):
+                    except ValueError:
                         print(f"WARNING: Signal {base_sig.name()} has invalid range: {start=} {end=}")
                         continue
                     if lo == hi:

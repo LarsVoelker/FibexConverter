@@ -79,7 +79,7 @@ def _service_summary(factory: TextFactory) -> dict[str, Any]:
     IDs because the field key choice may differ between FIBEX and FLYNC parsers.
     """
     result: dict[str, Any] = {}
-    for sid, svc in factory.__services__.items():
+    for sid, svc in factory._services.items():
         result[sid] = {
             "name": svc.name(),
             "major": svc.majorversion(),
@@ -116,4 +116,4 @@ def test_round_trip_ecus(fibex_file: Path, tmp_path: Path) -> None:
     ws_dir = _fibex_to_flync_workspace(fibex_file, tmp_path)
     flync_factory = _parse_flync_with_text_factory(ws_dir)
 
-    assert set(fibex_factory.__ecus__.keys()) == set(flync_factory.__ecus__.keys())
+    assert set(fibex_factory._ecus.keys()) == set(flync_factory._ecus.keys())
