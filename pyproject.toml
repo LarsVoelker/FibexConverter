@@ -9,7 +9,7 @@ maintainers = [
     { name = "Dr. Lars Völker", email = "lars.voelker@technica-engineering.de" },
 ]
 dependencies = [
-    "black",
+    "black>=26.10.1",
     "isort",
     "flake8",
     "colorama",
