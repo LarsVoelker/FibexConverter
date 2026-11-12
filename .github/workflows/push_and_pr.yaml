@@ -35,7 +35,7 @@ jobs:
       - name: Run isort
         run: |
           mkdir format-reports
-          isort --check --diff --color --profile black --line-length 149 src/ > format-reports/isort-report.diff
+          isort --check --diff --profile black --line-length 149 src/ > format-reports/isort-report.diff
 
       - name: Archive artifacts
         uses: actions/upload-artifact@v7
