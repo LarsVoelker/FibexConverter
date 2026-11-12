@@ -1001,22 +1001,18 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
         if cc is None:
             return
 
+        valid: list[tuple[str | None, int, int]] = []
         for value, start, end in cc:
             if start is None or end is None:
                 print(f"WARNING: CompuConst without limits not supported! {pdu_id:08x}:{position} {value}")
                 continue
             if 0 <= int(start) <= pow(2, 64) and 0 <= int(end) <= pow(2, 64):
-                f_enum.write(
-                    f'"{pdu_id:08x}",'
-                    f'"{position}",'
-                    f'"{len(cc)}",'
-                    f'"{int(start):x}",'
-                    f'"{int(end):x}",'
-                    f'"{cleanup_string(value or "")}"'
-                    "\n"
-                )
+                valid.append((value, int(start), int(end)))
             else:
                 print(f"WARNING: CompuConst<0 or >2^64 not supported! " f"{pdu_id:08x}:{position} {start}-{end} {value}")
+
+        for value, lo, hi in valid:
+            f_enum.write(f'"{pdu_id:08x}",' f'"{position}",' f'"{len(valid)}",' f'"{lo:x}",' f'"{hi:x}",' f'"{cleanup_string(value or "")}"' "\n")
 
     def write_someip_signal_configlines(
         self, f: TextIO, f_enum: TextIO, pdu_id: int, pdu_name: str, params: list[SOMEIPBaseParameter] | None
@@ -1178,6 +1174,7 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                 tmp_pdu_instances[pdu_start_pos] = pdu_inst
 
         tmp: list[tuple[str, str]] = []
+        tmp_values: list[tuple[int, BaseSignal]] = []
         pos = 0
         dummy_number = 0
         current_bit_pos = 0
@@ -1263,12 +1260,16 @@ class WiresharkConfigurationFactory(BaseConfigurationFactory):
                         "FALSE",
                     )
                     tmp.append((tmp1, tmp2))
+                    tmp_values.append((pos, signal))
 
                     pos += 1
                     current_bit_pos = start_pos + signal_length
 
         for left_part, right_part in tmp:
             f_sig.write(left_part + f"{len(tmp)}" + right_part)
+
+        for value_pos, value_signal in tmp_values:
+            self.write_signal_value_configlines(f_sigv, pdu_id, value_pos, value_signal)
 
     def has_channel_more_than_one_type(self, key: str) -> bool:
         channel = self._channels[key]
